@@ -151,6 +151,7 @@ export interface Sale {
   paymentStatus: 'unpaid' | 'partially_paid' | 'paid';
   paymentMethod: 'cash' | 'card' | 'mobile_money' | 'bank_transfer' | 'check';
   paidAmount: number;
+  dueDate?: string | null; // échéance de la créance (calendrier)
   loyaltyPointsEarned: number;
   notes?: string;
   cashierId: string;

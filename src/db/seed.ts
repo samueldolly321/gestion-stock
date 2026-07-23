@@ -202,6 +202,14 @@ async function main() {
     // > 90 jours (doit être EXCLU des classements)
     mkSale('SALE-D09', 'FAC-000001', daysAgo(120), 'CLI-2', 'Hôtel Colbert', [li('PRD-2', 2)]),
   ];
+  // Échéances de paiement sur les ventes à crédit (reste dû) → apparaissent au calendrier.
+  datedSales.forEach((s: any) => {
+    const reste = s.totalAmount - s.paidAmount;
+    if (reste <= 0.5) return;
+    if (s.id === 'SALE-D01') s.dueDate = daysAgo(-5); // échéance proche (ce mois)
+    else if (s.id === 'SALE-D04') s.dueDate = daysAgo(-20); // échéance plus lointaine
+    else s.dueDate = daysAgo(-15);
+  });
   await db.insert(schema.sales).values(datedSales);
   // Compteur de facturation aligné sur le dernier numéro utilisé (FAC-000010/11 = ventes du jour ; prochaine = FAC-000012).
   await db.insert(schema.documentCounters).values({ key: 'invoice', value: 11 });

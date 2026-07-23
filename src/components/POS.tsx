@@ -54,6 +54,12 @@ export default function POS({
   const [deliveryFee, setDeliveryFee] = useState<number>(defaultFeeFor('moto'));
   const [advanceMode, setAdvanceMode] = useState(false); // vente partielle / à crédit
   const [amountReceived, setAmountReceived] = useState<number>(0);
+  // Échéance de la créance (par défaut : dans 30 jours) — placée sur le calendrier.
+  const [dueDate, setDueDate] = useState<string>(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 30);
+    return d.toISOString().slice(0, 10);
+  });
 
   // Checkout Receipt state
   const [showReceipt, setShowReceipt] = useState<Sale | null>(null);
@@ -211,6 +217,7 @@ export default function POS({
         loyaltyPointsEarned: totals.loyaltyPointsEarned,
         // Montant encaissé (le reste devient une créance client).
         paidAmount: advanceMode ? Math.max(0, Math.min(amountReceived, totals.totalAmount)) : totals.totalAmount,
+        dueDate: advanceMode ? dueDate : undefined, // échéance si vente à crédit
         notes: notesFinal,
         warehouseId: products[0]?.locationId || '',
       });
@@ -599,6 +606,16 @@ export default function POS({
                 <div className="flex justify-between mt-1 text-[11px] font-mono">
                   <span className="text-slate-400">Reste dû (créance)</span>
                   <span className="text-red-500 font-bold">{format(Math.max(0, totals.totalAmount - amountReceived))}</span>
+                </div>
+                <div className="mt-2">
+                  <label className="text-slate-400 block mb-1">Échéance de paiement</label>
+                  <input
+                    type="date"
+                    value={dueDate}
+                    onChange={(e) => setDueDate(e.target.value)}
+                    title="Date à laquelle le client doit régler le reste — apparaîtra sur le calendrier"
+                    className="w-full bg-white dark:bg-slate-950/20 p-2 text-xs rounded-lg border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500"
+                  />
                 </div>
               </div>
             )}

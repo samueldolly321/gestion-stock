@@ -65,6 +65,7 @@ salesRouter.post('/', requireAuth, requireRole(...CASHIER_ROLES), async (req: Au
           paymentStatus,
           paymentMethod: b.paymentMethod ?? null,
           paidAmount,
+          dueDate: remaining > 0 ? (b.dueDate || null) : null, // échéance seulement s'il reste dû
           loyaltyPointsEarned: loyaltyEarned,
           notes: b.notes ?? null,
           cashierId: req.user!.sub,

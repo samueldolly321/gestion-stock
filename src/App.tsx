@@ -687,6 +687,7 @@ export default function App() {
             <Calendar
               deliveries={deliveries}
               purchases={purchases}
+              sales={sales}
               onNavigate={(tab) => setActiveTab(tab)}
             />
           )}

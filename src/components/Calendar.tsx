@@ -1,19 +1,22 @@
 import React, { useMemo, useState } from 'react';
-import { CalendarDays, ChevronLeft, ChevronRight, Truck, ShoppingBag } from 'lucide-react';
-import { Delivery, Purchase } from '../types';
+import { CalendarDays, ChevronLeft, ChevronRight, Truck, ShoppingBag, HandCoins } from 'lucide-react';
+import { Delivery, Purchase, Sale } from '../types';
 import { deliveryTypeLabel } from '../services/deliveriesService';
+import { useMoney } from '../services/CurrencyContext';
 
 interface CalendarProps {
   deliveries: Delivery[];
   purchases: Purchase[];
+  sales: Sale[];
   onNavigate: (tab: string) => void;
 }
 
-type Ev = { kind: 'delivery' | 'purchase'; label: string; sub: string };
+type Ev = { kind: 'delivery' | 'purchase' | 'receivable'; label: string; sub: string };
 
 const WEEKDAYS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
 
-export default function Calendar({ deliveries, purchases, onNavigate }: CalendarProps) {
+export default function Calendar({ deliveries, purchases, sales, onNavigate }: CalendarProps) {
+  const { format } = useMoney();
   const [anchor, setAnchor] = useState<Date>(() => new Date());
   const today = new Date();
   const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
@@ -33,8 +36,15 @@ export default function Calendar({ deliveries, purchases, onNavigate }: Calendar
     purchases.forEach((p) => {
       if (p.status === 'ordered') add(p.expectedDate, { kind: 'purchase', label: p.supplierName || 'Commande', sub: 'Réception prévue' });
     });
+    sales.forEach((s) => {
+      if (s.type === 'return') return; // pas les avoirs
+      const reste = (Number(s.totalAmount) || 0) - (Number(s.paidAmount) || 0);
+      if (reste > 0.5 && s.dueDate) {
+        add(s.dueDate, { kind: 'receivable', label: s.clientName || 'Créance', sub: `Échéance ${format(reste)}` });
+      }
+    });
     return m;
-  }, [deliveries, purchases]);
+  }, [deliveries, purchases, sales, format]);
 
   const year = anchor.getFullYear();
   const month = anchor.getMonth();
@@ -54,6 +64,7 @@ export default function Calendar({ deliveries, purchases, onNavigate }: Calendar
   const monthKeys = Object.keys(events).filter((k) => k.startsWith(`${year}-${String(month + 1).padStart(2, '0')}`));
   const nbDeliv = monthKeys.reduce((a, k) => a + events[k].filter((e) => e.kind === 'delivery').length, 0);
   const nbPurch = monthKeys.reduce((a, k) => a + events[k].filter((e) => e.kind === 'purchase').length, 0);
+  const nbCrea = monthKeys.reduce((a, k) => a + events[k].filter((e) => e.kind === 'receivable').length, 0);
 
   return (
     <div className="space-y-6">
@@ -70,6 +81,7 @@ export default function Calendar({ deliveries, purchases, onNavigate }: Calendar
           <div className="flex gap-3 text-[10px] font-mono mr-1">
             <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-cyan-500 inline-block"></span> Livraisons</span>
             <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-500 inline-block"></span> Commandes</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500 inline-block"></span> Créances</span>
           </div>
           <button onClick={() => setAnchor(new Date())} className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer">Aujourd'hui</button>
           <div className="flex items-center gap-1 bg-white dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 rounded-lg px-1">
@@ -80,7 +92,7 @@ export default function Calendar({ deliveries, purchases, onNavigate }: Calendar
         </div>
       </div>
 
-      <p className="text-[11px] text-slate-400 font-mono">{nbDeliv} livraison(s) · {nbPurch} commande(s) ce mois-ci</p>
+      <p className="text-[11px] text-slate-400 font-mono">{nbDeliv} livraison(s) · {nbPurch} commande(s) · {nbCrea} échéance(s) de créance ce mois-ci</p>
 
       {/* Grille */}
       <div className="bg-white dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800/80 rounded-2xl overflow-hidden shadow-sm">
@@ -98,21 +110,25 @@ export default function Calendar({ deliveries, purchases, onNavigate }: Calendar
             return (
               <div key={i} className="min-h-[92px] border-b border-r border-slate-100 dark:border-slate-800/40 p-1.5 space-y-1 align-top">
                 <div className={`text-[11px] font-mono ${isToday ? 'inline-flex items-center justify-center w-5 h-5 rounded-full bg-cyan-500 text-white font-bold' : 'text-slate-400'}`}>{day}</div>
-                {evs.slice(0, 3).map((e, j) => (
-                  <button
-                    key={j}
-                    onClick={() => onNavigate(e.kind === 'delivery' ? 'deliveries' : 'purchases')}
-                    title={`${e.label} — ${e.sub}`}
-                    className={`w-full text-left px-1.5 py-0.5 rounded text-[9px] truncate flex items-center gap-1 cursor-pointer transition ${
-                      e.kind === 'delivery'
-                        ? 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-300 hover:bg-cyan-500/20'
-                        : 'bg-amber-500/10 text-amber-600 dark:text-amber-300 hover:bg-amber-500/20'
-                    }`}
-                  >
-                    {e.kind === 'delivery' ? <Truck className="w-2.5 h-2.5 shrink-0" /> : <ShoppingBag className="w-2.5 h-2.5 shrink-0" />}
-                    <span className="truncate">{e.label}</span>
-                  </button>
-                ))}
+                {evs.slice(0, 3).map((e, j) => {
+                  const tab = e.kind === 'delivery' ? 'deliveries' : e.kind === 'purchase' ? 'purchases' : 'receivables';
+                  const cls = e.kind === 'delivery'
+                    ? 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-300 hover:bg-cyan-500/20'
+                    : e.kind === 'purchase'
+                    ? 'bg-amber-500/10 text-amber-600 dark:text-amber-300 hover:bg-amber-500/20'
+                    : 'bg-red-500/10 text-red-600 dark:text-red-300 hover:bg-red-500/20';
+                  return (
+                    <button
+                      key={j}
+                      onClick={() => onNavigate(tab)}
+                      title={`${e.label} — ${e.sub}`}
+                      className={`w-full text-left px-1.5 py-0.5 rounded text-[9px] truncate flex items-center gap-1 cursor-pointer transition ${cls}`}
+                    >
+                      {e.kind === 'delivery' ? <Truck className="w-2.5 h-2.5 shrink-0" /> : e.kind === 'purchase' ? <ShoppingBag className="w-2.5 h-2.5 shrink-0" /> : <HandCoins className="w-2.5 h-2.5 shrink-0" />}
+                      <span className="truncate">{e.label}</span>
+                    </button>
+                  );
+                })}
                 {evs.length > 3 && <div className="text-[9px] text-slate-400 pl-1">+{evs.length - 3} autre(s)</div>}
               </div>
             );

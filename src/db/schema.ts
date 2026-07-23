@@ -188,6 +188,7 @@ export const sales = pgTable('sales', {
   paymentStatus: text('payment_status').notNull(),
   paymentMethod: text('payment_method'), // cash | card | mobile_money | bank_transfer | check
   paidAmount: doublePrecision('paid_amount').default(0).notNull(), // encaissé (le reste = créance client)
+  dueDate: text('due_date'), // date d'échéance de la créance (pour le calendrier)
   loyaltyPointsEarned: integer('loyalty_points_earned').default(0).notNull(),
   notes: text('notes'),
   cashierId: text('cashier_id').notNull(),
