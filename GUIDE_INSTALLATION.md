@@ -165,20 +165,26 @@ Puis ouvre ton navigateur sur **http://localhost:3000**.
 > Le `.gitignore` exclut déjà `node_modules/`, `dist/` et **`.env`** (tes secrets ne partent pas sur Git — c'est voulu).
 > Chez toi (ou sur un autre PC), après un `git clone`, il faudra donc **refaire `.env` (étape 4a)** et **`npm install`**.
 
-Depuis le dossier du projet, la **première fois** :
+> ℹ️ Le dépôt local est **déjà initialisé** (branche `main`, 1er commit fait, remote `origin`
+> pointant sur `https://github.com/samueldolly321/gestion-stock.git`). Il ne reste qu'à **publier** :
 
+```powershell
+git push -u origin main
+```
+
+> Si Git demande une authentification, utilise ton identifiant GitHub et, comme **mot de passe**,
+> un **jeton d'accès personnel** (GitHub → Settings → Developer settings → Personal access tokens →
+> « Generate new token », coche la case `repo`). Colle ce jeton quand le mot de passe est demandé.
+
+**Repartir de zéro sur un autre PC** (si tu n'as pas copié le dossier `.git`) :
 ```powershell
 git init
 git branch -M main
 git add .
 git commit -m "Import initial du projet Vokatra-ko"
-git remote add origin https://github.com/TON-COMPTE/gestion-stock.git
+git remote add origin https://github.com/samueldolly321/gestion-stock.git
 git push -u origin main
 ```
-
-> Remplace `TON-COMPTE` par ton identifiant GitHub. Si Git demande une authentification,
-> utilise un **jeton d'accès personnel** (GitHub → Settings → Developer settings →
-> Personal access tokens) comme mot de passe.
 
 Les fois **suivantes** (après des modifications) :
 
