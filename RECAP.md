@@ -16,6 +16,8 @@
 | **Auth** | Maison — JWT + mots de passe hachés bcrypt, RBAC par rôle |
 | **Devise** | Base **Ariary (MGA)**, affichage Ar ou € converti (taux configurable) |
 | **Temps réel** | Server-Sent Events (SSE) — toasts + notifications navigateur |
+| **Dépôt** | GitHub `samueldolly321/gestion-stock` (branche `main`) |
+| **Déploiement** | ✅ **En ligne sur Render** (Blueprint `render.yaml` — 1 web service `vokatra-ko` qui sert API + front, + base PostgreSQL `vokatra-ko-db`) |
 
 > Historique : l'app tournait à l'origine sur **Firebase/Firestore** (générée par Google AI Studio), puis **migrée intégralement vers PostgreSQL** — Firebase a été entièrement retiré. Noms successifs : **StockFlow → Invenzo → Vokatra-ko** (nom actuel).
 
@@ -186,7 +188,7 @@ et côté client :
 - [ ] **RBAC sur les lectures** (les `GET` ne vérifient que l'authentification, pas le rôle)
 - [ ] Sécurité prod : `JWT_SECRET` fort, HTTPS, verrouillage anti-bruteforce, retrait du simulateur de rôle
 - [ ] Tests automatisés, sauvegardes, mode hors-ligne (PWA)
-- [x] **Versionnage git** (repo GitHub `samueldolly321/gestion-stock`) et **déploiement Render** — single web service : l'API Express sert aussi le front buildé (`dist/`) sur la même origine ; base via `DATABASE_URL`+SSL ; Blueprint `render.yaml` + guides `GUIDE_INSTALLATION.md` (local) & `GUIDE_RENDER.md` (cloud). Script prod `npm start` (`tsx src/server.ts`).
+- [x] **Versionnage git + déploiement Render — FAIT & EN LIGNE.** Repo GitHub `samueldolly321/gestion-stock` ; **déployé sur Render** via Blueprint `render.yaml` (auto-redeploy à chaque `git push` sur `main`). Single web service : l'API Express sert aussi le front buildé (`dist/`) sur la même origine ; base via `DATABASE_URL`+SSL. Script prod `npm start` (`tsx src/server.ts`). Guides `GUIDE_INSTALLATION.md` (local) & `GUIDE_RENDER.md` (cloud).
 
 ---
 
