@@ -9,17 +9,18 @@ const sqlDbName = process.env.SQL_DB_NAME || "stockflow_db";
 const user = process.env.SQL_ADMIN_USER || "postgres";
 const password = process.env.SQL_ADMIN_PASSWORD || "postgres";
 
+// En production (Render…), la base est fournie via DATABASE_URL avec SSL.
+const url = process.env.DATABASE_URL;
+const sep = url && url.includes("?") ? "&" : "?";
+const prodUrl = url && !url.includes("sslmode=") ? `${url}${sep}sslmode=no-verify` : url;
+
 export default defineConfig({
   schema: "./src/db/schema.ts",
   out: "./drizzle", // Output directory for migrations.
   dialect: "postgresql",
   schemaFilter: ["public"],
-  dbCredentials: {
-    host: sqlHost,
-    user: user,
-    password: password,
-    database: sqlDbName,
-    ssl: false,
-  },
+  dbCredentials: prodUrl
+    ? { url: prodUrl }
+    : { host: sqlHost, user, password, database: sqlDbName, ssl: false },
   verbose: true,
 });

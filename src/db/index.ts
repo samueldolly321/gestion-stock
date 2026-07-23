@@ -5,7 +5,15 @@ import * as schema from './schema.ts';
 const { Pool } = pg;
 
 // Function to create a new connection pool.
+// En production (Render, Railway…), la base est fournie via DATABASE_URL (avec SSL).
+// En local, on utilise les variables SQL_* du fichier .env.
 export const createPool = () => {
+  const url = process.env.DATABASE_URL;
+  if (url) {
+    const sep = url.includes('?') ? '&' : '?';
+    const connectionString = url.includes('sslmode=') ? url : `${url}${sep}sslmode=no-verify`;
+    return new Pool({ connectionString, connectionTimeoutMillis: 15000 });
+  }
   return new Pool({
     host: process.env.SQL_HOST || 'localhost',
     user: process.env.SQL_USER || 'postgres',

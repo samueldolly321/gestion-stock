@@ -186,7 +186,7 @@ et côté client :
 - [ ] **RBAC sur les lectures** (les `GET` ne vérifient que l'authentification, pas le rôle)
 - [ ] Sécurité prod : `JWT_SECRET` fort, HTTPS, verrouillage anti-bruteforce, retrait du simulateur de rôle
 - [ ] Tests automatisés, sauvegardes, mode hors-ligne (PWA)
-- [ ] **Versionnage git** (init repo, `.gitignore`) et **déploiement** (build front + servir l'API, variables d'env prod)
+- [x] **Versionnage git** (repo GitHub `samueldolly321/gestion-stock`) et **déploiement Render** — single web service : l'API Express sert aussi le front buildé (`dist/`) sur la même origine ; base via `DATABASE_URL`+SSL ; Blueprint `render.yaml` + guides `GUIDE_INSTALLATION.md` (local) & `GUIDE_RENDER.md` (cloud). Script prod `npm start` (`tsx src/server.ts`).
 
 ---
 

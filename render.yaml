@@ -1,0 +1,28 @@
+# Blueprint Render — déploie Vokatra-ko en 1 clic (base PostgreSQL + service web).
+# Sur Render : New → Blueprint → sélectionne le dépôt gestion-stock.
+# Doc du guide : voir GUIDE_RENDER.md
+databases:
+  - name: vokatra-ko-db
+    databaseName: stock
+    plan: free
+
+services:
+  - type: web
+    name: vokatra-ko
+    runtime: node
+    plan: free
+    # --include=dev : garde tsx + drizzle-kit dispo pour le build et les migrations.
+    buildCommand: npm install --include=dev && npm run build && npm run db:push
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: vokatra-ko-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true # secret fort généré automatiquement
+      # Renseigne APP_URL avec l'URL publique du service une fois créé (facultatif :
+      # inutile pour le CORS puisque le front est servi par la même origine).
+      - key: APP_URL
+        sync: false

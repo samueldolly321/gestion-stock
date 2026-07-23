@@ -5,6 +5,8 @@
  * Lancement :  npm run server
  */
 import 'dotenv/config';
+import path from 'node:path';
+import fs from 'node:fs';
 import express from 'express';
 import { sql } from 'drizzle-orm';
 import { db } from './db/index.ts';
@@ -97,8 +99,21 @@ app.get('/api/health', async (_req, res) => {
   }
 });
 
+// En production (Render…), on sert le front React buildé (dist/) depuis la même origine
+// que l'API : les appels `/api` du front pointent alors sur ce serveur, sans CORS.
+const distDir = path.resolve('dist');
+if (fs.existsSync(path.join(distDir, 'index.html'))) {
+  app.use(express.static(distDir));
+  // Toute route GET hors /api renvoie index.html (routing côté client React).
+  app.use((req, res, next) => {
+    if (req.method === 'GET' && !req.path.startsWith('/api')) {
+      return res.sendFile(path.join(distDir, 'index.html'));
+    }
+    next();
+  });
+}
+
 const PORT = Number(process.env.PORT) || 3001;
 app.listen(PORT, () => {
-  console.log(`🚀 API Vokatra-ko démarrée sur http://localhost:${PORT}`);
-  console.log(`   Test santé : http://localhost:${PORT}/api/health`);
+  console.log(`🚀 API Vokatra-ko démarrée sur le port ${PORT}`);
 });
