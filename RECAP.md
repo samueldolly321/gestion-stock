@@ -56,6 +56,7 @@ npm run dev      # Front (Vite)  -> http://localhost:3000
 | **Réapprovisionnement** | reorder | Articles sous seuil mini, quantités suggérées, **création de commande d'achat** groupée par fournisseur, **indicateur « commande en cours »** (anti-doublon) |
 | **Dépenses** | expenses | Frais divers (transport, douane, taxes…), liés aux achats, statut payé/non payé |
 | **Livraisons** | deliveries | Livraisons client (type moto/voiture/camion…, tarif ajouté à la facture), statuts, chauffeur |
+| **Calendrier** | calendar | Vue mensuelle des **commandes fournisseurs** (date de réception prévue) et **livraisons planifiées** ; navigation mois, clic → onglet concerné |
 | **Audits & Ajustements** | audits | Inventaires physiques, validation (ajustement stock), historique |
 | **Historique des Flux** | movements | Registre inaltérable des mouvements de stock (dont retours d'avoirs) |
 | **Comptabilité** | accounting | **État de TVA** (collectée/déductible/nette) + **compte de résultat** (CA HT, COGS, marge, résultat net) par mois/trimestre/année, exports PDF/Excel |
@@ -108,7 +109,7 @@ Système à **deux dimensions**, **configurable** depuis Configuration ERP et **
 ## 6. Modèle de données (tables Drizzle — `src/db/schema.ts`)
 
 `users`, `categories`, `brands`, `suppliers`, `clients`, `warehouses`, `products`,
-`stock_movements`, `inventory_audits`, `purchases` (+ `paid_amount`, `received_at`),
+`stock_movements`, `inventory_audits`, `purchases` (+ `paid_amount`, `received_at`, **`expected_date`** = réception prévue),
 `sales` (+ `paid_amount`, **`invoice_number`** unique, **`related_sale_id`** = facture d'origine d'un avoir), `payments` (kind `sale`/`purchase`/**`credit_note`**), `expenses`, `deliveries`, `audit_logs`,
 `document_counters` (compteurs de séquences légales — clés `invoice` **et `credit_note`**),
 `settings` (+ `role_permissions`, `write_permissions`, `logo_initials`, **`invoice_prefix`**, **`credit_note_prefix`**, **`invoice_padding`**).

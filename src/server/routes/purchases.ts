@@ -64,6 +64,7 @@ purchasesRouter.post('/', requireAuth, requireWrite('purchases'), async (req: Au
         totalAmount,
         paymentStatus: 'unpaid',
         paidAmount: 0,
+        expectedDate: b.expectedDate || null,
         notes: b.notes ?? null,
         createdBy: req.user?.name ?? 'Système',
       })

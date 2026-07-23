@@ -29,6 +29,7 @@ import {
   ClipboardList,
   History,
   Landmark,
+  CalendarDays,
   Settings as SettingsIcon,
   LogOut,
   Sparkles,
@@ -69,6 +70,7 @@ import Deliveries from './components/Deliveries';
 import UsersAdmin from './components/Users';
 import Audits from './components/Audits';
 import Movements from './components/Movements';
+import Calendar from './components/Calendar';
 import Accounting from './components/Accounting';
 import Settings from './components/Settings';
 import NotificationCenter from './components/NotificationCenter';
@@ -395,6 +397,7 @@ export default function App() {
     { id: 'deliveries', label: 'Livraisons', icon: Truck },
     { id: 'audits', label: 'Audits & Ajustements', icon: ClipboardList },
     { id: 'movements', label: 'Historique des Flux', icon: History },
+    { id: 'calendar', label: 'Calendrier', icon: CalendarDays },
     { id: 'accounting', label: 'Comptabilité', icon: Landmark },
     { id: 'users', label: 'Utilisateurs', icon: UserCog },
     { id: 'settings', label: 'Configuration ERP', icon: SettingsIcon }
@@ -677,6 +680,14 @@ export default function App() {
               warehouses={warehouses}
               onRefresh={() => {}}
               currencySymbol={currencySymbol}
+            />
+          )}
+
+          {activeTab === 'calendar' && (
+            <Calendar
+              deliveries={deliveries}
+              purchases={purchases}
+              onNavigate={(tab) => setActiveTab(tab)}
             />
           )}
 

@@ -164,6 +164,7 @@ export const purchases = pgTable('purchases', {
   paymentStatus: text('payment_status').notNull(), // unpaid | partially_paid | paid
   paidAmount: doublePrecision('paid_amount').default(0).notNull(),
   receivedAt: text('received_at'), // date de réception en stock (null = pas encore reçu)
+  expectedDate: text('expected_date'), // date de réception prévue (pour le calendrier)
   notes: text('notes'),
   createdBy: text('created_by').notNull(),
   createdAt,

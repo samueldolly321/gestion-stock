@@ -223,6 +223,7 @@ export interface Purchase {
   paymentStatus: 'unpaid' | 'partially_paid' | 'paid';
   paidAmount: number;
   receivedAt?: string | null;
+  expectedDate?: string | null; // date de réception prévue (calendrier)
   notes?: string;
   createdBy: string;
   createdAt: string;

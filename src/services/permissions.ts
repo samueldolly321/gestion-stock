@@ -12,6 +12,7 @@ export const ALL_TABS = [
   'reorder',
   'expenses',
   'deliveries',
+  'calendar',
   'audits',
   'movements',
   'accounting',
@@ -29,6 +30,7 @@ export const TAB_LABELS: Record<string, string> = {
   reorder: 'Réapprovisionnement',
   expenses: 'Dépenses',
   deliveries: 'Livraisons',
+  calendar: 'Calendrier',
   audits: 'Audits & Ajustements',
   movements: 'Historique des Flux',
   accounting: 'Comptabilité',
@@ -52,11 +54,11 @@ export const DEFAULT_ROLE_TABS: Record<string, string[]> = {
   Admin: [...ALL_TABS],
   // Le Manager gère tout sauf les comptes utilisateurs.
   Manager: ALL_TABS.filter((t) => t !== 'users'),
-  Commercial: ['dashboard', 'products', 'pos', 'receivables', 'partners', 'deliveries', 'movements'],
-  Acheteur: ['products'],
+  Commercial: ['dashboard', 'products', 'pos', 'receivables', 'partners', 'deliveries', 'calendar', 'movements'],
+  Acheteur: ['products', 'calendar'],
   Auditeur: ['dashboard', 'products', 'movements', 'audits'],
-  Comptable: ['dashboard', 'products', 'pos', 'receivables', 'partners', 'purchases', 'expenses', 'deliveries', 'movements', 'accounting', 'settings'],
-  Magasinier: ['dashboard', 'products', 'purchases', 'reorder', 'movements', 'audits', 'deliveries'],
+  Comptable: ['dashboard', 'products', 'pos', 'receivables', 'partners', 'purchases', 'expenses', 'deliveries', 'calendar', 'movements', 'accounting', 'settings'],
+  Magasinier: ['dashboard', 'products', 'purchases', 'reorder', 'deliveries', 'calendar', 'movements', 'audits'],
 };
 
 // Note : 'users' (gestion des comptes) reste réservé à Super Admin / Admin.

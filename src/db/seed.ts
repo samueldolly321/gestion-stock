@@ -291,7 +291,7 @@ async function main() {
         { productId: 'PRD-8', productName: 'Coca-Cola 1L (pack de 6)', sku: 'BOIS-COLA-1', quantity: 30, unitCost: 12000, tax: 20, total: 360000 },
       ],
       vatAmount: 162000, discountAmount: 0, totalAmount: 972000, paymentStatus: 'unpaid', paidAmount: 0,
-      notes: 'En attente de livraison', createdBy: 'Système',
+      expectedDate: daysAgo(-5), notes: 'En attente de livraison', createdBy: 'Système',
     },
     {
       id: 'ACH-DEMO-3', type: 'order', supplierId: 'SUP-2', supplierName: 'Océan Indien Distribution', status: 'ordered',
@@ -301,7 +301,7 @@ async function main() {
         { productId: 'PRD-11', productName: 'Réfrigérateur LG 200L', sku: 'ELM-LG-FRIGO', quantity: 10, unitCost: 1500000, tax: 20, total: 15000000 },
       ],
       vatAmount: 4120000, discountAmount: 0, totalAmount: 24720000, paymentStatus: 'partially_paid', paidAmount: 3000000,
-      notes: 'Acompte versé', createdBy: 'Système',
+      expectedDate: daysAgo(-12), notes: 'Acompte versé', createdBy: 'Système',
     },
   ]);
 

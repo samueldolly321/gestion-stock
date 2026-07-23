@@ -62,6 +62,7 @@ export default function Purchases({ purchases, suppliers, products, user, onRefr
   const [supplierId, setSupplierId] = useState('');
   const [lines, setLines] = useState<Line[]>([{ productId: '', quantity: 1, unitCost: 0, tax: 20 }]);
   const [notes, setNotes] = useState('');
+  const [expectedDate, setExpectedDate] = useState(''); // date de réception prévue (calendrier)
   const [busy, setBusy] = useState(false);
 
   // Modal paiement / détails
@@ -83,6 +84,7 @@ export default function Purchases({ purchases, suppliers, products, user, onRefr
     setSupplierId(suppliers[0]?.id || '');
     setLines([{ productId: '', quantity: 1, unitCost: 0, tax: 20 }]);
     setNotes('');
+    setExpectedDate('');
     setIsCreateOpen(true);
   };
 
@@ -121,7 +123,7 @@ export default function Purchases({ purchases, suppliers, products, user, onRefr
     setBusy(true);
     try {
       const sup = suppliers.find((s) => s.id === supplierId);
-      await createPurchase({ supplierId, supplierName: sup?.name, items, notes });
+      await createPurchase({ supplierId, supplierName: sup?.name, items, notes, expectedDate: expectedDate || undefined });
       setIsCreateOpen(false);
       showToast('Commande d\'achat créée.', { title: 'Achats' });
       onRefresh();
@@ -328,9 +330,15 @@ export default function Purchases({ purchases, suppliers, products, user, onRefr
                 ))}
               </div>
 
-              <div>
-                <label className="text-slate-500 dark:text-slate-400 block mb-1">Notes</label>
-                <input type="text" value={notes} onChange={(e) => setNotes(e.target.value)} className={inputCls} placeholder="N° facture fournisseur, conditions..." />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-slate-500 dark:text-slate-400 block mb-1">Date de réception prévue</label>
+                  <input type="date" value={expectedDate} onChange={(e) => setExpectedDate(e.target.value)} className={inputCls} title="Apparaîtra sur le calendrier" />
+                </div>
+                <div>
+                  <label className="text-slate-500 dark:text-slate-400 block mb-1">Notes</label>
+                  <input type="text" value={notes} onChange={(e) => setNotes(e.target.value)} className={inputCls} placeholder="N° facture, conditions..." />
+                </div>
               </div>
 
               <div className="border-t border-slate-200 dark:border-slate-800 pt-3 space-y-1 font-mono text-slate-500">
