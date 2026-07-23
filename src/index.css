@@ -1,0 +1,80 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import "tailwindcss";
+
+/* Tailwind v4 : par défaut les variantes `dark:` suivent la préférence système.
+   On les fait dépendre de la classe `.dark` posée sur <html> pour piloter le thème manuellement. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  /* Charte « Cobalt Sky » : l'accent de l'app (échelle `cyan-*`) est remappé sur une
+     rampe cobalt → sky → navy. 300 = sky #82c8e5, 500 = cobalt #0047ab, 900 = navy #000080. */
+  --color-cyan-50:  #edf4fb;
+  --color-cyan-100: #d3e6f6;
+  --color-cyan-200: #a8d2ec;
+  --color-cyan-300: #82c8e5;
+  --color-cyan-400: #4187c8;
+  --color-cyan-500: #0047ab;
+  --color-cyan-600: #003f9c;
+  --color-cyan-700: #002d96;
+  --color-cyan-800: #00198a;
+  --color-cyan-900: #000080;
+  --color-cyan-950: #00004d;
+}
+
+/* Lisibilité des listes déroulantes natives : les <option> héritent parfois du fond
+   sombre translucide du <select> et deviennent illisibles (texte foncé sur fond foncé).
+   On force des couleurs nettes et contrastées dans les deux thèmes. */
+select option {
+  background-color: #ffffff;
+  color: #0f172a; /* slate-900 */
+}
+.dark select option {
+  background-color: #1e293b; /* slate-800 */
+  color: #f1f5f9;            /* slate-100 */
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(156, 163, 175, 0.3);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(156, 163, 175, 0.5);
+}
+
+/* Custom transitions and printing styles */
+@media print {
+  body {
+    background: white;
+    color: black;
+    font-size: 12px;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .print-only {
+    display: block !important;
+  }
+  .print-card {
+    border: 1px solid #e5e7eb !important;
+    box-shadow: none !important;
+    margin: 0 !important;
+    padding: 10px !important;
+  }
+  /* Format A4 : le ticket occupe toute la largeur de la page. */
+  .print-a4-card {
+    max-width: 100% !important;
+    width: 100% !important;
+    font-size: 13px !important;
+  }
+}
