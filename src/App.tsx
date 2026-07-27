@@ -627,6 +627,7 @@ export default function App() {
               user={currentUser}
               onRefresh={reloadPartners}
               onRefreshSupplierProducts={reloadSupplierProducts}
+              onRefreshProducts={reloadProducts}
               currencySymbol={currencySymbol}
               writePerms={settings?.writePermissions}
             />

@@ -20,6 +20,8 @@ import {
 import { Supplier, Client, User, Product, SupplierProduct } from '../types';
 import { savePartner, deletePartner } from '../services/partnersService';
 import { saveSupplierProduct, updateSupplierProduct, deleteSupplierProduct } from '../services/supplierProductsService';
+import { createProduct } from '../services/productsService';
+import { generateId } from '../services/ids';
 import { showAlert, showConfirm } from '../services/dialog';
 import { showToast } from '../services/toast';
 import { exportPdf } from '../services/exportPdf';
@@ -36,6 +38,7 @@ interface PartnersProps {
   user: User;
   onRefresh: () => void;
   onRefreshSupplierProducts: () => void;
+  onRefreshProducts: () => void;
   currencySymbol: string;
   writePerms?: Record<string, string[]> | null;
 }
@@ -48,6 +51,7 @@ export default function Partners({
   user,
   onRefresh,
   onRefreshSupplierProducts,
+  onRefreshProducts,
   currencySymbol,
   writePerms
 }: PartnersProps) {
@@ -82,6 +86,11 @@ export default function Partners({
   const [newCatProductId, setNewCatProductId] = useState('');
   const [newCatPrice, setNewCatPrice] = useState<number>(0);
   const [newCatRef, setNewCatRef] = useState('');
+  // Mode d'ajout : produit déjà existant, ou création d'un nouvel article à la volée.
+  const [catalogMode, setCatalogMode] = useState<'existing' | 'new'>('existing');
+  const [npName, setNpName] = useState('');
+  const [npSku, setNpSku] = useState('');
+  const [npSalePrice, setNpSalePrice] = useState<number>(0);
 
   // Supplier Documents Drawer State
   const [activeDocSupplier, setActiveDocSupplier] = useState<Supplier | null>(null);
@@ -117,10 +126,30 @@ export default function Partners({
     setNewCatProductId('');
     setNewCatPrice(0);
     setNewCatRef('');
+    setCatalogMode('existing');
+    setNpName('');
+    setNpSku('');
+    setNpSalePrice(0);
   };
 
-  const handleAddCatalogProduct = async (e: React.FormEvent) => {
+  const resetAddForm = () => {
+    setNewCatProductId('');
+    setNewCatPrice(0);
+    setNewCatRef('');
+    setNpName('');
+    setNpSku('');
+    setNpSalePrice(0);
+  };
+
+  // Dispatch selon le mode (produit existant ou nouveau).
+  const handleAddCatalogSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (catalogMode === 'new') handleAddNewProduct();
+    else handleAddExistingProduct();
+  };
+
+  // Associe un produit DÉJÀ existant au fournisseur.
+  const handleAddExistingProduct = async () => {
     if (!activeCatalogSupplier || !newCatProductId) {
       showAlert('Sélectionnez un produit.', { variant: 'warning' });
       return;
@@ -132,13 +161,54 @@ export default function Partners({
         purchasePrice: Number(newCatPrice) || 0,
         supplierRef: newCatRef || null,
       });
-      setNewCatProductId('');
-      setNewCatPrice(0);
-      setNewCatRef('');
+      resetAddForm();
       onRefreshSupplierProducts();
       showToast('Produit ajouté au catalogue fournisseur.', { title: 'Fournisseurs' });
     } catch (err: any) {
       showAlert(err?.message || 'Ajout refusé (permissions insuffisantes).', { variant: 'error' });
+    }
+  };
+
+  // Crée un NOUVEL article (pas encore dans Articles & Stocks) puis l'associe au fournisseur.
+  const handleAddNewProduct = async () => {
+    if (!activeCatalogSupplier || !npName.trim()) {
+      showAlert('Indiquez au moins le nom du nouveau produit.', { variant: 'warning' });
+      return;
+    }
+    try {
+      // SKU auto si laissé vide (dérivé du nom + suffixe unique).
+      const sku = npSku.trim() || `${npName.trim().slice(0, 6).toUpperCase().replace(/\s+/g, '-')}-${generateId()}`;
+      const created = await createProduct({
+        sku,
+        barcode: '',
+        name: npName.trim(),
+        categoryId: '',
+        purchasePrice: Number(newCatPrice) || 0,
+        salePrice: Number(npSalePrice) || 0,
+        vatRate: 20,
+        unit: 'Unités',
+        minStock: 5,
+        maxStock: 100,
+        quantity: 0,
+        supplierId: activeCatalogSupplier.id,
+        supplierName: activeCatalogSupplier.name,
+        status: 'out_of_stock',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+      await saveSupplierProduct({
+        supplierId: activeCatalogSupplier.id,
+        productId: created.id,
+        purchasePrice: Number(newCatPrice) || 0,
+        supplierRef: newCatRef || null,
+      });
+      resetAddForm();
+      setCatalogMode('existing');
+      onRefreshProducts();
+      onRefreshSupplierProducts();
+      showToast(`Produit « ${created.name} » créé et ajouté au catalogue.`, { title: 'Fournisseurs' });
+    } catch (err: any) {
+      showAlert(err?.message || 'Création refusée (droit d\'écriture « Articles » requis).', { variant: 'error' });
     }
   };
 
@@ -625,7 +695,7 @@ export default function Partners({
       {/* SUPPLIER PRODUCTS (CATALOGUE) DRAWER MODAL */}
       {activeCatalogSupplier && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex justify-end">
-          <div className="bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 w-full max-w-md p-6 space-y-5 shadow-2xl h-full flex flex-col overflow-y-auto animate-slide-left text-xs">
+          <div className="bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 w-full max-w-md p-6 space-y-5 shadow-2xl h-full flex flex-col overflow-y-auto overflow-x-hidden animate-slide-left text-xs">
             <div className="flex justify-between items-center">
               <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
                 <Package className="w-5 h-5 text-cyan-400" />
@@ -646,19 +716,79 @@ export default function Partners({
 
             {/* Add product form */}
             {canWrite && (
-              <form onSubmit={handleAddCatalogProduct} className="space-y-2 border border-slate-200 dark:border-slate-800 rounded-xl p-3 bg-slate-50 dark:bg-slate-950/20">
+              <form onSubmit={handleAddCatalogSubmit} className="space-y-2 border border-slate-200 dark:border-slate-800 rounded-xl p-3 bg-slate-50 dark:bg-slate-950/20">
                 <label className="text-[10px] font-mono text-slate-500 uppercase tracking-widest">Ajouter un produit</label>
-                <select
-                  value={newCatProductId}
-                  onChange={(e) => onPickProductToAdd(e.target.value)}
-                  className="w-full bg-white dark:bg-slate-950/20 p-2 text-xs rounded-lg border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500"
-                >
-                  <option value="">— Sélectionner un produit —</option>
-                  {productsToAdd.map((p) => (
-                    <option key={p.id} value={p.id}>{p.name} ({p.sku})</option>
-                  ))}
-                </select>
-                <div className="flex gap-2">
+
+                {/* Sélecteur de mode : produit existant vs nouveau produit */}
+                <div className="grid grid-cols-2 gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setCatalogMode('existing')}
+                    className={`py-1.5 rounded-lg text-[11px] font-bold transition ${
+                      catalogMode === 'existing'
+                        ? 'bg-cyan-500/15 text-cyan-500 border border-cyan-500/30'
+                        : 'bg-white dark:bg-slate-950/20 text-slate-500 border border-slate-200 dark:border-slate-800'
+                    }`}
+                  >
+                    Produit existant
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCatalogMode('new')}
+                    className={`py-1.5 rounded-lg text-[11px] font-bold transition ${
+                      catalogMode === 'new'
+                        ? 'bg-cyan-500/15 text-cyan-500 border border-cyan-500/30'
+                        : 'bg-white dark:bg-slate-950/20 text-slate-500 border border-slate-200 dark:border-slate-800'
+                    }`}
+                  >
+                    Nouveau produit
+                  </button>
+                </div>
+
+                {catalogMode === 'existing' ? (
+                  <select
+                    value={newCatProductId}
+                    onChange={(e) => onPickProductToAdd(e.target.value)}
+                    className="w-full min-w-0 bg-white dark:bg-slate-950/20 p-2 text-xs rounded-lg border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500"
+                  >
+                    <option value="">— Sélectionner un produit —</option>
+                    {productsToAdd.map((p) => (
+                      <option key={p.id} value={p.id}>{p.name} ({p.sku})</option>
+                    ))}
+                  </select>
+                ) : (
+                  <>
+                    <input
+                      type="text"
+                      value={npName}
+                      onChange={(e) => setNpName(e.target.value)}
+                      placeholder="Nom du nouveau produit *"
+                      className="w-full min-w-0 bg-white dark:bg-slate-950/20 p-2 text-xs rounded-lg border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500"
+                    />
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        type="text"
+                        value={npSku}
+                        onChange={(e) => setNpSku(e.target.value)}
+                        placeholder="SKU (auto si vide)"
+                        className="w-full min-w-0 bg-white dark:bg-slate-950/20 p-2 text-xs rounded-lg border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500"
+                      />
+                      <input
+                        type="number"
+                        min={0}
+                        value={npSalePrice}
+                        onChange={(e) => setNpSalePrice(Number(e.target.value))}
+                        placeholder="Prix de vente"
+                        title="Prix de vente du nouvel article"
+                        className="w-full min-w-0 bg-white dark:bg-slate-950/20 p-2 text-xs rounded-lg border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500"
+                      />
+                    </div>
+                    <p className="text-[10px] text-slate-400">Le produit est créé dans Articles &amp; Stocks (quantité 0), rattaché à ce fournisseur.</p>
+                  </>
+                )}
+
+                {/* Prix d'achat + réf. fournisseur */}
+                <div className="grid grid-cols-2 gap-2">
                   <input
                     type="number"
                     min={0}
@@ -666,24 +796,29 @@ export default function Partners({
                     onChange={(e) => setNewCatPrice(Number(e.target.value))}
                     placeholder="Prix d'achat"
                     title="Prix d'achat chez ce fournisseur"
-                    className="flex-1 bg-white dark:bg-slate-950/20 p-2 text-xs rounded-lg border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500"
+                    className="w-full min-w-0 bg-white dark:bg-slate-950/20 p-2 text-xs rounded-lg border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500"
                   />
                   <input
                     type="text"
                     value={newCatRef}
                     onChange={(e) => setNewCatRef(e.target.value)}
                     placeholder="Réf. fourn. (opt.)"
-                    className="flex-1 bg-white dark:bg-slate-950/20 p-2 text-xs rounded-lg border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500"
+                    className="w-full min-w-0 bg-white dark:bg-slate-950/20 p-2 text-xs rounded-lg border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500"
                   />
-                  <button
-                    type="submit"
-                    className="px-3 py-2 bg-cyan-500 hover:bg-cyan-600 text-white font-bold rounded-lg cursor-pointer flex items-center gap-1"
-                  >
-                    <PlusIcon className="w-3.5 h-3.5" />
-                  </button>
                 </div>
-                {productsToAdd.length === 0 && (
-                  <p className="text-[10px] text-slate-400">Tous les produits sont déjà catalogués pour ce fournisseur.</p>
+
+                <button
+                  type="submit"
+                  className="w-full py-2 bg-cyan-500 hover:bg-cyan-600 text-white font-bold rounded-lg cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  <PlusIcon className="w-3.5 h-3.5" />
+                  {catalogMode === 'new' ? 'Créer et ajouter' : 'Ajouter au catalogue'}
+                </button>
+
+                {catalogMode === 'existing' && productsToAdd.length === 0 && (
+                  <p className="text-[10px] text-slate-400">
+                    Tous les produits sont déjà catalogués. Bascule sur « Nouveau produit » pour en créer un.
+                  </p>
                 )}
               </form>
             )}
