@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Landmark, Receipt, TrendingUp, TrendingDown, ChevronLeft, ChevronRight, Download, Scale, Info } from 'lucide-react';
-import { Sale, Purchase, Expense, Product } from '../types';
+import { Sale, Purchase, Expense, Product, StockMovement, Delivery } from '../types';
 import { useMoney } from '../services/CurrencyContext';
 import { exportPdf } from '../services/exportPdf';
 import { exportExcel } from '../services/exportExcel';
@@ -11,6 +11,8 @@ interface AccountingProps {
   purchases: Purchase[];
   expenses: Expense[];
   products: Product[];
+  movements: StockMovement[];
+  deliveries: Delivery[];
 }
 
 type Gran = 'month' | 'quarter' | 'year';
@@ -30,7 +32,7 @@ function periodRange(gran: Gran, anchor: Date) {
   return { start: new Date(y, m, 1), end: new Date(y, m + 1, 0, 23, 59, 59, 999), label: label.charAt(0).toUpperCase() + label.slice(1) };
 }
 
-export default function Accounting({ sales, purchases, expenses, products }: AccountingProps) {
+export default function Accounting({ sales, purchases, expenses, products, movements, deliveries }: AccountingProps) {
   const { format } = useMoney();
   const [gran, setGran] = useState<Gran>('month');
   const [anchor, setAnchor] = useState<Date>(() => new Date());
@@ -48,17 +50,26 @@ export default function Accounting({ sales, purchases, expenses, products }: Acc
   const f = useMemo(() => {
     const s0 = range.start.getTime(), s1 = range.end.getTime();
     const inR = (ds?: string | null) => { if (!ds) return false; const t = new Date(ds).getTime(); return t >= s0 && t <= s1; };
-    const cost = (id: string) => { const p = products.find((x) => x.id === id); return p ? Number(p.purchasePrice) || 0 : 0; };
+    // Frais de livraison facturés sur une vente (table deliveries) — à exclure du CA.
+    const deliveryForSale = (saleId: string) => deliveries.filter((d) => d.saleId === saleId).reduce((a, d) => a + (Number(d.fee) || 0), 0);
 
     const salesIn = sales.filter((s) => inR(s.createdAt));
     const invoices = salesIn.filter((s) => s.type !== 'return');
     const avoirs = salesIn.filter((s) => s.type === 'return');
 
-    // Ventes : total TTC = HT + TVA (les avoirs sont négatifs → tout se nette).
-    const caHT = salesIn.reduce((a, s) => a + ((Number(s.totalAmount) || 0) - (Number(s.vatAmount) || 0)), 0);
+    // CA HT net : total TTC − TVA − frais de livraison (le transport n'est pas du CA
+    // marchandises et n'a pas de COGS en face). Les avoirs (négatifs) se nettent.
+    const caHT = salesIn.reduce((a, s) => a + ((Number(s.totalAmount) || 0) - (Number(s.vatAmount) || 0) - deliveryForSale(s.id)), 0);
     const tvaCollectee = salesIn.reduce((a, s) => a + (Number(s.vatAmount) || 0), 0);
-    // Coût des marchandises vendues : prix d'achat courant × quantités vendues (retours déduits).
-    const cogs = salesIn.reduce((a, s) => a + (s.items || []).reduce((b: number, it: any) => b + cost(it.productId) * (Number(it.quantity) || 0), 0), 0);
+    // COGS au COÛT HISTORIQUE : coût réel enregistré dans les mouvements de stock au moment
+    // de la vente (exit_sale), diminué des retours réintégrés (entry_return) sur la période.
+    // Robuste aux variations de prix d'achat (contrairement au prix « fiche » courant).
+    const movementsIn = movements.filter((m) => inR(m.createdAt));
+    const cogs = movementsIn.reduce((a, m) => {
+      if (m.type === 'exit_sale') return a + (Number(m.costTotal) || 0);
+      if (m.type === 'entry_return') return a - (Number(m.costTotal) || 0);
+      return a;
+    }, 0);
     const margeBrute = caHT - cogs;
 
     const purchasesIn = purchases.filter((p) => p.status !== 'cancelled' && inR(p.createdAt));
@@ -72,7 +83,7 @@ export default function Accounting({ sales, purchases, expenses, products }: Acc
     const tauxMarge = caHT > 0 ? (margeBrute / caHT) * 100 : 0;
 
     return { caHT, tvaCollectee, cogs, margeBrute, tauxMarge, tvaDeductible, charges, resultatNet, tvaNette, nbFactures: invoices.length, nbAvoirs: avoirs.length, nbAchats: purchasesIn.length, nbFrais: expensesIn.length };
-  }, [sales, purchases, expenses, products, range]);
+  }, [sales, purchases, expenses, movements, deliveries, range]);
 
   const exportRows = [
     { poste: 'Ventes (hors taxe)', montant: format(f.caHT) },

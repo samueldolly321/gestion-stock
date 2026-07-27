@@ -191,9 +191,12 @@ et côté client :
 - [ ] **Remboursement cash** d'un avoir (v1 = crédit client uniquement)
 - [x] **États TVA** (collectée/déductible) & **compte de résultat** — module Comptabilité (`Accounting.tsx`), sélecteur Mois/Trimestre/Année + navigation, calcul 100 % front. TVA nette = collectée (ventes) − déductible (achats) ; compte de résultat = CA HT net des avoirs − COGS (prix d'achat × qté vendue) − charges externes. Exports PDF/Excel. Onglet `accounting` (RBAC : SA/Admin/Manager/Comptable).
 - [ ] **Réception partielle** des commandes d'achat
-- [ ] **Désactiver l'auto-inscription** (register limité au bootstrap) + **changement de mot de passe forcé** au 1ᵉʳ login
-- [ ] **RBAC sur les lectures** (les `GET` ne vérifient que l'authentification, pas le rôle)
-- [ ] Sécurité prod : `JWT_SECRET` fort, HTTPS, verrouillage anti-bruteforce, retrait du simulateur de rôle
+- [x] **Recalcul serveur des ventes (anti-falsification)** — `POST /sales` recalcule total/TVA/fidélité depuis les articles + prix en base et **rejoue le blocage vente à perte** (ne fait plus confiance aux montants du client). POS envoie `discountPercent`/`deliveryFee`/`applyVat` pour ce recalcul.
+- [x] **Auto-inscription fermée après le bootstrap** — `POST /auth/register` refuse (403) dès qu'un compte existe ; endpoint `GET /auth/registration-open` ; AuthPage masque l'inscription hors 1ère installation. *(Reste : changement de mot de passe forcé au 1ᵉʳ login.)*
+- [x] **RBAC en lecture** — middleware `requireAnyTab(...)` (`auth-middleware.ts`) sur les GET sensibles (`sales`, `payments`, `purchases`, `client-prices`, `supplier-products`, `expenses`) : lit `rolePermissions`, refuse (403) si le rôle n'a aucun onglet consommant la donnée.
+- [x] **JWT durci + simulateur verrouillé** — le serveur **refuse de démarrer** si `JWT_SECRET` est absent/faible en prod ; le **simulateur de rôle n'est visible que pour le Super Admin réel** (`realRole` immuable issu du JWT) et n'est plus qu'une prévisualisation UI (les droits serveur restent ceux du compte). Bouton « Charger Données Démo » (stub) retiré.
+- [x] **Comptabilité corrigée** — CA HT **exclut les frais de livraison** (`totalAmount − TVA − livraison`) ; **COGS au coût historique** (`stock_movements.costTotal` des `exit_sale`, net des `entry_return`) au lieu du prix d'achat courant.
+- [ ] Sécurité prod restante : HTTPS (fourni par Render), verrouillage anti-bruteforce, changement mot de passe forcé au 1er login
 - [ ] Tests automatisés, sauvegardes, mode hors-ligne (PWA)
 - [x] **Versionnage git + déploiement Render — FAIT & EN LIGNE.** Repo GitHub `samueldolly321/gestion-stock` ; **déployé sur Render** via Blueprint `render.yaml` (auto-redeploy à chaque `git push` sur `main`). Single web service : l'API Express sert aussi le front buildé (`dist/`) sur la même origine ; base via `DATABASE_URL`+SSL. Script prod `npm start` (`tsx src/server.ts`). Guides `GUIDE_INSTALLATION.md` (local) & `GUIDE_RENDER.md` (cloud).
 

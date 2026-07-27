@@ -270,7 +270,11 @@ export default function POS({
         status: 'delivered',
         items: itemsForSale,
         vatAmount: totals.vatTotal,
-        totalAmount: totals.totalAmount, // inclut le tarif de livraison
+        totalAmount: totals.totalAmount, // indicatif : le serveur recalcule
+        // Champs pour le recalcul serveur (anti-falsification) :
+        discountPercent,
+        deliveryFee: totals.delivery,
+        applyVat,
         paymentStatus: 'paid',
         paymentMethod,
         loyaltyPointsEarned: totals.loyaltyPointsEarned,

@@ -9,9 +9,16 @@ export function listSales(): Promise<Sale[]> {
   return apiFetch<Sale[]>('/sales');
 }
 
-// Le serveur génère l'id, la date, et renseigne le caissier depuis le jeton.
+// Le serveur génère l'id, la date, renseigne le caissier depuis le jeton ET
+// RECALCULE lui-même les montants (total/TVA/fidélité) à partir des articles :
+// discountPercent / deliveryFee / applyVat lui sont transmis pour ce recalcul.
 export function createSale(
-  data: Omit<Sale, 'id' | 'createdAt' | 'cashierId' | 'cashierName' | 'paidAmount'> & { paidAmount?: number },
+  data: Omit<Sale, 'id' | 'createdAt' | 'cashierId' | 'cashierName' | 'paidAmount'> & {
+    paidAmount?: number;
+    discountPercent?: number;
+    deliveryFee?: number;
+    applyVat?: boolean;
+  },
 ): Promise<Sale> {
   return apiFetch<Sale>('/sales', { method: 'POST', body: JSON.stringify(data) });
 }

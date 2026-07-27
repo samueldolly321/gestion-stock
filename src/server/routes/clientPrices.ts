@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { desc, eq } from 'drizzle-orm';
 import { db } from '../../db/index.ts';
 import { clientPrices, products, clients } from '../../db/schema.ts';
-import { requireAuth, requireWrite, type AuthedRequest } from '../auth-middleware.ts';
+import { requireAuth, requireWrite, requireAnyTab, type AuthedRequest } from '../auth-middleware.ts';
 import { generateId, writeAuditLog } from '../helpers.ts';
 
 export const clientPricesRouter = Router();
@@ -31,7 +31,7 @@ function selectEnriched() {
 }
 
 /** GET /api/client-prices?clientId=... — tarifs négociés (tous, ou filtrés par client). */
-clientPricesRouter.get('/', requireAuth, async (req, res) => {
+clientPricesRouter.get('/', requireAuth, requireAnyTab('pos', 'partners', 'sales'), async (req, res) => {
   try {
     const clientId = typeof req.query.clientId === 'string' ? req.query.clientId : undefined;
     const rows = clientId

@@ -3,10 +3,20 @@ import jwt from 'jsonwebtoken';
 import { eq } from 'drizzle-orm';
 import { db } from '../db/index.ts';
 import { settings } from '../db/schema.ts';
-import { canWrite } from '../services/permissions.ts';
+import { canWrite, allowedTabsFor } from '../services/permissions.ts';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-change-me-super-secret-key';
+const DEFAULT_SECRET = 'dev-change-me-super-secret-key';
+const JWT_SECRET = process.env.JWT_SECRET || DEFAULT_SECRET;
 const JWT_EXPIRES_IN = '7d';
+
+// En production, refuse de démarrer avec un secret manquant/faible : sinon n'importe qui
+// connaissant la clé publique du dépôt pourrait forger un jeton Super Admin.
+const IS_PROD = process.env.NODE_ENV === 'production' || !!process.env.DATABASE_URL;
+if (IS_PROD && (!process.env.JWT_SECRET || process.env.JWT_SECRET === DEFAULT_SECRET || process.env.JWT_SECRET.length < 16)) {
+  throw new Error(
+    'JWT_SECRET manquant ou trop faible en production. Définissez une clé forte (≥ 32 caractères aléatoires) dans les variables d\'environnement.',
+  );
+}
 
 export interface JwtPayload {
   sub: string; // user id
@@ -51,6 +61,30 @@ export function requireRole(...roles: string[]) {
       return res.status(403).json({ error: 'Accès refusé : rôle insuffisant.' });
     }
     next();
+  };
+}
+
+// Middleware factory (RBAC en LECTURE) : autorise si le rôle a accès à AU MOINS UN des
+// onglets qui consomment cette donnée (matrice rolePermissions configurée, repli défauts).
+// Empêche p.ex. un Acheteur/Auditeur de lire les règlements ou les tarifs client via l'API.
+export function requireAnyTab(...tabs: string[]) {
+  return async (req: AuthedRequest, res: Response, next: NextFunction) => {
+    if (!req.user) return res.status(401).json({ error: 'Non authentifié.' });
+    if (req.user.role === 'Super Admin') return next();
+    try {
+      const [row] = await db
+        .select({ rp: settings.rolePermissions })
+        .from(settings)
+        .where(eq(settings.id, 'global'))
+        .limit(1);
+      const matrix = (row?.rp as Record<string, string[]> | null) ?? null;
+      const allowed = allowedTabsFor(req.user.role, matrix);
+      if (tabs.some((t) => allowed.includes(t))) return next();
+      return res.status(403).json({ error: 'Accès en lecture non autorisé pour ce module.' });
+    } catch (err) {
+      console.error('requireAnyTab error:', err);
+      return res.status(500).json({ error: 'Erreur de vérification des droits.' });
+    }
   };
 }
 

@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { desc, eq } from 'drizzle-orm';
 import { db } from '../../db/index.ts';
 import { purchases, products, stockMovements } from '../../db/schema.ts';
-import { requireAuth, requireWrite, type AuthedRequest } from '../auth-middleware.ts';
+import { requireAuth, requireWrite, requireAnyTab, type AuthedRequest } from '../auth-middleware.ts';
 import { generateId, computeProductStatus, writeAuditLog } from '../helpers.ts';
 
 export const purchasesRouter = Router();
@@ -27,7 +27,7 @@ function pickItems(raw: any): any[] {
 }
 
 /** GET /api/purchases — liste des achats (plus récents d'abord). */
-purchasesRouter.get('/', requireAuth, async (_req, res) => {
+purchasesRouter.get('/', requireAuth, requireAnyTab('purchases', 'reorder', 'calendar', 'accounting', 'dashboard', 'sales'), async (_req, res) => {
   try {
     res.json(await db.select().from(purchases).orderBy(desc(purchases.createdAt)));
   } catch (err) {

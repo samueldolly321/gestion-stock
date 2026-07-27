@@ -36,7 +36,6 @@ import {
   Settings as SettingsIcon,
   LogOut,
   Sparkles,
-  Database,
   User as UserIcon,
   Shield,
   Loader2,
@@ -82,12 +81,14 @@ import Settings from './components/Settings';
 import NotificationCenter from './components/NotificationCenter';
 import { ToastMessage, showToast } from './services/toast';
 import DialogHost from './components/DialogHost';
-import { showAlert } from './services/dialog';
 import { allowedTabsFor } from './services/permissions';
 import { setExportCompany } from './services/exportContext';
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  // Rôle RÉEL issu du jeton (immuable) — le simulateur ne le modifie jamais.
+  // Sert à n'exposer le simulateur qu'au vrai Super Admin (anti-escalade côté UI).
+  const [realRole, setRealRole] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [productFilter, setProductFilter] = useState<string>('all'); // filtre appliqué en arrivant sur Articles
@@ -116,14 +117,12 @@ export default function App() {
   const [currencySymbol, setCurrencySymbol] = useState('€');
   const [theme, setTheme] = useState<'light' | 'dark'>('dark');
 
-  // Trigger seeding progress
-  const [seeding, setSeeding] = useState(false);
 
   // 1. Restaure la session à partir du jeton JWT stocké (auth PostgreSQL)
   useEffect(() => {
     fetchMe()
-      .then((user) => setCurrentUser(user))
-      .catch(() => setCurrentUser(null))
+      .then((user) => { setCurrentUser(user); setRealRole(user?.role ?? null); })
+      .catch(() => { setCurrentUser(null); setRealRole(null); })
       .finally(() => setAuthLoading(false));
 
     // Load initial theme from localStorage
@@ -377,11 +376,6 @@ export default function App() {
     if (!allowed.includes(activeTab)) setActiveTab(allowed[0]);
   }, [currentUser, activeTab, settings]);
 
-  // Handle manual or automatic data seeding
-  // TODO (étape CRUD) : brancher sur POST /api/seed (données de démo PostgreSQL).
-  const handleSeedData = async () => {
-    showAlert('Le chargement des données de démo sera disponible à l\'étape suivante (API CRUD PostgreSQL).', { variant: 'info' });
-  };
 
   // Change simulation role
   const handleRoleChange = (newRole: string) => {
@@ -395,6 +389,7 @@ export default function App() {
   const handleLogout = () => {
     authLogout();
     setCurrentUser(null);
+    setRealRole(null);
   };
 
   if (authLoading) {
@@ -407,7 +402,7 @@ export default function App() {
   }
 
   if (!currentUser) {
-    return <AuthPage onLoginSuccess={(user) => setCurrentUser(user)} />;
+    return <AuthPage onLoginSuccess={(user) => { setCurrentUser(user); setRealRole(user.role); }} />;
   }
 
   // Sidebar list items
@@ -438,14 +433,17 @@ export default function App() {
     <CurrencyProvider>
     <div className="h-dvh overflow-hidden bg-slate-100 dark:bg-slate-950 text-slate-900 dark:text-gray-100 flex flex-col transition-colors duration-150">
       
-      {/* 1. TOP UTILITY ACTION BAR (Role Simulator & Db Seeder) */}
+      {/* 1. TOP UTILITY ACTION BAR — outils Super Admin uniquement (simulateur de rôle).
+             Réservé au rôle RÉEL Super Admin : un utilisateur normal ne peut donc pas
+             se donner d'autres rôles depuis l'UI (le serveur reste la source de vérité). */}
+      {realRole === 'Super Admin' && (
       <div className="bg-slate-950 text-white border-b border-slate-800/80 px-4 py-2 flex flex-col sm:flex-row justify-between items-center gap-3 text-xs z-30">
         <div className="flex items-center gap-2">
           <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 bg-yellow-500/10 text-yellow-400 rounded border border-yellow-500/20">
-            Simulateur de Rôles ERP
+            Simulateur de Rôles (prévisualisation UI)
           </span>
           <div className="flex items-center gap-1">
-            <span className="text-slate-400 text-[11px]">Rôle actif :</span>
+            <span className="text-slate-400 text-[11px]">Rôle simulé :</span>
             <select
               value={currentUser.role}
               onChange={(e) => handleRoleChange(e.target.value)}
@@ -456,29 +454,15 @@ export default function App() {
               <option value="Manager">💼 Gérant / Manager</option>
               <option value="Commercial">📈 Commercial</option>
               <option value="Acheteur">📦 Acheteur</option>
+              <option value="Comptable">🧮 Comptable</option>
               <option value="Auditeur">🔍 Auditeur</option>
               <option value="Magasinier">🏗️ Magasinier</option>
             </select>
           </div>
-        </div>
-
-        {/* Database Quick Seeder Indicator */}
-        <div className="flex items-center gap-3">
-          {products.length === 0 && (
-            <span className="text-rose-400 flex items-center gap-1 text-[11px] font-mono animate-pulse">
-              ⚠️ Base vide
-            </span>
-          )}
-          <button
-            onClick={handleSeedData}
-            disabled={seeding}
-            className="px-3 py-1 bg-cyan-500 hover:bg-cyan-600 disabled:opacity-40 text-white font-bold text-[11px] rounded transition flex items-center gap-1 cursor-pointer"
-          >
-            <Database className="w-3.5 h-3.5" />
-            {seeding ? 'Seeding...' : products.length === 0 ? 'Charger Données Démo (ERP)' : 'Réinitialiser Données Démo'}
-          </button>
+          <span className="text-[10px] text-slate-500 hidden md:inline">Prévisualisation seulement — les droits serveur restent ceux de votre compte.</span>
         </div>
       </div>
+      )}
 
       {/* Main ERP Frame Structure */}
       <div className="flex-1 flex flex-col md:flex-row min-h-0">
@@ -565,14 +549,6 @@ export default function App() {
         {/* 3. CORE WORKSPACE ROUTER SCREEN */}
         <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto w-full">
           
-          {/* Seeding State Alert */}
-          {seeding && (
-            <div className="mb-6 p-4 bg-cyan-950/20 text-cyan-400 border border-cyan-500/30 rounded-xl flex items-center gap-3 text-xs">
-              <Loader2 className="w-4 h-4 animate-spin shrink-0" />
-              <span>Génération de la structure du stock de départ, fournisseurs et clients...</span>
-            </div>
-          )}
-
           {/* Route views mapping */}
           {activeTab === 'dashboard' && (
             <Dashboard
@@ -754,6 +730,8 @@ export default function App() {
               purchases={purchases}
               expenses={expenses}
               products={products}
+              movements={movements}
+              deliveries={deliveries}
             />
           )}
 

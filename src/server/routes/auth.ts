@@ -8,11 +8,6 @@ import { generateId, writeAuditLog } from '../helpers.ts';
 
 export const authRouter = Router();
 
-const VALID_ROLES = [
-  'Super Admin', 'Admin', 'Manager', 'Magasinier',
-  'Commercial', 'Acheteur', 'Comptable', 'Auditeur',
-];
-
 // Retire le hash du mot de passe avant d'envoyer l'utilisateur au client.
 function sanitize(u: typeof users.$inferSelect) {
   const { passwordHash, ...safe } = u;
@@ -20,13 +15,29 @@ function sanitize(u: typeof users.$inferSelect) {
 }
 
 /**
+ * GET /api/auth/registration-open
+ * Indique si l'auto-inscription est ouverte (uniquement tant qu'aucun compte n'existe :
+ * bootstrap du 1er propriétaire). Ensuite, les comptes se créent via la gestion des utilisateurs.
+ */
+authRouter.get('/registration-open', async (_req, res) => {
+  try {
+    const [{ count }] = await db.select({ count: sql<number>`count(*)::int` }).from(users);
+    res.json({ open: count === 0 });
+  } catch (err) {
+    console.error('registration-open error:', err);
+    res.status(500).json({ open: false });
+  }
+});
+
+/**
  * POST /api/auth/register
- * Crée un compte. Le tout premier utilisateur devient 'Super Admin' (propriétaire).
- * L'auto-inscription ne peut pas se donner 'Super Admin' (anti-escalade de privilèges).
+ * Crée le PREMIER compte (propriétaire → 'Super Admin'). Fermé ensuite : une fois un
+ * compte existant, l'inscription publique est refusée (403) — les comptes suivants se
+ * créent via /api/users (réservé aux administrateurs).
  */
 authRouter.post('/register', async (req, res) => {
   try {
-    const { name, email, password, role } = req.body ?? {};
+    const { name, email, password } = req.body ?? {};
 
     if (!name || !email || !password) {
       return res.status(400).json({ error: 'Nom, e-mail et mot de passe sont requis.' });
@@ -39,13 +50,12 @@ authRouter.post('/register', async (req, res) => {
     const [{ count }] = await db.select({ count: sql<number>`count(*)::int` }).from(users);
     const isFirstUser = count === 0;
 
-    let finalRole: string;
-    if (isFirstUser) {
-      finalRole = 'Super Admin';
-    } else {
-      finalRole = VALID_ROLES.includes(role) ? role : 'Magasinier';
-      if (finalRole === 'Super Admin') finalRole = 'Admin'; // pas d'auto-escalade
+    // Auto-inscription fermée après le bootstrap (anti-création de comptes non autorisée).
+    if (!isFirstUser) {
+      return res.status(403).json({ error: 'Inscription fermée. Contactez un administrateur pour obtenir un compte.' });
     }
+
+    const finalRole = 'Super Admin';
 
     const passwordHash = await bcrypt.hash(password, 10);
     const id = generateId('USR');

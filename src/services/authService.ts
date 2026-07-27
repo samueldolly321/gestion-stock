@@ -3,18 +3,19 @@
  * Remplace l'ancienne authentification Firebase.
  */
 import { apiFetch, setToken, clearToken, getToken } from './api';
-import type { User, UserRole } from '../types';
+import type { User } from '../types';
 
 interface AuthResponse {
   token: string;
   user: User;
 }
 
+// Le rôle n'est plus transmis : le serveur crée le 1er compte en « Super Admin »
+// et refuse toute inscription ultérieure.
 export async function register(input: {
   name: string;
   email: string;
   password: string;
-  role: UserRole;
 }): Promise<User> {
   const { token, user } = await apiFetch<AuthResponse>('/auth/register', {
     method: 'POST',
@@ -22,6 +23,16 @@ export async function register(input: {
   });
   setToken(token);
   return user;
+}
+
+// L'auto-inscription n'est ouverte que pour le tout premier compte (bootstrap).
+export async function isRegistrationOpen(): Promise<boolean> {
+  try {
+    const { open } = await apiFetch<{ open: boolean }>('/auth/registration-open');
+    return !!open;
+  } catch {
+    return false;
+  }
 }
 
 export async function login(email: string, password: string): Promise<User> {

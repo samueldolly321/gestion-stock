@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { desc, eq } from 'drizzle-orm';
 import { db } from '../../db/index.ts';
 import { expenses } from '../../db/schema.ts';
-import { requireAuth, requireWrite, type AuthedRequest } from '../auth-middleware.ts';
+import { requireAuth, requireWrite, requireAnyTab, type AuthedRequest } from '../auth-middleware.ts';
 import { generateId, writeAuditLog } from '../helpers.ts';
 
 export const expensesRouter = Router();
@@ -24,7 +24,7 @@ function pickFields(b: any) {
 }
 
 /** GET /api/expenses — liste des dépenses (plus récentes d'abord). */
-expensesRouter.get('/', requireAuth, async (_req, res) => {
+expensesRouter.get('/', requireAuth, requireAnyTab('expenses', 'accounting', 'dashboard'), async (_req, res) => {
   try {
     res.json(await db.select().from(expenses).orderBy(desc(expenses.createdAt)));
   } catch (err) {

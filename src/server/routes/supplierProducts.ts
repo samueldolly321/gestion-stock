@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { desc, eq } from 'drizzle-orm';
 import { db } from '../../db/index.ts';
 import { supplierProducts, products, suppliers } from '../../db/schema.ts';
-import { requireAuth, requireWrite, type AuthedRequest } from '../auth-middleware.ts';
+import { requireAuth, requireWrite, requireAnyTab, type AuthedRequest } from '../auth-middleware.ts';
 import { generateId, writeAuditLog } from '../helpers.ts';
 
 export const supplierProductsRouter = Router();
@@ -35,7 +35,7 @@ function selectEnriched() {
  * GET /api/supplier-products?supplierId=... — catalogue d'approvisionnement.
  * Sans filtre : toutes les associations (chargées globalement par le front).
  */
-supplierProductsRouter.get('/', requireAuth, async (req, res) => {
+supplierProductsRouter.get('/', requireAuth, requireAnyTab('purchases', 'partners', 'reorder', 'calendar'), async (req, res) => {
   try {
     const supplierId = typeof req.query.supplierId === 'string' ? req.query.supplierId : undefined;
     const rows = supplierId

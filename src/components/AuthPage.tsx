@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { User, UserRole } from '../types';
-import { register, login } from '../services/authService';
+import React, { useState, useEffect } from 'react';
+import { User } from '../types';
+import { register, login, isRegistrationOpen } from '../services/authService';
 import {
   LogIn,
   Sparkles,
@@ -22,22 +22,18 @@ export default function AuthPage({ onLoginSuccess }: AuthPageProps) {
 
   // Form states
   const [isSignUp, setIsSignUp] = useState(false);
+  // L'inscription n'est ouverte que pour le tout premier compte (bootstrap propriétaire).
+  const [regOpen, setRegOpen] = useState(false);
+  useEffect(() => {
+    isRegistrationOpen().then((open) => {
+      setRegOpen(open);
+      if (!open) setIsSignUp(false); // force le mode connexion si l'inscription est fermée
+    });
+  }, []);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [fullName, setFullName] = useState('');
-  const [selectedRole, setSelectedRole] = useState<UserRole>('Admin');
-
-  const USER_ROLES: UserRole[] = [
-    'Super Admin',
-    'Admin',
-    'Manager',
-    'Magasinier',
-    'Commercial',
-    'Acheteur',
-    'Comptable',
-    'Auditeur',
-  ];
 
   const handleEmailAuthSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -66,7 +62,7 @@ export default function AuthPage({ onLoginSuccess }: AuthPageProps) {
     setLoading(true);
     try {
       const user = isSignUp
-        ? await register({ name: fullName, email, password, role: selectedRole })
+        ? await register({ name: fullName, email, password })
         : await login(email, password);
       onLoginSuccess(user);
     } catch (err: any) {
@@ -234,24 +230,10 @@ export default function AuthPage({ onLoginSuccess }: AuthPageProps) {
                   </div>
                 </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-[11px] font-mono uppercase text-slate-400 tracking-wider">
-                    Rôle d'habilitation ERP souhaité
-                  </label>
-                  <select
-                    value={selectedRole}
-                    onChange={(e) => setSelectedRole(e.target.value as UserRole)}
-                    disabled={loading}
-                    className="w-full bg-slate-950 border border-slate-800 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 rounded-xl py-2.5 px-3 text-xs text-white outline-none transition cursor-pointer"
-                  >
-                    {USER_ROLES.map((role) => (
-                      <option key={role} value={role} className="bg-[#0b0f19]">
-                        {role}
-                      </option>
-                    ))}
-                  </select>
-                  <p className="text-[10px] text-slate-400 leading-normal font-mono mt-1">
-                    Le tout premier compte créé devient automatiquement « Super Admin ».
+                <div className="p-3 bg-cyan-500/5 border border-cyan-500/20 rounded-xl">
+                  <p className="text-[10px] text-cyan-300 leading-normal font-mono">
+                    Ce compte est le <strong>propriétaire</strong> de l'ERP : il sera créé en « Super Admin ».
+                    Les comptes suivants se créent ensuite depuis l'onglet Utilisateurs.
                   </p>
                 </div>
               </>
@@ -278,21 +260,23 @@ export default function AuthPage({ onLoginSuccess }: AuthPageProps) {
               )}
             </button>
 
-            {/* Toggle Login/Signup Mode */}
-            <div className="text-center pt-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setIsSignUp(!isSignUp);
-                  setError(null);
-                }}
-                className="text-xs text-cyan-400 hover:text-cyan-300 hover:underline font-medium transition cursor-pointer"
-              >
-                {isSignUp
-                  ? 'Déjà un compte ? Connectez-vous ici'
-                  : 'Pas encore de compte ? Créez-en un ici'}
-              </button>
-            </div>
+            {/* Toggle Login/Signup Mode — visible seulement si l'inscription est ouverte (bootstrap) */}
+            {regOpen && (
+              <div className="text-center pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsSignUp(!isSignUp);
+                    setError(null);
+                  }}
+                  className="text-xs text-cyan-400 hover:text-cyan-300 hover:underline font-medium transition cursor-pointer"
+                >
+                  {isSignUp
+                    ? 'Déjà un compte ? Connectez-vous ici'
+                    : 'Créer le compte propriétaire (première installation)'}
+                </button>
+              </div>
+            )}
           </form>
 
           {/* Info notice */}

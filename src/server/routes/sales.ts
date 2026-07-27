@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { and, desc, eq, sql } from 'drizzle-orm';
 import { db } from '../../db/index.ts';
 import { sales, products, clients, stockMovements, payments } from '../../db/schema.ts';
-import { requireAuth, requireRole, type AuthedRequest } from '../auth-middleware.ts';
+import { requireAuth, requireRole, requireAnyTab, type AuthedRequest } from '../auth-middleware.ts';
 import { generateId, computeProductStatus, writeAuditLog, nextDocNumber } from '../helpers.ts';
 
 export const salesRouter = Router();
@@ -10,7 +10,7 @@ export const salesRouter = Router();
 const CASHIER_ROLES = ['Super Admin', 'Admin', 'Manager', 'Commercial', 'Magasinier'];
 
 /** GET /api/sales — historique des ventes (plus récentes d'abord). */
-salesRouter.get('/', requireAuth, async (_req, res) => {
+salesRouter.get('/', requireAuth, requireAnyTab('dashboard', 'pos', 'receivables', 'accounting', 'calendar', 'sales'), async (_req, res) => {
   try {
     res.json(await db.select().from(sales).orderBy(desc(sales.createdAt)));
   } catch (err) {
@@ -33,17 +33,57 @@ salesRouter.post('/', requireAuth, requireRole(...CASHIER_ROLES), async (req: Au
 
   try {
     const saleId = generateId('SALE');
-    const loyaltyEarned = Number(b.loyaltyPointsEarned) || 0;
+    const saleType = b.type || 'invoice';
+
+    // --- Recalcul serveur des montants (anti-falsification) + garde-fou vente à perte ---
+    // On ne fait JAMAIS confiance à totalAmount/vatAmount/loyaltyPointsEarned envoyés par
+    // le client : ils sont recalculés depuis les articles et les prix lus en base.
+    const applyVat = b.applyVat !== undefined
+      ? !!b.applyVat
+      : items.some((it: any) => (Number(it.tax) || 0) > 0); // repli : TVA si des taux sont présents
+    const discountPercent = Math.min(100, Math.max(0, Number(b.discountPercent) || 0));
+    const deliveryFee = Math.max(0, Number(b.deliveryFee) || 0);
+
+    let subtotal = 0, vat = 0;
+    const normalizedItems: any[] = [];
+    for (const it of items) {
+      const [product] = await db.select().from(products).where(eq(products.id, it.productId)).limit(1);
+      const quantity = Math.max(0, Math.floor(Number(it.quantity) || 0));
+      const unitPrice = Math.max(0, Number(it.unitPrice) || 0);
+      // Garde-fou marge : refus si prix de vente sous le prix d'achat (sauf avoir/retour).
+      if (product && saleType !== 'return' && unitPrice < product.purchasePrice) {
+        return res.status(400).json({
+          error: `Vente à perte refusée pour « ${product.name} » : prix de vente (${unitPrice}) inférieur au prix d'achat (${product.purchasePrice}).`,
+        });
+      }
+      const lineHT = quantity * unitPrice;
+      subtotal += lineHT;
+      const tax = applyVat ? (Number(it.tax) || 0) : 0;
+      if (applyVat) vat += lineHT * (tax / 100);
+      normalizedItems.push({
+        productId: it.productId,
+        productName: product?.name ?? it.productName ?? null,
+        sku: product?.sku ?? it.sku ?? null,
+        quantity,
+        unitPrice,
+        discount: Number(it.discount) || 0,
+        tax,
+        total: lineHT,
+      });
+    }
+    const discountAmount = subtotal * (discountPercent / 100);
+    const goodsTotal = subtotal + vat - discountAmount;
+    const totalAmount = Math.max(0, Math.round(goodsTotal + deliveryFee));
+    const vatAmount = Math.round(vat);
+    // Fidélité : 1 point / 10 (marchandises hors livraison), calculée serveur.
+    const loyaltyEarned = Math.floor(Math.max(0, goodsTotal) / 10);
 
     // Avance / reste : le montant encaissé peut être inférieur au total (vente à crédit).
-    const totalAmount = Number(b.totalAmount) || 0;
     const paidAmount = b.paidAmount === undefined
       ? totalAmount
       : Math.max(0, Math.min(totalAmount, Number(b.paidAmount) || 0));
     const remaining = totalAmount - paidAmount;
     const paymentStatus = paidAmount >= totalAmount ? 'paid' : paidAmount > 0 ? 'partially_paid' : 'unpaid';
-
-    const saleType = b.type || 'invoice';
 
     const sale = await db.transaction(async (tx) => {
       // Numéro de facture légal (séquence continue) — factures uniquement.
@@ -59,8 +99,8 @@ salesRouter.post('/', requireAuth, requireRole(...CASHIER_ROLES), async (req: Au
           clientId: b.clientId || 'PASSAGE',
           clientName: b.clientName ?? null,
           status: b.status || 'delivered',
-          items,
-          vatAmount: Number(b.vatAmount) || 0,
+          items: normalizedItems,
+          vatAmount,
           totalAmount,
           paymentStatus,
           paymentMethod: b.paymentMethod ?? null,
@@ -76,7 +116,7 @@ salesRouter.post('/', requireAuth, requireRole(...CASHIER_ROLES), async (req: Au
         .returning();
 
       // 2. Mouvement de sortie + déduction de stock pour chaque article
-      for (const item of items) {
+      for (const item of normalizedItems) {
         const [product] = await tx.select().from(products).where(eq(products.id, item.productId)).limit(1);
         if (!product) continue; // article introuvable : on ignore
 

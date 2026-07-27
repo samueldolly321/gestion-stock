@@ -2,12 +2,12 @@ import { Router } from 'express';
 import { desc, eq } from 'drizzle-orm';
 import { db } from '../../db/index.ts';
 import { payments } from '../../db/schema.ts';
-import { requireAuth } from '../auth-middleware.ts';
+import { requireAuth, requireAnyTab } from '../auth-middleware.ts';
 
 export const paymentsRouter = Router();
 
 /** GET /api/payments — historique des règlements. Filtres : ?refId= | ?partyId= */
-paymentsRouter.get('/', requireAuth, async (req, res) => {
+paymentsRouter.get('/', requireAuth, requireAnyTab('receivables', 'accounting', 'purchases', 'sales'), async (req, res) => {
   try {
     const refId = req.query.refId ? String(req.query.refId) : null;
     const partyId = req.query.partyId ? String(req.query.partyId) : null;
