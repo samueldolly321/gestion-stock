@@ -289,6 +289,7 @@ export const deliveries = pgTable('deliveries', {
 export const settings = pgTable('settings', {
   id: text('id').primaryKey(), // 'global'
   companyName: text('company_name'),
+  brandName: text('brand_name'), // nom de marque affiché dans la barre latérale (ex-« INVENZO »)
   logo: text('logo'),
   logoInitials: text('logo_initials'), // 1-2 lettres affichées dans le logo (sinon dérivées du nom)
   currency: text('currency').default('EUR').notNull(),

@@ -44,6 +44,7 @@ export default function Settings({
   
   // Local inputs
   const [companyName, setCompanyName] = useState(settings?.companyName || 'Vokatra-ko');
+  const [brandName, setBrandName] = useState(settings?.brandName || '');
   const [logoInitials, setLogoInitials] = useState(settings?.logoInitials || '');
   const [taxId, setTaxId] = useState(settings?.taxId || 'FR-993821034');
   const [address, setAddress] = useState(settings?.address || '42 Avenue de la République, 75011 Paris');
@@ -89,6 +90,7 @@ export default function Settings({
   useEffect(() => {
     if (!settings) return;
     setCompanyName(settings.companyName || '');
+    setBrandName(settings.brandName || '');
     setLogoInitials(settings.logoInitials || '');
     setTaxId(settings.taxId || '');
     setAddress(settings.address || '');
@@ -128,6 +130,7 @@ export default function Settings({
       // Informations d'entreprise persistées en base ; devise/taux/thème restent en localStorage.
       await saveSettings({
         companyName,
+        brandName: brandName || null,
         logoInitials: logoInitials || null,
         taxId,
         address,
@@ -217,6 +220,19 @@ export default function Settings({
                   onChange={(e) => setCompanyName(e.target.value)}
                   className="w-full bg-white dark:bg-slate-950/20 p-2 text-xs rounded-lg border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none"
                 />
+              </div>
+
+              <div>
+                <label className="text-slate-400 block mb-1">Nom de marque (barre latérale)</label>
+                <input
+                  type="text"
+                  maxLength={40}
+                  value={brandName}
+                  onChange={(e) => setBrandName(e.target.value)}
+                  placeholder="Vokatra-ko"
+                  className="w-full bg-white dark:bg-slate-950/20 p-2 text-xs rounded-lg border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none"
+                />
+                <p className="text-[10px] text-slate-500 mt-1">Titre affiché en haut de la barre latérale (au-dessus de la raison sociale). Vide = « Vokatra-ko ».</p>
               </div>
 
               <div>

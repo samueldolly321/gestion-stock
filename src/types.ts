@@ -321,6 +321,7 @@ export interface AuditLog {
 export interface Setting {
   id: string; // 'global'
   companyName: string;
+  brandName?: string | null;
   logo?: string;
   logoInitials?: string | null;
   currency: string;

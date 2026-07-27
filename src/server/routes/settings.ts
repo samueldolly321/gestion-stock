@@ -27,6 +27,7 @@ settingsRouter.put('/', requireAuth, requireRole(...MANAGE_ROLES), async (req: A
     const values = {
       id: 'global',
       companyName: b.companyName ?? null,
+      brandName: b.brandName ? String(b.brandName).slice(0, 40) : null,
       logo: b.logo ?? null,
       logoInitials: b.logoInitials ? String(b.logoInitials).slice(0, 2).toUpperCase() : null,
       currency: b.currency || 'MGA',

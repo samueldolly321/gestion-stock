@@ -34,4 +34,7 @@ export async function ensureSchema(): Promise<void> {
       END IF;
     END $$;
   `);
+
+  // Colonne `brand_name` sur settings (nom de marque de la barre latérale, administrable).
+  await db.execute(sql`ALTER TABLE settings ADD COLUMN IF NOT EXISTS brand_name text;`);
 }

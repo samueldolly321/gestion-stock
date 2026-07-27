@@ -479,7 +479,7 @@ export default function App() {
                   {(settings?.logoInitials || settings?.companyName?.trim().slice(0, 1) || 'S').toUpperCase()}
                 </div>
                 <div className="min-w-0">
-                  <h1 className="font-extrabold text-sm text-slate-900 dark:text-white tracking-wider">INVENZO</h1>
+                  <h1 className="font-extrabold text-sm text-slate-900 dark:text-white tracking-wider">{(settings?.brandName || 'Vokatra-ko').toUpperCase()}</h1>
                   <span className="text-[10px] text-cyan-400 font-mono block truncate">
                     {settings?.companyName || 'ERP de Gestion de Stock'}
                   </span>
