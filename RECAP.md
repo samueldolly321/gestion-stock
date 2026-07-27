@@ -57,7 +57,7 @@ npm run dev      # Front (Vite)  -> http://localhost:3000
 | **Réapprovisionnement** | reorder | Articles sous seuil mini, quantités suggérées, **création de commande d'achat** groupée par fournisseur, **indicateur « commande en cours »** (anti-doublon) |
 | **Dépenses** | expenses | Frais divers (transport, douane, taxes…), liés aux achats, statut payé/non payé |
 | **Livraisons** | deliveries | Livraisons client (type moto/voiture/camion…, tarif ajouté à la facture), statuts, chauffeur |
-| **Calendrier** | calendar | Vue mensuelle : **commandes fournisseurs** (réception prévue), **livraisons planifiées** et **échéances de créances** ; navigation mois, clic → onglet concerné |
+| **Calendrier** | calendar | Vue mensuelle : **commandes fournisseurs** (réception prévue), **livraisons planifiées** et **échéances de créances** ; navigation mois, clic → onglet concerné ; **bouton « + » par date → création rapide d'une commande fournisseur ou d'une livraison à cette date** |
 | **Audits & Ajustements** | audits | Inventaires physiques, validation (ajustement stock), historique |
 | **Historique des Flux** | movements | Registre inaltérable des mouvements de stock (dont retours d'avoirs) |
 | **Comptabilité** | accounting | **État de TVA** (collectée/déductible/nette) + **compte de résultat** (CA HT, COGS, marge, résultat net) par mois/trimestre/année, exports PDF/Excel |

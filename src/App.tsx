@@ -737,7 +737,14 @@ export default function App() {
               deliveries={deliveries}
               purchases={purchases}
               sales={sales}
+              suppliers={suppliers}
+              products={products}
+              supplierProducts={supplierProducts}
+              clients={clients}
+              user={currentUser}
+              onRefresh={() => { reloadPurchases(); reloadDeliveries(); }}
               onNavigate={(tab) => setActiveTab(tab)}
+              writePerms={settings?.writePermissions}
             />
           )}
 
