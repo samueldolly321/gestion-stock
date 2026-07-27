@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import {
-  ShoppingCart, ChevronLeft, ChevronRight, Download, Eye, X, Printer, FileText, Receipt, Coins,
+  ShoppingCart, ChevronLeft, ChevronRight, Download, Eye, X, Printer,
 } from 'lucide-react';
 import { Sale, TransactionItem, User } from '../types';
 import { useMoney } from '../services/CurrencyContext';
@@ -8,6 +8,7 @@ import { exportPdf } from '../services/exportPdf';
 import { exportExcel } from '../services/exportExcel';
 import { showToast } from '../services/toast';
 import Pagination, { usePagination } from './Pagination';
+import ReceiptModal from './ReceiptModal';
 
 interface SalesProps {
   sales: Sale[];
@@ -49,7 +50,6 @@ export default function Sales({ sales, user, currencySymbol, company }: SalesPro
 
   const [viewTarget, setViewTarget] = useState<Sale | null>(null);   // détail
   const [receipt, setReceipt] = useState<Sale | null>(null);          // réimpression
-  const [printFormat, setPrintFormat] = useState<'ticket' | 'a4'>('ticket');
 
   const range = useMemo(() => periodRange(gran, anchor), [gran, anchor]);
 
@@ -220,7 +220,7 @@ export default function Sales({ sales, user, currencySymbol, company }: SalesPro
                           <button onClick={() => setViewTarget(s)} title="Détail" className="p-1.5 bg-slate-100 hover:bg-cyan-500/10 text-slate-500 hover:text-cyan-500 dark:bg-slate-800/60 dark:text-slate-400 rounded-md transition">
                             <Eye className="w-3.5 h-3.5" />
                           </button>
-                          <button onClick={() => { setReceipt(s); setPrintFormat('ticket'); }} title="Réimprimer le reçu" className="p-1.5 bg-slate-100 hover:bg-cyan-500/10 text-slate-500 hover:text-cyan-500 dark:bg-slate-800/60 dark:text-slate-400 rounded-md transition">
+                          <button onClick={() => setReceipt(s)} title="Réimprimer le reçu" className="p-1.5 bg-slate-100 hover:bg-cyan-500/10 text-slate-500 hover:text-cyan-500 dark:bg-slate-800/60 dark:text-slate-400 rounded-md transition">
                             <Printer className="w-3.5 h-3.5" />
                           </button>
                         </div>
@@ -264,7 +264,7 @@ export default function Sales({ sales, user, currencySymbol, company }: SalesPro
               </div>
             </div>
             <div className="p-4 border-t border-slate-200 dark:border-slate-800 flex justify-end gap-2">
-              <button onClick={() => { setReceipt(viewTarget); setPrintFormat('ticket'); setViewTarget(null); }} className="px-4 py-2 bg-cyan-500 hover:bg-cyan-600 text-white font-semibold rounded-lg cursor-pointer flex items-center gap-1.5">
+              <button onClick={() => { setReceipt(viewTarget); setViewTarget(null); }} className="px-4 py-2 bg-cyan-500 hover:bg-cyan-600 text-white font-semibold rounded-lg cursor-pointer flex items-center gap-1.5">
                 <Printer className="w-4 h-4" /> Réimprimer
               </button>
               <button onClick={() => setViewTarget(null)} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-white font-semibold rounded-lg cursor-pointer">Fermer</button>
@@ -273,76 +273,9 @@ export default function Sales({ sales, user, currencySymbol, company }: SalesPro
         </div>
       )}
 
-      {/* Reçu réimprimable */}
+      {/* Reçu réimprimable (composant partagé avec la Caisse POS) */}
       {receipt && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <style>{`@media print { @page { size: ${printFormat === 'a4' ? 'A4' : '80mm auto'}; margin: ${printFormat === 'a4' ? '15mm' : '4mm'}; } }`}</style>
-          <div className={`bg-white text-slate-950 rounded-2xl w-full ${printFormat === 'a4' ? 'max-w-md print-a4-card' : 'max-w-sm'} overflow-hidden shadow-2xl p-6 space-y-4 print-card animate-scale-up`}>
-            <div className="text-center space-y-1">
-              <span className="font-bold tracking-tight text-lg uppercase">{company?.name || 'Vokatra-ko ERP'}</span>
-              {company?.address && <p className="text-[10px] text-slate-500">{company.address}</p>}
-              {company?.phone && <p className="text-[10px] text-slate-500">Tél: {company.phone}</p>}
-              {company?.taxId && <p className="text-[10px] text-slate-500">NIF / Stat: {company.taxId}</p>}
-              <div className="border-b border-dashed border-slate-300 py-1"></div>
-            </div>
-
-            <div className="text-[10px] space-y-1">
-              <div className="flex justify-between"><span>Facture N° :</span><span className="font-bold">{receipt.invoiceNumber || receipt.id}</span></div>
-              <div className="flex justify-between"><span>Date :</span><span>{new Date(receipt.createdAt).toLocaleString()}</span></div>
-              <div className="flex justify-between"><span>Caissier :</span><span>{receipt.cashierName}</span></div>
-              <div className="flex justify-between"><span>Client :</span><span className="font-bold">{receipt.clientName}</span></div>
-              <div className="border-b border-dashed border-slate-300 py-1"></div>
-            </div>
-
-            <div className="space-y-1.5 text-[11px]">
-              {receipt.items.map((item) => (
-                <div key={item.productId} className="flex justify-between items-start">
-                  <div><span>{item.productName}</span><span className="text-[9px] text-slate-500 block">{item.quantity} x {format(item.unitPrice)}</span></div>
-                  <span className="font-mono">{format(item.quantity * item.unitPrice)}</span>
-                </div>
-              ))}
-              <div className="border-b border-dashed border-slate-300 py-1"></div>
-            </div>
-
-            <div className="text-xs space-y-1 text-right font-mono">
-              <div className="flex justify-between"><span>TVA :</span><span>{format(receipt.vatAmount)}</span></div>
-              <div className="flex justify-between text-sm font-bold border-t border-slate-200 pt-1 text-slate-950 font-sans"><span>TOTAL TTC :</span><span>{format(receipt.totalAmount)}</span></div>
-              {receipt.paidAmount < receipt.totalAmount && (
-                <>
-                  <div className="flex justify-between"><span>Payé :</span><span>{format(receipt.paidAmount)}</span></div>
-                  <div className="flex justify-between font-bold text-red-600"><span>Reste dû :</span><span>{format(receipt.totalAmount - receipt.paidAmount)}</span></div>
-                </>
-              )}
-            </div>
-
-            <div className="text-center pt-2 text-[10px] text-slate-500 border-t border-dashed border-slate-300">
-              <p>Moyen de paiement: <strong className="uppercase">{receipt.paymentMethod}</strong></p>
-              {receipt.notes && <p className="mt-0.5">{receipt.notes}</p>}
-              <p className="mt-1 flex items-center justify-center gap-1"><Coins className="w-3 h-3" /> Points fidélité: +{receipt.loyaltyPointsEarned}</p>
-              <p className="font-bold mt-2">Merci de votre visite !</p>
-            </div>
-
-            <div className="pt-3 space-y-2.5 no-print">
-              <div>
-                <span className="text-[10px] font-mono uppercase text-slate-500 block mb-1.5">Format d'impression</span>
-                <div className="grid grid-cols-2 gap-2">
-                  <button type="button" onClick={() => setPrintFormat('ticket')} className={`py-2 px-2 rounded-lg border text-[11px] font-bold flex items-center justify-center gap-1.5 transition cursor-pointer ${printFormat === 'ticket' ? 'bg-slate-950 text-white border-slate-950' : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'}`}>
-                    <Receipt className="w-3.5 h-3.5" /> Ticket (80mm)
-                  </button>
-                  <button type="button" onClick={() => setPrintFormat('a4')} className={`py-2 px-2 rounded-lg border text-[11px] font-bold flex items-center justify-center gap-1.5 transition cursor-pointer ${printFormat === 'a4' ? 'bg-slate-950 text-white border-slate-950' : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'}`}>
-                    <FileText className="w-3.5 h-3.5" /> Facture A4
-                  </button>
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <button onClick={() => window.print()} className="flex-1 py-2 bg-cyan-500 hover:bg-cyan-600 text-white font-bold rounded-lg text-xs cursor-pointer flex items-center justify-center gap-1.5">
-                  <Printer className="w-4 h-4" /> Imprimer ({printFormat === 'a4' ? 'A4' : 'Ticket'})
-                </button>
-                <button onClick={() => setReceipt(null)} className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold rounded-lg text-xs cursor-pointer">Fermer</button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <ReceiptModal sale={receipt} company={company} onClose={() => setReceipt(null)} />
       )}
     </div>
   );
