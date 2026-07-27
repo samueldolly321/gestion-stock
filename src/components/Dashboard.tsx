@@ -32,6 +32,7 @@ import {
 } from 'recharts';
 import { Product, StockMovement, Category, Supplier, Client, AuditLog, Sale, Purchase, Expense } from '../types';
 import { useMoney } from '../services/CurrencyContext';
+import AiSummaryCard from './AiSummaryCard';
 
 interface DashboardProps {
   products: Product[];
@@ -246,6 +247,9 @@ export default function Dashboard({
           </button>
         </div>
       </div>
+
+      {/* Résumé d'activité généré par l'IA */}
+      <AiSummaryCard />
 
       {/* Metrics Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

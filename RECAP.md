@@ -47,7 +47,7 @@ npm run dev      # Front (Vite)  -> http://localhost:3000
 
 | Module | Onglet | Contenu |
 |---|---|---|
-| **Tableau de bord** | Dashboard | KPI, graphiques, alertes cliquables (rupture/périmés), **Performance commerciale** (7/30/90 j) : meilleures ventes, meilleurs clients, **Recettes / Dépenses / Solde** |
+| **Tableau de bord** | Dashboard | KPI, graphiques, alertes cliquables (rupture/périmés), **Performance commerciale** (7/30/90 j) : meilleures ventes, meilleurs clients, **Recettes / Dépenses / Solde**, **carte « Résumé d'activité (IA) »** : résumé en langage naturel jour/mois généré par Claude (`POST /api/ai/summary`, clé `ANTHROPIC_API_KEY`) |
 | **Articles & Stocks** | products | Catalogue produits (CRUD, import image, catégories/sous-cat, marques, entrepôts), **unité de mesure en liste déroulante** (+ « Autre »), **code-barres EAN-13** (génération + rendu SVG scannable + **étiquette imprimable**), fiche article, ajustement rapide |
 | **Caisse POS** | pos | Encaissement, panier (quantité éditable au clavier + boutons +/−), **prix de vente éditable par ligne + tarif client auto-appliqué (blocage vente à perte < prix d'achat)**, remise, moyens de paiement (+ référence), **livraison**, **paiement partiel / avance**, **TVA optionnelle (case « Appliquer la TVA », désactivée par défaut → vente sans TVA)**, reçu (ticket 80mm / A4) |
 | **Créances Clients** | receivables | Avances/reste par vente, encaissements, **historique détaillé** des règlements, états payé/partiel/non payé, **établissement d'avoirs** (notes de crédit) |

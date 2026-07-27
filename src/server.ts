@@ -31,6 +31,7 @@ import { purchasesRouter } from './server/routes/purchases.ts';
 import { expensesRouter } from './server/routes/expenses.ts';
 import { paymentsRouter } from './server/routes/payments.ts';
 import { eventsRouter } from './server/routes/events.ts';
+import { aiRouter } from './server/routes/ai.ts';
 
 const app = express();
 app.use(express.json());
@@ -91,6 +92,9 @@ app.use('/api/payments', paymentsRouter);
 
 // Flux temps réel (Server-Sent Events)
 app.use('/api/events', eventsRouter);
+
+// Assistant IA (résumé d'activité)
+app.use('/api/ai', aiRouter);
 
 // Vérifie que l'API tourne et que la base répond.
 app.get('/api/health', async (_req, res) => {
