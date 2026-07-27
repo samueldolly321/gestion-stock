@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { desc, eq } from 'drizzle-orm';
 import { db } from '../../db/index.ts';
-import { purchases, products, stockMovements } from '../../db/schema.ts';
+import { purchases, products, stockMovements, payments } from '../../db/schema.ts';
 import { requireAuth, requireWrite, requireAnyTab, type AuthedRequest } from '../auth-middleware.ts';
 import { generateId, computeProductStatus, writeAuditLog } from '../helpers.ts';
 
@@ -104,8 +104,15 @@ purchasesRouter.post('/:id/receive', requireAuth, requireWrite('purchases'), asy
         if (!product) continue;
 
         const qty = Number(item.quantity) || 0;
+        const unitCost = Number(item.unitCost) || 0;
         const newQty = product.quantity + qty;
         const status = computeProductStatus(newQty, product.minStock, product.expirationDate);
+
+        // Coût moyen pondéré (PMP/CUMP) : le prix d'achat de la fiche est réactualisé au
+        // coût réel réceptionné → fiabilise le COGS et le garde-fou vente à perte.
+        const newPurchasePrice = newQty > 0
+          ? (product.quantity * product.purchasePrice + qty * unitCost) / newQty
+          : (unitCost || product.purchasePrice);
 
         await tx.insert(stockMovements).values({
           id: generateId('MVT'),
@@ -118,13 +125,13 @@ purchasesRouter.post('/:id/receive', requireAuth, requireWrite('purchases'), asy
           reason: `Réception achat Réf: ${purchase.id}`,
           performedBy: req.user?.name ?? 'Achats',
           referenceId: purchase.id,
-          costPrice: Number(item.unitCost) || 0,
-          costTotal: (Number(item.unitCost) || 0) * qty,
+          costPrice: unitCost,
+          costTotal: unitCost * qty,
         });
 
         await tx
           .update(products)
-          .set({ quantity: newQty, status, updatedAt: new Date().toISOString() })
+          .set({ quantity: newQty, purchasePrice: newPurchasePrice, status, updatedAt: new Date().toISOString() })
           .where(eq(products.id, product.id));
       }
 
@@ -158,19 +165,37 @@ purchasesRouter.post('/:id/pay', requireAuth, requireWrite('purchases'), async (
     const [purchase] = await db.select().from(purchases).where(eq(purchases.id, req.params.id)).limit(1);
     if (!purchase) return res.status(404).json({ error: 'Achat introuvable.' });
 
-    const paidAmount = Math.min(purchase.totalAmount, (purchase.paidAmount || 0) + amount);
+    const already = purchase.paidAmount || 0;
+    const applied = Math.min(amount, purchase.totalAmount - already);
+    if (applied <= 0) return res.status(409).json({ error: 'Cet achat est déjà entièrement réglé.' });
+    const paidAmount = already + applied;
     const paymentStatus = paidAmount >= purchase.totalAmount ? 'paid' : paidAmount > 0 ? 'partially_paid' : 'unpaid';
 
-    const [updated] = await db
-      .update(purchases)
-      .set({ paidAmount, paymentStatus })
-      .where(eq(purchases.id, purchase.id))
-      .returning();
+    // Transaction : mise à jour de l'achat + trace du règlement dans l'historique (payments).
+    const updated = await db.transaction(async (tx) => {
+      const [row] = await tx
+        .update(purchases)
+        .set({ paidAmount, paymentStatus })
+        .where(eq(purchases.id, purchase.id))
+        .returning();
+      await tx.insert(payments).values({
+        id: generateId('PAY'),
+        kind: 'purchase',
+        refId: purchase.id,
+        partyId: purchase.supplierId ?? null,
+        partyName: purchase.supplierName ?? null,
+        amount: applied,
+        method: req.body?.method ?? null,
+        note: req.body?.note ?? 'Règlement fournisseur',
+        createdBy: req.user?.name ?? null,
+      });
+      return row;
+    });
 
     await writeAuditLog({
       userId: req.user?.sub,
       userName: req.user?.name,
-      action: `Règlement fournisseur ${amount} (Réf ${purchase.id}) — ${paymentStatus}`,
+      action: `Règlement fournisseur ${applied} (Réf ${purchase.id}) — ${paymentStatus}`,
       module: 'Achats',
       entityId: purchase.id,
     });

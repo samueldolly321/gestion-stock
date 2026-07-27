@@ -217,9 +217,11 @@ salesRouter.post('/:id/pay', requireAuth, requireRole(...PAY_ROLES), async (req:
         .where(eq(sales.id, sale.id))
         .returning();
       if (sale.clientId && sale.clientId !== 'PASSAGE') {
+        // Solde non borné à 0 : cohérent avec l'avoir. Un solde négatif = crédit client
+        // (borner à 0 ici effaçait par erreur un crédit issu d'un avoir antérieur).
         await tx
           .update(clients)
-          .set({ balance: sql`GREATEST(0, ${clients.balance} - ${applied})` })
+          .set({ balance: sql`${clients.balance} - ${applied}` })
           .where(eq(clients.id, sale.clientId));
       }
       await tx.insert(payments).values({
