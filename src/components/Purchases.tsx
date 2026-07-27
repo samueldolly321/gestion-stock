@@ -81,30 +81,46 @@ export default function Purchases({ purchases, suppliers, products, supplierProd
     return { subtotal, vat, total: subtotal + vat };
   }, [lines]);
 
-  // Produits catalogués pour le fournisseur sélectionné (avec son prix d'achat négocié).
-  const catalog = useMemo(
-    () => supplierProducts.filter((sp) => sp.supplierId === supplierId),
-    [supplierProducts, supplierId],
-  );
+  // Produits achetables auprès d'un fournisseur : UNION de deux sources, dédupliquée —
+  //  1) le catalogue « Produits fournis » (prix d'achat négocié, prioritaire) ;
+  //  2) les articles dont ce fournisseur est le fournisseur principal (fiche Articles & Stocks).
+  // Ainsi, un produit auquel on affecte un fournisseur (n'importe où) apparaît dans ses achats.
+  const buildCatalog = (sid: string) => {
+    const map = new Map<string, { productId: string; name: string; purchasePrice: number; vatRate: number }>();
+    supplierProducts.filter((sp) => sp.supplierId === sid).forEach((sp) => {
+      const prod = products.find((p) => p.id === sp.productId);
+      map.set(sp.productId, {
+        productId: sp.productId,
+        name: sp.productName || prod?.name || sp.sku || sp.productId,
+        purchasePrice: sp.purchasePrice,
+        vatRate: prod ? prod.vatRate : 20,
+      });
+    });
+    products.filter((p) => p.supplierId && p.supplierId === sid).forEach((p) => {
+      if (!map.has(p.id)) {
+        map.set(p.id, { productId: p.id, name: p.name, purchasePrice: p.purchasePrice, vatRate: p.vatRate });
+      }
+    });
+    return Array.from(map.values());
+  };
+
+  const catalog = useMemo(() => buildCatalog(supplierId), [supplierProducts, products, supplierId]);
 
   // Options proposées dans les listes déroulantes : le catalogue du fournisseur si
   // renseigné, sinon tous les produits (repli pour ne jamais bloquer la saisie).
   const optionProducts = useMemo(() => {
     if (catalog.length) {
-      return catalog.map((sp) => ({ id: sp.productId, name: sp.productName || sp.sku || sp.productId }));
+      return catalog.map((c) => ({ id: c.productId, name: c.name }));
     }
     return products.map((p) => ({ id: p.id, name: p.name }));
   }, [catalog, products]);
 
   // Construit les lignes de commande à partir du catalogue d'un fournisseur :
-  // tous ses produits, quantité 1, coût = son prix négocié. Repli sur une ligne vide.
+  // tous ses produits, quantité 1, coût = son prix négocié / d'achat. Repli sur une ligne vide.
   const linesForSupplier = (sid: string): Line[] => {
-    const cat = supplierProducts.filter((sp) => sp.supplierId === sid);
+    const cat = buildCatalog(sid);
     if (cat.length === 0) return [{ productId: '', quantity: 1, unitCost: 0, tax: 20 }];
-    return cat.map((sp) => {
-      const prod = products.find((p) => p.id === sp.productId);
-      return { productId: sp.productId, quantity: 1, unitCost: sp.purchasePrice, tax: prod ? prod.vatRate : 20 };
-    });
+    return cat.map((c) => ({ productId: c.productId, quantity: 1, unitCost: c.purchasePrice, tax: c.vatRate }));
   };
 
   const openCreate = () => {
@@ -126,13 +142,13 @@ export default function Purchases({ purchases, suppliers, products, supplierProd
     setLines((prev) => prev.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
 
   const onSelectProduct = (i: number, pid: string) => {
-    // Prix négocié chez ce fournisseur en priorité, sinon prix d'achat de la fiche article.
-    const sp = catalog.find((s) => s.productId === pid);
+    // Prix issu du catalogue unifié (négocié en priorité), sinon prix d'achat de la fiche.
+    const c = catalog.find((s) => s.productId === pid);
     const prod = products.find((p) => p.id === pid);
     setLine(i, {
       productId: pid,
-      unitCost: sp ? sp.purchasePrice : prod ? prod.purchasePrice : 0,
-      tax: prod ? prod.vatRate : 20,
+      unitCost: c ? c.purchasePrice : prod ? prod.purchasePrice : 0,
+      tax: c ? c.vatRate : prod ? prod.vatRate : 20,
     });
   };
 
