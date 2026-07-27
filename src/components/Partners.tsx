@@ -84,13 +84,14 @@ export default function Partners({
   // Supplier Products (catalogue d'approvisionnement) Drawer State
   const [activeCatalogSupplier, setActiveCatalogSupplier] = useState<Supplier | null>(null);
   const [newCatProductId, setNewCatProductId] = useState('');
-  const [newCatPrice, setNewCatPrice] = useState<number>(0);
+  // Champs de prix : '' = vide (placeholder visible) plutôt que 0.
+  const [newCatPrice, setNewCatPrice] = useState<number | ''>('');
   const [newCatRef, setNewCatRef] = useState('');
   // Mode d'ajout : produit déjà existant, ou création d'un nouvel article à la volée.
   const [catalogMode, setCatalogMode] = useState<'existing' | 'new'>('existing');
   const [npName, setNpName] = useState('');
   const [npSku, setNpSku] = useState('');
-  const [npSalePrice, setNpSalePrice] = useState<number>(0);
+  const [npSalePrice, setNpSalePrice] = useState<number | ''>('');
 
   // Supplier Documents Drawer State
   const [activeDocSupplier, setActiveDocSupplier] = useState<Supplier | null>(null);
@@ -124,21 +125,21 @@ export default function Partners({
   const openCatalog = (s: Supplier) => {
     setActiveCatalogSupplier(s);
     setNewCatProductId('');
-    setNewCatPrice(0);
+    setNewCatPrice('');
     setNewCatRef('');
     setCatalogMode('existing');
     setNpName('');
     setNpSku('');
-    setNpSalePrice(0);
+    setNpSalePrice('');
   };
 
   const resetAddForm = () => {
     setNewCatProductId('');
-    setNewCatPrice(0);
+    setNewCatPrice('');
     setNewCatRef('');
     setNpName('');
     setNpSku('');
-    setNpSalePrice(0);
+    setNpSalePrice('');
   };
 
   // Dispatch selon le mode (produit existant ou nouveau).
@@ -758,30 +759,40 @@ export default function Partners({
                   </select>
                 ) : (
                   <>
-                    <input
-                      type="text"
-                      value={npName}
-                      onChange={(e) => setNpName(e.target.value)}
-                      placeholder="Nom du nouveau produit *"
-                      className="w-full min-w-0 bg-white dark:bg-slate-950/20 p-2 text-xs rounded-lg border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500"
-                    />
-                    <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[10px] text-slate-500 dark:text-slate-400 block mb-0.5">Nom de l'article *</label>
                       <input
                         type="text"
-                        value={npSku}
-                        onChange={(e) => setNpSku(e.target.value)}
-                        placeholder="SKU (auto si vide)"
+                        value={npName}
+                        onChange={(e) => setNpName(e.target.value)}
+                        placeholder="Ex. Ciment 50 kg"
                         className="w-full min-w-0 bg-white dark:bg-slate-950/20 p-2 text-xs rounded-lg border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500"
                       />
-                      <input
-                        type="number"
-                        min={0}
-                        value={npSalePrice}
-                        onChange={(e) => setNpSalePrice(Number(e.target.value))}
-                        placeholder="Prix de vente"
-                        title="Prix de vente du nouvel article"
-                        className="w-full min-w-0 bg-white dark:bg-slate-950/20 p-2 text-xs rounded-lg border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500"
-                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-[10px] text-slate-500 dark:text-slate-400 block mb-0.5">SKU / référence</label>
+                        <input
+                          type="text"
+                          value={npSku}
+                          onChange={(e) => setNpSku(e.target.value)}
+                          placeholder="Auto si vide"
+                          title="Code interne unique de l'article (généré automatiquement si laissé vide)"
+                          className="w-full min-w-0 bg-white dark:bg-slate-950/20 p-2 text-xs rounded-lg border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-slate-500 dark:text-slate-400 block mb-0.5">Prix de vente ({currencySymbol})</label>
+                        <input
+                          type="number"
+                          min={0}
+                          value={npSalePrice}
+                          onChange={(e) => setNpSalePrice(e.target.value === '' ? '' : Number(e.target.value))}
+                          placeholder="0"
+                          title="Prix auquel vous revendez l'article (caisse POS)"
+                          className="w-full min-w-0 bg-white dark:bg-slate-950/20 p-2 text-xs rounded-lg border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500"
+                        />
+                      </div>
                     </div>
                     <p className="text-[10px] text-slate-400">Le produit est créé dans Articles &amp; Stocks (quantité 0), rattaché à ce fournisseur.</p>
                   </>
@@ -789,22 +800,29 @@ export default function Partners({
 
                 {/* Prix d'achat + réf. fournisseur */}
                 <div className="grid grid-cols-2 gap-2">
-                  <input
-                    type="number"
-                    min={0}
-                    value={newCatPrice}
-                    onChange={(e) => setNewCatPrice(Number(e.target.value))}
-                    placeholder="Prix d'achat"
-                    title="Prix d'achat chez ce fournisseur"
-                    className="w-full min-w-0 bg-white dark:bg-slate-950/20 p-2 text-xs rounded-lg border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500"
-                  />
-                  <input
-                    type="text"
-                    value={newCatRef}
-                    onChange={(e) => setNewCatRef(e.target.value)}
-                    placeholder="Réf. fourn. (opt.)"
-                    className="w-full min-w-0 bg-white dark:bg-slate-950/20 p-2 text-xs rounded-lg border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500"
-                  />
+                  <div>
+                    <label className="text-[10px] text-slate-500 dark:text-slate-400 block mb-0.5">Prix d'achat ({currencySymbol})</label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={newCatPrice}
+                      onChange={(e) => setNewCatPrice(e.target.value === '' ? '' : Number(e.target.value))}
+                      placeholder="0"
+                      title="Prix auquel ce fournisseur vous vend l'article"
+                      className="w-full min-w-0 bg-white dark:bg-slate-950/20 p-2 text-xs rounded-lg border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-slate-500 dark:text-slate-400 block mb-0.5">Réf. fournisseur (opt.)</label>
+                    <input
+                      type="text"
+                      value={newCatRef}
+                      onChange={(e) => setNewCatRef(e.target.value)}
+                      placeholder="Code chez le fourn."
+                      title="Référence de l'article chez le fournisseur (facultatif)"
+                      className="w-full min-w-0 bg-white dark:bg-slate-950/20 p-2 text-xs rounded-lg border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500"
+                    />
+                  </div>
                 </div>
 
                 <button
