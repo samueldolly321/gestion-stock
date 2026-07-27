@@ -64,6 +64,7 @@ export default function Purchases({ purchases, suppliers, products, supplierProd
   const [lines, setLines] = useState<Line[]>([{ productId: '', quantity: 1, unitCost: 0, tax: 20 }]);
   const [notes, setNotes] = useState('');
   const [expectedDate, setExpectedDate] = useState(''); // date de réception prévue (calendrier)
+  const [applyVat, setApplyVat] = useState(false); // TVA optionnelle (désactivée par défaut)
   const [busy, setBusy] = useState(false);
 
   // Modal paiement / détails
@@ -76,10 +77,11 @@ export default function Purchases({ purchases, suppliers, products, supplierProd
     lines.forEach((l) => {
       const t = (Number(l.quantity) || 0) * (Number(l.unitCost) || 0);
       subtotal += t;
-      vat += t * ((Number(l.tax) || 0) / 100);
+      // La TVA n'est comptée que si l'option est activée (achat sans TVA sinon).
+      if (applyVat) vat += t * ((Number(l.tax) || 0) / 100);
     });
     return { subtotal, vat, total: subtotal + vat };
-  }, [lines]);
+  }, [lines, applyVat]);
 
   // Produits achetables auprès d'un fournisseur : UNION de deux sources, dédupliquée —
   //  1) le catalogue « Produits fournis » (prix d'achat négocié, prioritaire) ;
@@ -129,6 +131,7 @@ export default function Purchases({ purchases, suppliers, products, supplierProd
     setLines(linesForSupplier(sid));
     setNotes('');
     setExpectedDate('');
+    setApplyVat(false);
     setIsCreateOpen(true);
   };
 
@@ -166,7 +169,7 @@ export default function Purchases({ purchases, suppliers, products, supplierProd
           sku: prod?.sku,
           quantity,
           unitCost,
-          tax: Number(l.tax) || 0,
+          tax: applyVat ? (Number(l.tax) || 0) : 0, // TVA neutralisée si l'option est décochée
           total: quantity * unitCost,
         };
       });
@@ -381,7 +384,7 @@ export default function Purchases({ purchases, suppliers, products, supplierProd
                     </select>
                     <input type="number" min={1} value={l.quantity} onChange={(e) => setLine(i, { quantity: Number(e.target.value) })} className={`${inputCls} col-span-2`} title="Quantité" />
                     <input type="number" min={0} value={l.unitCost} onChange={(e) => setLine(i, { unitCost: Number(e.target.value) })} className={`${inputCls} col-span-3`} title="Coût unitaire" />
-                    <span className="col-span-1 text-[10px] font-mono text-slate-400 text-center">{l.tax}%</span>
+                    <span className="col-span-1 text-[10px] font-mono text-slate-400 text-center">{applyVat ? l.tax : 0}%</span>
                     <button type="button" onClick={() => setLines((p) => p.filter((_, idx) => idx !== i))} className="col-span-1 text-slate-400 hover:text-red-500 flex justify-center"><Trash2 className="w-3.5 h-3.5" /></button>
                   </div>
                 ))}
@@ -398,9 +401,18 @@ export default function Purchases({ purchases, suppliers, products, supplierProd
                 </div>
               </div>
 
-              <div className="border-t border-slate-200 dark:border-slate-800 pt-3 space-y-1 font-mono text-slate-500">
+              {/* Option TVA (désactivée par défaut) */}
+              <label className="flex items-center gap-2 cursor-pointer select-none border-t border-slate-200 dark:border-slate-800 pt-3">
+                <input type="checkbox" checked={applyVat} onChange={(e) => setApplyVat(e.target.checked)} className="accent-cyan-500 w-3.5 h-3.5" />
+                <span className="text-slate-700 dark:text-slate-200 font-semibold">Appliquer la TVA</span>
+                <span className="text-[10px] text-slate-400">(sinon achat sans TVA)</span>
+              </label>
+
+              <div className="space-y-1 font-mono text-slate-500">
                 <div className="flex justify-between"><span>Sous-total HT</span><span className="text-slate-900 dark:text-white">{format(totals.subtotal)}</span></div>
-                <div className="flex justify-between"><span>TVA</span><span className="text-slate-900 dark:text-white">{format(totals.vat)}</span></div>
+                {applyVat && (
+                  <div className="flex justify-between"><span>TVA</span><span className="text-slate-900 dark:text-white">{format(totals.vat)}</span></div>
+                )}
                 <div className="flex justify-between text-sm font-bold font-sans text-slate-900 dark:text-white"><span>Total TTC</span><span className="text-cyan-500">{format(totals.total)}</span></div>
               </div>
 
