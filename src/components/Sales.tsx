@@ -9,6 +9,7 @@ import { exportExcel } from '../services/exportExcel';
 import { showToast } from '../services/toast';
 import Pagination, { usePagination } from './Pagination';
 import ReceiptModal from './ReceiptModal';
+import { periodRange, shiftAnchor, type Gran } from '../services/period';
 
 interface SalesProps {
   sales: Sale[];
@@ -17,27 +18,11 @@ interface SalesProps {
   company?: { name?: string; address?: string; phone?: string; taxId?: string };
 }
 
-type Gran = 'day' | 'month' | 'year';
-
 const PAY_META: Record<string, { label: string; cls: string }> = {
   unpaid: { label: 'Non payé', cls: 'bg-red-500/10 text-red-500' },
   partially_paid: { label: 'Partiel', cls: 'bg-amber-500/10 text-amber-500' },
   paid: { label: 'Payé', cls: 'bg-emerald-500/10 text-emerald-500' },
 };
-
-// Bornes [début, fin] + libellé de la période selon la granularité et la date d'ancrage.
-function periodRange(gran: Gran, anchor: Date) {
-  const y = anchor.getFullYear(), m = anchor.getMonth(), d = anchor.getDate();
-  if (gran === 'year') {
-    return { start: new Date(y, 0, 1), end: new Date(y, 11, 31, 23, 59, 59, 999), label: `Année ${y}` };
-  }
-  if (gran === 'day') {
-    const lbl = anchor.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-    return { start: new Date(y, m, d, 0, 0, 0, 0), end: new Date(y, m, d, 23, 59, 59, 999), label: lbl.charAt(0).toUpperCase() + lbl.slice(1) };
-  }
-  const label = anchor.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
-  return { start: new Date(y, m, 1), end: new Date(y, m + 1, 0, 23, 59, 59, 999), label: label.charAt(0).toUpperCase() + label.slice(1) };
-}
 
 export default function Sales({ sales, user, currencySymbol, company }: SalesProps) {
   const { format } = useMoney();
@@ -53,13 +38,7 @@ export default function Sales({ sales, user, currencySymbol, company }: SalesPro
 
   const range = useMemo(() => periodRange(gran, anchor), [gran, anchor]);
 
-  const shift = (dir: number) => setAnchor((a) => {
-    const d = new Date(a);
-    if (gran === 'year') d.setFullYear(d.getFullYear() + dir);
-    else if (gran === 'day') d.setDate(d.getDate() + dir);
-    else d.setMonth(d.getMonth() + dir);
-    return d;
-  });
+  const shift = (dir: number) => setAnchor((a) => shiftAnchor(gran, a, dir));
 
   // Ventes de la période (hors avoirs), triées récentes d'abord, filtrées par recherche.
   // Un intervalle Du/Au personnalisé prime sur la granularité Jour/Mois/Année.

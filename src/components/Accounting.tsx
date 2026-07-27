@@ -5,6 +5,7 @@ import { useMoney } from '../services/CurrencyContext';
 import { exportPdf } from '../services/exportPdf';
 import { exportExcel } from '../services/exportExcel';
 import { showToast } from '../services/toast';
+import { periodRange, shiftAnchor, type Gran } from '../services/period';
 
 interface AccountingProps {
   sales: Sale[];
@@ -15,23 +16,6 @@ interface AccountingProps {
   deliveries: Delivery[];
 }
 
-type Gran = 'month' | 'quarter' | 'year';
-
-// Bornes [début, fin] et libellé de la période à partir de la granularité + date d'ancrage.
-function periodRange(gran: Gran, anchor: Date) {
-  const y = anchor.getFullYear();
-  const m = anchor.getMonth();
-  if (gran === 'year') {
-    return { start: new Date(y, 0, 1), end: new Date(y, 11, 31, 23, 59, 59, 999), label: `Année ${y}` };
-  }
-  if (gran === 'quarter') {
-    const q = Math.floor(m / 3);
-    return { start: new Date(y, q * 3, 1), end: new Date(y, q * 3 + 3, 0, 23, 59, 59, 999), label: `T${q + 1} ${y}` };
-  }
-  const label = anchor.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
-  return { start: new Date(y, m, 1), end: new Date(y, m + 1, 0, 23, 59, 59, 999), label: label.charAt(0).toUpperCase() + label.slice(1) };
-}
-
 export default function Accounting({ sales, purchases, expenses, products, movements, deliveries }: AccountingProps) {
   const { format } = useMoney();
   const [gran, setGran] = useState<Gran>('month');
@@ -39,13 +23,7 @@ export default function Accounting({ sales, purchases, expenses, products, movem
 
   const range = useMemo(() => periodRange(gran, anchor), [gran, anchor]);
 
-  const shift = (dir: number) => setAnchor((a) => {
-    const d = new Date(a);
-    if (gran === 'year') d.setFullYear(d.getFullYear() + dir);
-    else if (gran === 'quarter') d.setMonth(d.getMonth() + 3 * dir);
-    else d.setMonth(d.getMonth() + dir);
-    return d;
-  });
+  const shift = (dir: number) => setAnchor((a) => shiftAnchor(gran, a, dir));
 
   const f = useMemo(() => {
     const s0 = range.start.getTime(), s1 = range.end.getTime();
