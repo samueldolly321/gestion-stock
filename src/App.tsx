@@ -25,6 +25,7 @@ import {
   PackagePlus,
   Wallet,
   HandCoins,
+  Receipt,
   Users,
   UserCog,
   Truck,
@@ -67,6 +68,7 @@ import Products from './components/Products';
 import POS from './components/POS';
 import Partners from './components/Partners';
 import Purchases from './components/Purchases';
+import Sales from './components/Sales';
 import Reorder from './components/Reorder';
 import Expenses from './components/Expenses';
 import Receivables from './components/Receivables';
@@ -416,6 +418,7 @@ export default function App() {
     { id: 'receivables', label: 'Créances Clients', icon: HandCoins },
     { id: 'partners', label: 'Clients & Fournisseurs', icon: Users },
     { id: 'purchases', label: 'Achats', icon: ShoppingBag },
+    { id: 'sales', label: 'Ventes', icon: Receipt },
     { id: 'reorder', label: 'Réapprovisionnement', icon: PackagePlus },
     { id: 'expenses', label: 'Dépenses', icon: Wallet },
     { id: 'deliveries', label: 'Livraisons', icon: Truck },
@@ -657,6 +660,20 @@ export default function App() {
               user={currentUser}
               onRefresh={reloadAfterPurchase}
               writePerms={settings?.writePermissions}
+            />
+          )}
+
+          {activeTab === 'sales' && (
+            <Sales
+              sales={sales}
+              user={currentUser}
+              currencySymbol={currencySymbol}
+              company={{
+                name: settings?.companyName,
+                address: settings?.address,
+                phone: settings?.phone,
+                taxId: settings?.taxId,
+              }}
             />
           )}
 

@@ -53,6 +53,7 @@ npm run dev      # Front (Vite)  -> http://localhost:3000
 | **Créances Clients** | receivables | Avances/reste par vente, encaissements, **historique détaillé** des règlements, états payé/partiel/non payé, **établissement d'avoirs** (notes de crédit) |
 | **Clients & Fournisseurs** | partners | CRUD clients & fournisseurs, coffre-fort documents, fiche en ligne mobile, **catalogue « Produits fournis » par fournisseur (prix d'achat négocié, multi-fournisseurs) — panneau Package**, **« Tarifs » de vente par client (prix négocié par produit, panneau Tag) appliqués en caisse** |
 | **Achats** | purchases | Commandes fournisseurs, **pré-remplissage auto des produits du fournisseur sélectionné (avec son prix négocié)**, **réception valorisée** (→ stock), **suivi des règlements** (dette fournisseurs), détails |
+| **Ventes** | sales | **Journal des ventes** : filtre Jour/Mois/Année + navigation, cartes de synthèse (nb ventes, CA TTC, encaissé, reste dû), recherche, **détail d'une vente + réimpression du reçu** (ticket 80mm / A4), export PDF/Excel |
 | **Réapprovisionnement** | reorder | Articles sous seuil mini, quantités suggérées, **création de commande d'achat** groupée par fournisseur, **indicateur « commande en cours »** (anti-doublon) |
 | **Dépenses** | expenses | Frais divers (transport, douane, taxes…), liés aux achats, statut payé/non payé |
 | **Livraisons** | deliveries | Livraisons client (type moto/voiture/camion…, tarif ajouté à la facture), statuts, chauffeur |

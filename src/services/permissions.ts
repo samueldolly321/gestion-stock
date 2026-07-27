@@ -9,6 +9,7 @@ export const ALL_TABS = [
   'receivables',
   'partners',
   'purchases',
+  'sales',
   'reorder',
   'expenses',
   'deliveries',
@@ -27,6 +28,7 @@ export const TAB_LABELS: Record<string, string> = {
   receivables: 'Créances Clients',
   partners: 'Clients & Fournisseurs',
   purchases: 'Achats',
+  sales: 'Ventes',
   reorder: 'Réapprovisionnement',
   expenses: 'Dépenses',
   deliveries: 'Livraisons',
@@ -54,10 +56,10 @@ export const DEFAULT_ROLE_TABS: Record<string, string[]> = {
   Admin: [...ALL_TABS],
   // Le Manager gère tout sauf les comptes utilisateurs.
   Manager: ALL_TABS.filter((t) => t !== 'users'),
-  Commercial: ['dashboard', 'products', 'pos', 'receivables', 'partners', 'deliveries', 'calendar', 'movements'],
+  Commercial: ['dashboard', 'products', 'pos', 'receivables', 'partners', 'sales', 'deliveries', 'calendar', 'movements'],
   Acheteur: ['products', 'calendar'],
   Auditeur: ['dashboard', 'products', 'movements', 'audits'],
-  Comptable: ['dashboard', 'products', 'pos', 'receivables', 'partners', 'purchases', 'expenses', 'deliveries', 'calendar', 'movements', 'accounting', 'settings'],
+  Comptable: ['dashboard', 'products', 'pos', 'receivables', 'partners', 'purchases', 'sales', 'expenses', 'deliveries', 'calendar', 'movements', 'accounting', 'settings'],
   Magasinier: ['dashboard', 'products', 'purchases', 'reorder', 'deliveries', 'calendar', 'movements', 'audits'],
 };
 
