@@ -93,7 +93,16 @@ SQL_ADMIN_PASSWORD=user
 PORT=3001
 JWT_SECRET=mets-ici-une-longue-chaine-aleatoire
 APP_URL=http://localhost:3000
+
+# (Optionnel) Assistant IA — carte « Résumé d'activité » du Tableau de bord.
+# Laisse vide si tu ne l'utilises pas. Clé à créer sur console.anthropic.com.
+ANTHROPIC_API_KEY=
+# (Optionnel) Modèle IA — défaut claude-opus-4-8 ; claude-haiku-4-5 = moins cher.
+# AI_MODEL=claude-haiku-4-5
 ```
+
+> 🔐 **Sécurité** : mets une vraie chaîne aléatoire dans `JWT_SECRET` (≥ 32 caractères).
+> Ne partage jamais ton `ANTHROPIC_API_KEY` : si elle a fuité, régénère-la sur la console Anthropic.
 
 **b) Installer les dépendances** (recrée `node_modules`) :
 
@@ -114,12 +123,22 @@ npm run db:check
 npm run db:push
 ```
 
+> ℹ️ Le serveur crée aussi automatiquement les **tables récentes** à son démarrage
+> (mécanisme `ensureSchema`) : si `db:push` pose souci, lancer `npm run server` (étape 5)
+> suffit à créer/compléter le schéma.
+
 **e) (Optionnel) Remplir des données de démonstration** :
 
 ```powershell
 npm run db:seed
 ```
 → produits, ventes, achats, avoirs, etc. (contexte Madagascar, en Ariary).
+
+> ⚠️ `db:seed` est **rejouable** mais **vide d'abord les tables métier** (il garde les comptes
+> utilisateurs). Ne le lance pas si tu as déjà saisi de vraies données à conserver.
+
+📘 **Pour comprendre le fonctionnement complet** (tous les onglets, la comptabilité, les rôles…) :
+voir le document **`DOCUMENTATION_PROJET.docx`** fourni à la racine.
 
 ---
 
