@@ -43,6 +43,9 @@ export default function Sales({ sales, user, currencySymbol, company }: SalesPro
   const [gran, setGran] = useState<Gran>('day');
   const [anchor, setAnchor] = useState<Date>(() => new Date());
   const [search, setSearch] = useState('');
+  const [dateFrom, setDateFrom] = useState(''); // intervalle personnalisé (prioritaire sur la granularité)
+  const [dateTo, setDateTo] = useState('');
+  const customRange = !!(dateFrom || dateTo);
 
   const [viewTarget, setViewTarget] = useState<Sale | null>(null);   // détail
   const [receipt, setReceipt] = useState<Sale | null>(null);          // réimpression
@@ -59,8 +62,14 @@ export default function Sales({ sales, user, currencySymbol, company }: SalesPro
   });
 
   // Ventes de la période (hors avoirs), triées récentes d'abord, filtrées par recherche.
+  // Un intervalle Du/Au personnalisé prime sur la granularité Jour/Mois/Année.
   const periodSales = useMemo(() => {
-    const s0 = range.start.getTime(), s1 = range.end.getTime();
+    const s0 = customRange
+      ? (dateFrom ? new Date(dateFrom + 'T00:00:00').getTime() : -Infinity)
+      : range.start.getTime();
+    const s1 = customRange
+      ? (dateTo ? new Date(dateTo + 'T23:59:59.999').getTime() : Infinity)
+      : range.end.getTime();
     const q = search.toLowerCase();
     return sales
       .filter((s) => s.type !== 'return')
@@ -69,7 +78,7 @@ export default function Sales({ sales, user, currencySymbol, company }: SalesPro
         || (s.invoiceNumber || s.id).toLowerCase().includes(q)
         || (s.clientName || '').toLowerCase().includes(q))
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  }, [sales, range, search]);
+  }, [sales, range, search, customRange, dateFrom, dateTo]);
 
   const totals = useMemo(() => {
     const ca = periodSales.reduce((a, s) => a + (Number(s.totalAmount) || 0), 0);
@@ -90,7 +99,7 @@ export default function Sales({ sales, user, currencySymbol, company }: SalesPro
     { label: 'Caissier', value: (s: Sale) => s.cashierName || '' },
   ];
   const handleExport = (fmt: 'pdf' | 'excel') => {
-    const title = `Ventes — ${range.label}`;
+    const title = `Ventes — ${customRange ? `${dateFrom || '…'} au ${dateTo || '…'}` : range.label}`;
     if (fmt === 'excel') exportExcel('ventes', title, exportCols, periodSales);
     else exportPdf('ventes', title, exportCols, periodSales);
     showToast(`${periodSales.length} vente(s) exportée(s) (${fmt.toUpperCase()}).`, { title: 'Export' });
@@ -160,10 +169,22 @@ export default function Sales({ sales, user, currencySymbol, company }: SalesPro
         <SummaryCard label="Reste dû (créances)" value={format(totals.due)} accent="text-red-500" />
       </div>
 
-      {/* Search */}
-      <div className="bg-white dark:bg-slate-900/40 p-3 rounded-xl border border-slate-200 dark:border-slate-800/80 shadow-sm">
-        <input type="text" placeholder="Rechercher par n° facture ou client..." value={search} onChange={(e) => setSearch(e.target.value)} className={inputCls} />
+      {/* Search + intervalle de dates personnalisé */}
+      <div className="bg-white dark:bg-slate-900/40 p-3 rounded-xl border border-slate-200 dark:border-slate-800/80 shadow-sm flex flex-col lg:flex-row gap-3">
+        <input type="text" placeholder="Rechercher par n° facture ou client..." value={search} onChange={(e) => setSearch(e.target.value)} className={`${inputCls} flex-1`} />
+        <div className="flex items-center gap-2">
+          <label className="text-[10px] font-mono uppercase text-slate-400 shrink-0">Du</label>
+          <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className={`${inputCls} sm:w-40`} title="Intervalle personnalisé — début (prioritaire sur Jour/Mois/Année)" />
+          <label className="text-[10px] font-mono uppercase text-slate-400 shrink-0">Au</label>
+          <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className={`${inputCls} sm:w-40`} title="Intervalle personnalisé — fin" />
+          {customRange && (
+            <button type="button" onClick={() => { setDateFrom(''); setDateTo(''); }} className="text-[11px] text-cyan-500 hover:underline shrink-0">Effacer</button>
+          )}
+        </div>
       </div>
+      {customRange && (
+        <p className="text-[11px] text-amber-500 font-mono -mt-3">Intervalle personnalisé actif — le sélecteur Jour/Mois/Année est ignoré.</p>
+      )}
 
       {/* Table */}
       <div className="bg-white dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800/80 rounded-2xl overflow-hidden shadow-sm">

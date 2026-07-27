@@ -41,15 +41,21 @@ export default function Purchases({ purchases, suppliers, products, supplierProd
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [dateFrom, setDateFrom] = useState(''); // filtre période (date de commande)
+  const [dateTo, setDateTo] = useState('');
 
   const filtered = useMemo(() => {
     const s = search.toLowerCase();
+    const from = dateFrom ? new Date(dateFrom + 'T00:00:00').getTime() : null;
+    const to = dateTo ? new Date(dateTo + 'T23:59:59.999').getTime() : null;
     return purchases.filter((p) => {
       const match = (p.supplierName || '').toLowerCase().includes(s) || p.id.toLowerCase().includes(s);
       const st = statusFilter === 'all' || p.status === statusFilter;
-      return match && st;
+      const t = new Date(p.createdAt).getTime();
+      const okDate = (from === null || t >= from) && (to === null || t <= to);
+      return match && st && okDate;
     });
-  }, [purchases, search, statusFilter]);
+  }, [purchases, search, statusFilter, dateFrom, dateTo]);
   const page = usePagination<Purchase>(filtered);
 
   // Dette fournisseurs (total dû = total - payé, hors annulés).
@@ -276,9 +282,18 @@ export default function Purchases({ purchases, suppliers, products, supplierProd
       </div>
 
       {/* Filters */}
-      <div className="bg-white dark:bg-slate-900/40 p-4 rounded-xl border border-slate-200 dark:border-slate-800/80 shadow-sm flex flex-col sm:flex-row gap-3">
+      <div className="bg-white dark:bg-slate-900/40 p-4 rounded-xl border border-slate-200 dark:border-slate-800/80 shadow-sm flex flex-col lg:flex-row gap-3">
         <input type="text" placeholder="Rechercher fournisseur ou réf..." value={search} onChange={(e) => setSearch(e.target.value)} className={`${inputCls} flex-1`} />
-        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className={`${inputCls} sm:w-48`}>
+        <div className="flex items-center gap-2">
+          <label className="text-[10px] font-mono uppercase text-slate-400 shrink-0">Du</label>
+          <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className={`${inputCls} sm:w-40`} title="Date de commande — début" />
+          <label className="text-[10px] font-mono uppercase text-slate-400 shrink-0">Au</label>
+          <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className={`${inputCls} sm:w-40`} title="Date de commande — fin" />
+          {(dateFrom || dateTo) && (
+            <button type="button" onClick={() => { setDateFrom(''); setDateTo(''); }} className="text-[11px] text-cyan-500 hover:underline shrink-0">Effacer</button>
+          )}
+        </div>
+        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className={`${inputCls} lg:w-48`}>
           <option value="all">Tous les statuts</option>
           <option value="ordered">Commandé</option>
           <option value="received">Réceptionné</option>
