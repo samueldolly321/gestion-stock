@@ -77,7 +77,7 @@ export default function AuthPage({ onLoginSuccess }: AuthPageProps) {
   };
 
   return (
-    <div className="min-h-screen flex flex-col md:flex-row bg-[#0b0f19] text-gray-100 font-sans selection:bg-cyan-500 selection:text-black">
+    <div className="min-h-dvh flex flex-col md:flex-row bg-[#0b0f19] text-gray-100 font-sans selection:bg-cyan-500 selection:text-black">
 
       {/* Left pane: Branding & Design */}
       <div className="w-full md:w-5/12 bg-gradient-to-br from-slate-900 via-[#0d1527] to-[#080d1a] p-8 md:p-12 flex flex-col justify-between border-b md:border-b-0 md:border-r border-slate-800/80 relative overflow-hidden">
