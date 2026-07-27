@@ -18,6 +18,7 @@ import { movementsRouter } from './server/routes/movements.ts';
 import { clientsRouter } from './server/routes/clients.ts';
 import { suppliersRouter } from './server/routes/suppliers.ts';
 import { supplierProductsRouter } from './server/routes/supplierProducts.ts';
+import { clientPricesRouter } from './server/routes/clientPrices.ts';
 import { salesRouter } from './server/routes/sales.ts';
 import { auditsRouter } from './server/routes/audits.ts';
 import { auditLogsRouter } from './server/routes/auditLogs.ts';
@@ -57,6 +58,7 @@ app.use('/api/movements', movementsRouter);
 app.use('/api/clients', clientsRouter);
 app.use('/api/suppliers', suppliersRouter);
 app.use('/api/supplier-products', supplierProductsRouter);
+app.use('/api/client-prices', clientPricesRouter);
 
 // Routes ventes (POS)
 app.use('/api/sales', salesRouter);

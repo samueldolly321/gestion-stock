@@ -6,6 +6,7 @@ import { listProducts } from './services/productsService';
 import { listMovements } from './services/movementsService';
 import { listClients, listSuppliers } from './services/partnersService';
 import { listSupplierProducts } from './services/supplierProductsService';
+import { listClientPrices } from './services/clientPricesService';
 import { listSales } from './services/salesService';
 import { listDeliveries } from './services/deliveriesService';
 import { listUsers } from './services/usersService';
@@ -57,7 +58,8 @@ import {
   Delivery,
   Purchase,
   Expense,
-  SupplierProduct
+  SupplierProduct,
+  ClientPrice
 } from './types';
 import AuthPage from './components/AuthPage';
 import Dashboard from './components/Dashboard';
@@ -94,6 +96,7 @@ export default function App() {
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [supplierProducts, setSupplierProducts] = useState<SupplierProduct[]>([]);
+  const [clientPrices, setClientPrices] = useState<ClientPrice[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [movements, setMovements] = useState<StockMovement[]>([]);
   const [audits, setAudits] = useState<InventoryAudit[]>([]);
@@ -165,6 +168,13 @@ export default function App() {
     listSupplierProducts()
       .then(setSupplierProducts)
       .catch((err) => console.error('Chargement du catalogue fournisseur échoué :', err));
+  }, []);
+
+  // Tarifs de vente négociés par client (prix différent selon le client).
+  const reloadClientPrices = React.useCallback(() => {
+    listClientPrices()
+      .then(setClientPrices)
+      .catch((err) => console.error('Chargement des tarifs client échoué :', err));
   }, []);
 
   const reloadSales = React.useCallback(() => {
@@ -272,6 +282,7 @@ export default function App() {
     reloadMovements();
     reloadPartners();
     reloadSupplierProducts();
+    reloadClientPrices();
     reloadSales();
     reloadAudits();
     reloadDeliveries();
@@ -288,6 +299,7 @@ export default function App() {
     reloadMovements,
     reloadPartners,
     reloadSupplierProducts,
+    reloadClientPrices,
     reloadSales,
     reloadAudits,
     reloadDeliveries,
@@ -597,6 +609,7 @@ export default function App() {
             <POS
               products={products}
               clients={clients}
+              clientPrices={clientPrices}
               user={currentUser}
               onRefresh={reloadAfterSale}
               currencySymbol={currencySymbol}
@@ -624,9 +637,11 @@ export default function App() {
               clients={clients}
               products={products}
               supplierProducts={supplierProducts}
+              clientPrices={clientPrices}
               user={currentUser}
               onRefresh={reloadPartners}
               onRefreshSupplierProducts={reloadSupplierProducts}
+              onRefreshClientPrices={reloadClientPrices}
               onRefreshProducts={reloadProducts}
               currencySymbol={currencySymbol}
               writePerms={settings?.writePermissions}

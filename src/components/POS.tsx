@@ -18,7 +18,7 @@ import {
   FileText,
   Truck
 } from 'lucide-react';
-import { Product, Client, Sale, User, TransactionItem, DeliveryType } from '../types';
+import { Product, Client, ClientPrice, Sale, User, TransactionItem, DeliveryType } from '../types';
 import { createSale } from '../services/salesService';
 import { createDelivery, DELIVERY_TYPES, defaultFeeFor, deliveryTypeLabel } from '../services/deliveriesService';
 import { showAlert } from '../services/dialog';
@@ -28,6 +28,7 @@ import confetti from 'canvas-confetti';
 interface POSProps {
   products: Product[];
   clients: Client[];
+  clientPrices: ClientPrice[];
   user: User;
   onRefresh: () => void;
   currencySymbol: string;
@@ -37,6 +38,7 @@ interface POSProps {
 export default function POS({
   products,
   clients,
+  clientPrices,
   user,
   onRefresh,
   currencySymbol,
@@ -74,6 +76,29 @@ export default function POS({
     return clients.find((c) => c.id === selectedClientId) || null;
   }, [clients, selectedClientId]);
 
+  // Prix de vente applicable au client sélectionné : tarif négocié si défini, sinon prix par défaut.
+  const priceForClient = (product: Product): number => {
+    const cp = clientPrices.find((c) => c.clientId === selectedClientId && c.productId === product.id);
+    return cp ? cp.salePrice : product.salePrice;
+  };
+  // Un tarif négocié existe-t-il pour ce produit et ce client ?
+  const hasClientPrice = (productId: string): boolean =>
+    clientPrices.some((c) => c.clientId === selectedClientId && c.productId === productId);
+
+  // Changer de client ré-applique automatiquement SES tarifs à toutes les lignes du panier.
+  React.useEffect(() => {
+    setCart((prev) =>
+      prev.map((item) => {
+        const prod = products.find((p) => p.id === item.productId);
+        if (!prod) return item;
+        const cp = clientPrices.find((c) => c.clientId === selectedClientId && c.productId === prod.id);
+        const newPrice = cp ? cp.salePrice : prod.salePrice;
+        return { ...item, unitPrice: newPrice, total: item.quantity * newPrice * (1 - item.discount / 100) };
+      }),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedClientId]);
+
   // Filter products by search term (name, sku, barcode)
   const availableProducts = useMemo(() => {
     return products.filter((p) => {
@@ -104,15 +129,16 @@ export default function POS({
         )
       );
     } else {
+      const price = priceForClient(product); // tarif négocié du client si défini
       const newItem: TransactionItem = {
         productId: product.id,
         productName: product.name,
         sku: product.sku,
         quantity: 1,
-        unitPrice: product.salePrice,
+        unitPrice: price,
         discount: 0,
         tax: product.vatRate,
-        total: product.salePrice
+        total: price
       };
       setCart([...cart, newItem]);
     }
@@ -153,6 +179,24 @@ export default function POS({
     q = Math.max(1, Math.min(q, p.quantity));
     setCart(cart.map((item) => item.productId === productId
       ? { ...item, quantity: q, total: q * item.unitPrice * (1 - item.discount / 100) }
+      : item));
+  };
+
+  // Définit le prix de vente unitaire d'une ligne (négociation par client au comptoir).
+  // Garde-fou : bloque la vente à perte (prix < prix d'achat) → ramené au prix d'achat.
+  const setUnitPrice = (productId: string, value: number | string) => {
+    const p = products.find((prod) => prod.id === productId);
+    if (!p) return;
+    let price = Math.max(0, Number(value) || 0);
+    if (price < p.purchasePrice) {
+      showAlert(
+        `Prix de vente (${format(price)}) inférieur au prix d'achat (${format(p.purchasePrice)}). Vente à perte bloquée : prix ramené au prix d'achat.`,
+        { variant: 'warning' },
+      );
+      price = p.purchasePrice;
+    }
+    setCart(cart.map((item) => item.productId === productId
+      ? { ...item, unitPrice: price, total: item.quantity * price * (1 - item.discount / 100) }
       : item));
   };
 
@@ -197,6 +241,18 @@ export default function POS({
   // déduit le stock et crédite la fidélité en transaction.
   const handleCheckout = async () => {
     if (cart.length === 0) return;
+
+    // Garde-fou marge : aucune ligne ne peut être vendue sous son prix d'achat.
+    for (const item of cart) {
+      const prod = products.find((p) => p.id === item.productId);
+      if (prod && item.unitPrice < prod.purchasePrice) {
+        showAlert(
+          `« ${item.productName} » : prix de vente (${format(item.unitPrice)}) sous le prix d'achat (${format(prod.purchasePrice)}). Corrigez la ligne avant d'encaisser.`,
+          { variant: 'warning' },
+        );
+        return;
+      }
+    }
 
     try {
       // Notes finales : réf. de paiement (hors espèces) + livraison éventuelle.
@@ -389,7 +445,23 @@ export default function POS({
                 >
                   <div className="min-w-0 flex-1">
                     <span className="text-xs font-bold text-slate-900 dark:text-white block truncate">{item.productName}</span>
-                    <span className="text-[10px] text-slate-400 font-mono">{format(item.unitPrice)} HT</span>
+                    <div className="flex items-center gap-1 mt-0.5">
+                      <input
+                        type="number"
+                        min={0}
+                        value={item.unitPrice}
+                        onFocus={(e) => e.target.select()}
+                        onChange={(e) => setUnitPrice(item.productId, e.target.value)}
+                        title="Prix de vente unitaire (HT) — modifiable pour ce client. Vente à perte bloquée."
+                        className="w-20 font-mono text-[10px] text-slate-700 dark:text-slate-200 bg-transparent border border-slate-200 dark:border-slate-700 rounded px-1 py-0.5 focus:outline-none focus:border-cyan-500"
+                      />
+                      <span className="text-[9px] text-slate-400 font-mono">HT</span>
+                      {hasClientPrice(item.productId) && (
+                        <span className="text-[8px] px-1 py-0.5 bg-cyan-500/10 text-cyan-400 rounded font-mono" title="Tarif négocié de ce client">
+                          tarif client
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   <div className="flex items-center gap-2 shrink-0">

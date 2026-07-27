@@ -15,11 +15,13 @@ import {
   UserPlus,
   Download,
   Package,
+  Tag,
   Plus as PlusIcon
 } from 'lucide-react';
-import { Supplier, Client, User, Product, SupplierProduct } from '../types';
+import { Supplier, Client, User, Product, SupplierProduct, ClientPrice } from '../types';
 import { savePartner, deletePartner } from '../services/partnersService';
 import { saveSupplierProduct, updateSupplierProduct, deleteSupplierProduct } from '../services/supplierProductsService';
+import { saveClientPrice, updateClientPrice, deleteClientPrice } from '../services/clientPricesService';
 import { createProduct } from '../services/productsService';
 import { generateId } from '../services/ids';
 import { showAlert, showConfirm } from '../services/dialog';
@@ -35,9 +37,11 @@ interface PartnersProps {
   clients: Client[];
   products: Product[];
   supplierProducts: SupplierProduct[];
+  clientPrices: ClientPrice[];
   user: User;
   onRefresh: () => void;
   onRefreshSupplierProducts: () => void;
+  onRefreshClientPrices: () => void;
   onRefreshProducts: () => void;
   currencySymbol: string;
   writePerms?: Record<string, string[]> | null;
@@ -48,9 +52,11 @@ export default function Partners({
   clients,
   products,
   supplierProducts,
+  clientPrices,
   user,
   onRefresh,
   onRefreshSupplierProducts,
+  onRefreshClientPrices,
   onRefreshProducts,
   currencySymbol,
   writePerms
@@ -237,6 +243,82 @@ export default function Partners({
     setNewCatProductId(pid);
     const prod = products.find((p) => p.id === pid);
     if (prod) setNewCatPrice(prod.purchasePrice || 0);
+  };
+
+  // ----- Tarifs de vente par client (prix négociés) -----
+  const [activeTariffClient, setActiveTariffClient] = useState<Client | null>(null);
+  const [tarProductId, setTarProductId] = useState('');
+  const [tarPrice, setTarPrice] = useState<number | ''>('');
+
+  const tariffItems = useMemo(
+    () => (activeTariffClient ? clientPrices.filter((cp) => cp.clientId === activeTariffClient.id) : []),
+    [activeTariffClient, clientPrices],
+  );
+  const tariffCountByClient = useMemo(() => {
+    const m: Record<string, number> = {};
+    clientPrices.forEach((cp) => { m[cp.clientId] = (m[cp.clientId] || 0) + 1; });
+    return m;
+  }, [clientPrices]);
+  const productsToAddTariff = useMemo(() => {
+    const linked = new Set(tariffItems.map((cp) => cp.productId));
+    return products.filter((p) => !linked.has(p.id));
+  }, [tariffItems, products]);
+
+  const openTariffs = (c: Client) => {
+    setActiveTariffClient(c);
+    setTarProductId('');
+    setTarPrice('');
+  };
+  const onPickTariffProduct = (pid: string) => {
+    setTarProductId(pid);
+    const prod = products.find((p) => p.id === pid);
+    if (prod) setTarPrice(prod.salePrice || 0); // pré-remplit avec le prix de vente par défaut
+  };
+
+  const handleAddTariff = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeTariffClient || !tarProductId) {
+      showAlert('Sélectionnez un produit.', { variant: 'warning' });
+      return;
+    }
+    const prod = products.find((p) => p.id === tarProductId);
+    const price = Number(tarPrice) || 0;
+    if (prod && price < prod.purchasePrice) {
+      showAlert(`Prix de vente (${format(price)}) inférieur au prix d'achat (${format(prod.purchasePrice)}).`, { variant: 'warning' });
+      return;
+    }
+    try {
+      await saveClientPrice({ clientId: activeTariffClient.id, productId: tarProductId, salePrice: price });
+      setTarProductId('');
+      setTarPrice('');
+      onRefreshClientPrices();
+      showToast('Tarif client enregistré.', { title: 'Clients' });
+    } catch (err: any) {
+      showAlert(err?.message || 'Enregistrement refusé (permissions insuffisantes).', { variant: 'error' });
+    }
+  };
+  const handleUpdateTariffPrice = async (cp: ClientPrice, price: number) => {
+    const p = Number(price) || 0;
+    if (cp.purchasePrice != null && p < cp.purchasePrice) {
+      showAlert(`Prix de vente (${format(p)}) inférieur au prix d'achat (${format(cp.purchasePrice)}).`, { variant: 'warning' });
+      onRefreshClientPrices(); // recharge (annule la saisie invalide)
+      return;
+    }
+    try {
+      await updateClientPrice(cp.id, { salePrice: p });
+      onRefreshClientPrices();
+    } catch (err: any) {
+      showAlert(err?.message || 'Mise à jour refusée.', { variant: 'error' });
+    }
+  };
+  const handleRemoveTariff = async (cp: ClientPrice) => {
+    try {
+      await deleteClientPrice(cp.id);
+      onRefreshClientPrices();
+      showToast('Tarif retiré (retour au prix par défaut).', { title: 'Clients', type: 'info' });
+    } catch (err: any) {
+      showAlert(err?.message || 'Suppression refusée.', { variant: 'error' });
+    }
   };
 
   // Handle open modal
@@ -648,6 +730,20 @@ export default function Partners({
                             <FileText className="w-3.5 h-3.5" />
                           </button>
                         )}
+                        {partnerType === 'clients' && (
+                          <button
+                            onClick={() => openTariffs(p)}
+                            className="relative p-1.5 bg-slate-100 hover:bg-cyan-500/10 text-slate-500 hover:text-cyan-500 dark:bg-slate-800/60 dark:text-slate-400 dark:hover:text-cyan-400 rounded-md transition duration-150"
+                            title="Tarifs de vente de ce client"
+                          >
+                            <Tag className="w-3.5 h-3.5" />
+                            {tariffCountByClient[p.id] > 0 && (
+                              <span className="absolute -top-1 -right-1 bg-cyan-500 text-white text-[8px] font-bold rounded-full min-w-[14px] h-[14px] px-0.5 flex items-center justify-center">
+                                {tariffCountByClient[p.id]}
+                              </span>
+                            )}
+                          </button>
+                        )}
                         {canWrite && (
                           <>
                             <button
@@ -692,6 +788,111 @@ export default function Partners({
           onChange={partnersPage.setPage}
         />
       </div>
+
+      {/* CLIENT PRICES (TARIFS) DRAWER MODAL */}
+      {activeTariffClient && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex justify-end">
+          <div className="bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 w-full max-w-md p-6 space-y-5 shadow-2xl h-full flex flex-col overflow-y-auto overflow-x-hidden animate-slide-left text-xs">
+            <div className="flex justify-between items-center">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                <Tag className="w-5 h-5 text-cyan-400" />
+                Tarifs de vente
+              </h3>
+              <button onClick={() => setActiveTariffClient(null)} className="text-slate-400 hover:text-slate-900 dark:hover:text-white">✕</button>
+            </div>
+            <p className="text-slate-500 dark:text-slate-400">
+              Prix de vente négociés pour{' '}
+              <strong className="text-slate-900 dark:text-white">{activeTariffClient.name}</strong>.
+              Ces prix s'appliquent automatiquement en caisse quand ce client est sélectionné. Sans tarif = prix de vente par défaut de l'article.
+            </p>
+
+            {/* Add tariff form */}
+            {canWrite && (
+              <form onSubmit={handleAddTariff} className="space-y-2 border border-slate-200 dark:border-slate-800 rounded-xl p-3 bg-slate-50 dark:bg-slate-950/20">
+                <label className="text-[10px] font-mono text-slate-500 uppercase tracking-widest">Ajouter un tarif</label>
+                <select
+                  value={tarProductId}
+                  onChange={(e) => onPickTariffProduct(e.target.value)}
+                  className="w-full min-w-0 bg-white dark:bg-slate-950/20 p-2 text-xs rounded-lg border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500"
+                >
+                  <option value="">— Sélectionner un produit —</option>
+                  {productsToAddTariff.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name} ({format(p.salePrice)})</option>
+                  ))}
+                </select>
+                <div className="grid grid-cols-[1fr_auto] gap-2">
+                  <div>
+                    <label className="text-[10px] text-slate-500 dark:text-slate-400 block mb-0.5">Prix de vente pour ce client ({currencySymbol})</label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={tarPrice}
+                      onChange={(e) => setTarPrice(e.target.value === '' ? '' : Number(e.target.value))}
+                      placeholder="0"
+                      className="w-full min-w-0 bg-white dark:bg-slate-950/20 p-2 text-xs rounded-lg border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500"
+                    />
+                  </div>
+                  <button type="submit" className="self-end px-3 py-2 bg-cyan-500 hover:bg-cyan-600 text-white font-bold rounded-lg cursor-pointer flex items-center gap-1">
+                    <PlusIcon className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+                <p className="text-[10px] text-slate-400">La vente à perte (prix &lt; prix d'achat) est refusée.</p>
+                {productsToAddTariff.length === 0 && (
+                  <p className="text-[10px] text-slate-400">Tous les produits ont déjà un tarif pour ce client.</p>
+                )}
+              </form>
+            )}
+
+            {/* Tariff listing */}
+            <div className="space-y-2 flex-1">
+              <h4 className="text-[10px] font-mono text-slate-500 uppercase tracking-widest">
+                Tarifs ({tariffItems.length}) :
+              </h4>
+              {tariffItems.length === 0 ? (
+                <p className="text-slate-500 py-6 text-center border border-dashed border-slate-200 dark:border-slate-800 rounded-xl">
+                  Aucun tarif spécifique — ce client paie le prix par défaut.
+                </p>
+              ) : (
+                tariffItems.map((cp) => (
+                  <div key={cp.id} className="p-2.5 bg-slate-50 dark:bg-slate-950/20 rounded-lg border border-slate-200 dark:border-slate-800/60 flex items-center justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <span className="font-semibold text-slate-900 dark:text-white block truncate">{cp.productName || cp.productId}</span>
+                      <span className="text-[9px] text-slate-400 font-mono">
+                        {cp.sku} · Défaut {cp.defaultSalePrice != null ? format(cp.defaultSalePrice) : '—'}
+                        {cp.purchasePrice != null ? ` · Achat ${format(cp.purchasePrice)}` : ''}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <input
+                        key={`${cp.id}-${cp.salePrice}`}
+                        type="number"
+                        min={0}
+                        defaultValue={cp.salePrice}
+                        disabled={!canWrite}
+                        onBlur={(e) => {
+                          const v = Number(e.target.value) || 0;
+                          if (v !== cp.salePrice) handleUpdateTariffPrice(cp, v);
+                        }}
+                        title="Prix de vente pour ce client (modifiable). Vente à perte refusée."
+                        className="w-24 bg-white dark:bg-slate-950/40 p-1.5 text-[11px] text-right font-mono rounded-lg border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500 disabled:opacity-60"
+                      />
+                      {canWrite && (
+                        <button onClick={() => handleRemoveTariff(cp)} className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-500/10 rounded-md transition" title="Retirer ce tarif">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <button onClick={() => setActiveTariffClient(null)} className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-white font-bold rounded-lg cursor-pointer">
+              Fermer
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* SUPPLIER PRODUCTS (CATALOGUE) DRAWER MODAL */}
       {activeCatalogSupplier && (

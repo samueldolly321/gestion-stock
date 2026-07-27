@@ -37,4 +37,25 @@ export async function ensureSchema(): Promise<void> {
 
   // Colonne `brand_name` sur settings (nom de marque de la barre latérale, administrable).
   await db.execute(sql`ALTER TABLE settings ADD COLUMN IF NOT EXISTS brand_name text;`);
+
+  // Table `client_prices` — tarifs de vente négociés par client.
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS client_prices (
+      id text PRIMARY KEY NOT NULL,
+      client_id text NOT NULL,
+      product_id text NOT NULL,
+      sale_price double precision DEFAULT 0 NOT NULL,
+      created_at timestamp DEFAULT now() NOT NULL,
+      updated_at timestamp DEFAULT now() NOT NULL
+    );
+  `);
+  await db.execute(sql`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'uniq_client_product') THEN
+        ALTER TABLE client_prices
+          ADD CONSTRAINT uniq_client_product UNIQUE (client_id, product_id);
+      END IF;
+    END $$;
+  `);
 }

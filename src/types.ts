@@ -71,6 +71,25 @@ export interface SupplierProduct {
   supplierName?: string;
 }
 
+// Tarif de vente négocié d'un produit pour un client donné. Les champs `product*`/`default*`
+// sont enrichis à la lecture (jointure) pour l'affichage — pas stockés dans la table.
+export interface ClientPrice {
+  id: string;
+  clientId: string;
+  productId: string;
+  salePrice: number; // prix de vente pour ce client
+  createdAt: string;
+  updatedAt: string;
+  // Enrichis à la lecture (jointure) :
+  productName?: string;
+  sku?: string;
+  defaultSalePrice?: number; // prix de vente par défaut de la fiche article
+  purchasePrice?: number; // prix d'achat (pour le garde-fou marge)
+  vatRate?: number;
+  unit?: string;
+  clientName?: string;
+}
+
 export interface Client {
   id: string;
   name: string;

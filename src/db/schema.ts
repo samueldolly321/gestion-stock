@@ -130,6 +130,19 @@ export const supplierProducts = pgTable('supplier_products', {
   uniqSupplierProduct: unique('uniq_supplier_product').on(t.supplierId, t.productId),
 }));
 
+// 7c. Client ↔ Products — tarifs de vente négociés par client (prix différent par client).
+// Unicité (clientId, productId) : un prix par produit et par client. Absence = prix de vente par défaut.
+export const clientPrices = pgTable('client_prices', {
+  id: text('id').primaryKey(),
+  clientId: text('client_id').notNull(),
+  productId: text('product_id').notNull(),
+  salePrice: doublePrecision('sale_price').default(0).notNull(), // prix de vente pour CE client
+  createdAt,
+  updatedAt,
+}, (t) => ({
+  uniqClientProduct: unique('uniq_client_product').on(t.clientId, t.productId),
+}));
+
 // 8. Stock Movements
 export const stockMovements = pgTable('stock_movements', {
   id: text('id').primaryKey(),
