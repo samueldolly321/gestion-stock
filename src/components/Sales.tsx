@@ -172,7 +172,7 @@ export default function Sales({ sales, user, currencySymbol, company }: SalesPro
             <thead>
               <tr className="bg-slate-50 dark:bg-slate-950/20 border-b border-slate-200 dark:border-slate-800/60 text-[10px] font-mono text-slate-400 uppercase tracking-wider">
                 <th className="py-3 px-4">N° Facture</th>
-                <th className="py-3 px-4 hidden md:table-cell">Date</th>
+                <th className="py-3 px-4">Date</th>
                 <th className="py-3 px-4">Client</th>
                 <th className="py-3 px-4 text-right">Total TTC</th>
                 <th className="py-3 px-4 text-right hidden md:table-cell">Reste dû</th>
@@ -189,7 +189,7 @@ export default function Sales({ sales, user, currencySymbol, company }: SalesPro
                   return (
                     <tr key={s.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/10 transition cursor-pointer" onClick={() => setViewTarget(s)}>
                       <td className="py-3 px-4 font-mono font-bold text-[11px] text-cyan-500">{s.invoiceNumber || s.id}</td>
-                      <td className="py-3 px-4 hidden md:table-cell font-mono text-[11px] text-slate-400">{new Date(s.createdAt).toLocaleString()}</td>
+                      <td className="py-3 px-4 font-mono text-[11px] text-slate-400 whitespace-nowrap">{new Date(s.createdAt).toLocaleString()}</td>
                       <td className="py-3 px-4 font-semibold text-slate-900 dark:text-white">{s.clientName || '—'}</td>
                       <td className="py-3 px-4 text-right font-mono font-bold text-slate-900 dark:text-white">{format(s.totalAmount)}</td>
                       <td className="py-3 px-4 text-right hidden md:table-cell font-mono">{reste > 0 ? <span className="text-red-500 font-bold">{format(reste)}</span> : <span className="text-emerald-500">0</span>}</td>

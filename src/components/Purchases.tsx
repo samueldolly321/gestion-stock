@@ -294,7 +294,7 @@ export default function Purchases({ purchases, suppliers, products, supplierProd
               <tr className="bg-slate-50 dark:bg-slate-950/20 border-b border-slate-200 dark:border-slate-800/60 text-[10px] font-mono text-slate-400 uppercase tracking-wider">
                 <th className="py-3 px-4">Réf</th>
                 <th className="py-3 px-4">Fournisseur</th>
-                <th className="py-3 px-4 hidden lg:table-cell">Date</th>
+                <th className="py-3 px-4">Date</th>
                 <th className="py-3 px-4 text-right">Total TTC</th>
                 <th className="py-3 px-4 text-right hidden md:table-cell">Reste dû</th>
                 <th className="py-3 px-4 text-center">Statut</th>
@@ -312,7 +312,7 @@ export default function Purchases({ purchases, suppliers, products, supplierProd
                     <tr key={p.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/10 transition">
                       <td className="py-3 px-4 font-mono font-bold text-[11px] text-cyan-500">{p.id}</td>
                       <td className="py-3 px-4 font-semibold text-slate-900 dark:text-white">{p.supplierName || '—'}</td>
-                      <td className="py-3 px-4 hidden lg:table-cell font-mono text-[11px] text-slate-400">{new Date(p.createdAt).toLocaleDateString()}</td>
+                      <td className="py-3 px-4 font-mono text-[11px] text-slate-400 whitespace-nowrap">{new Date(p.createdAt).toLocaleDateString()}</td>
                       <td className="py-3 px-4 text-right font-mono font-bold text-slate-900 dark:text-white">{format(p.totalAmount)}</td>
                       <td className="py-3 px-4 text-right hidden md:table-cell font-mono">{reste > 0 ? <span className="text-red-500 font-bold">{format(reste)}</span> : <span className="text-emerald-500">0</span>}</td>
                       <td className="py-3 px-4 text-center"><span className={`px-1.5 py-0.5 rounded text-[9px] font-mono ${STATUS_META[p.status]?.cls}`}>{STATUS_META[p.status]?.label}</span></td>
