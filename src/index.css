@@ -36,6 +36,16 @@ select option {
   color: #f1f5f9;            /* slate-100 */
 }
 
+/* Lisibilité en mode CLAIR : les gris clairs (slate-400/500) manquent de contraste sur
+   fond blanc. On les fonce (spécificité > utilitaire Tailwind, donc prioritaire), SAUF
+   à l'intérieur d'éléments à fond volontairement sombre (barre du haut, sidebar sombre). */
+html:not(.dark) .text-slate-400 { color: #475569; } /* slate-600 */
+html:not(.dark) .text-slate-500 { color: #334155; } /* slate-700 */
+html:not(.dark) .bg-slate-950 .text-slate-400,
+html:not(.dark) .bg-slate-950 .text-slate-500,
+html:not(.dark) .bg-slate-900 .text-slate-400,
+html:not(.dark) .bg-slate-900 .text-slate-500 { color: #94a3b8; } /* garde un gris clair sur fond sombre */
+
 /* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
