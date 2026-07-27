@@ -1,0 +1,37 @@
+/**
+ * Migrations légères & idempotentes appliquées au DÉMARRAGE du serveur.
+ *
+ * Raison d'être : Render déploie le code automatiquement à chaque push, mais ne
+ * crée jamais les nouvelles tables. Depuis un poste où le port 5432 est bloqué en
+ * sortie (fréquent sur les réseaux d'entreprise), on ne peut pas non plus appliquer
+ * le schéma à distance. On laisse donc le serveur — qui, lui, atteint la base par
+ * le réseau interne — garantir la présence des tables récentes à chaque boot.
+ *
+ * Chaque instruction est idempotente (`IF NOT EXISTS`), donc rejouable sans risque.
+ */
+import { sql } from 'drizzle-orm';
+import { db } from './index.ts';
+
+export async function ensureSchema(): Promise<void> {
+  // Table `supplier_products` — catalogue d'approvisionnement (fournisseur ↔ produit).
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS supplier_products (
+      id text PRIMARY KEY NOT NULL,
+      supplier_id text NOT NULL,
+      product_id text NOT NULL,
+      purchase_price double precision DEFAULT 0 NOT NULL,
+      supplier_ref text,
+      created_at timestamp DEFAULT now() NOT NULL,
+      updated_at timestamp DEFAULT now() NOT NULL
+    );
+  `);
+  await db.execute(sql`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'uniq_supplier_product') THEN
+        ALTER TABLE supplier_products
+          ADD CONSTRAINT uniq_supplier_product UNIQUE (supplier_id, product_id);
+      END IF;
+    END $$;
+  `);
+}
