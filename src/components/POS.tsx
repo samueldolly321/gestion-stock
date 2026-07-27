@@ -183,21 +183,18 @@ export default function POS({
   };
 
   // Définit le prix de vente unitaire d'une ligne (négociation par client au comptoir).
-  // Garde-fou : bloque la vente à perte (prix < prix d'achat) → ramené au prix d'achat.
+  // Saisie libre : aucune alerte ici — le garde-fou vente à perte est vérifié à l'encaissement.
   const setUnitPrice = (productId: string, value: number | string) => {
-    const p = products.find((prod) => prod.id === productId);
-    if (!p) return;
-    let price = Math.max(0, Number(value) || 0);
-    if (price < p.purchasePrice) {
-      showAlert(
-        `Prix de vente (${format(price)}) inférieur au prix d'achat (${format(p.purchasePrice)}). Vente à perte bloquée : prix ramené au prix d'achat.`,
-        { variant: 'warning' },
-      );
-      price = p.purchasePrice;
-    }
+    const price = Math.max(0, Number(value) || 0);
     setCart(cart.map((item) => item.productId === productId
       ? { ...item, unitPrice: price, total: item.quantity * price * (1 - item.discount / 100) }
       : item));
+  };
+
+  // Une ligne est-elle en vente à perte (prix de vente < prix d'achat) ? — indicateur visuel.
+  const isBelowCost = (item: TransactionItem): boolean => {
+    const p = products.find((prod) => prod.id === item.productId);
+    return !!p && item.unitPrice < p.purchasePrice;
   };
 
   // Remove item from cart
@@ -452,11 +449,20 @@ export default function POS({
                         value={item.unitPrice}
                         onFocus={(e) => e.target.select()}
                         onChange={(e) => setUnitPrice(item.productId, e.target.value)}
-                        title="Prix de vente unitaire (HT) — modifiable pour ce client. Vente à perte bloquée."
-                        className="w-20 font-mono text-[10px] text-slate-700 dark:text-slate-200 bg-transparent border border-slate-200 dark:border-slate-700 rounded px-1 py-0.5 focus:outline-none focus:border-cyan-500"
+                        title="Prix de vente unitaire (HT) — modifiable pour ce client."
+                        className={`w-20 font-mono text-[10px] bg-transparent border rounded px-1 py-0.5 focus:outline-none focus:border-cyan-500 ${
+                          isBelowCost(item)
+                            ? 'border-red-500 text-red-500'
+                            : 'border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200'
+                        }`}
                       />
                       <span className="text-[9px] text-slate-400 font-mono">HT</span>
-                      {hasClientPrice(item.productId) && (
+                      {isBelowCost(item) && (
+                        <span className="text-[8px] px-1 py-0.5 bg-red-500/10 text-red-500 rounded font-mono" title="Prix sous le prix d'achat — bloqué à l'encaissement">
+                          &lt; achat
+                        </span>
+                      )}
+                      {!isBelowCost(item) && hasClientPrice(item.productId) && (
                         <span className="text-[8px] px-1 py-0.5 bg-cyan-500/10 text-cyan-400 rounded font-mono" title="Tarif négocié de ce client">
                           tarif client
                         </span>
