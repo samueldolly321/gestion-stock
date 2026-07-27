@@ -5,6 +5,7 @@ import { listCategories } from './services/categoriesService';
 import { listProducts } from './services/productsService';
 import { listMovements } from './services/movementsService';
 import { listClients, listSuppliers } from './services/partnersService';
+import { listSupplierProducts } from './services/supplierProductsService';
 import { listSales } from './services/salesService';
 import { listDeliveries } from './services/deliveriesService';
 import { listUsers } from './services/usersService';
@@ -55,7 +56,8 @@ import {
   AuditLog,
   Delivery,
   Purchase,
-  Expense
+  Expense,
+  SupplierProduct
 } from './types';
 import AuthPage from './components/AuthPage';
 import Dashboard from './components/Dashboard';
@@ -91,6 +93,7 @@ export default function App() {
   const [products, setProducts] = useState<Product[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [supplierProducts, setSupplierProducts] = useState<SupplierProduct[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [movements, setMovements] = useState<StockMovement[]>([]);
   const [audits, setAudits] = useState<InventoryAudit[]>([]);
@@ -155,6 +158,13 @@ export default function App() {
     listSuppliers()
       .then(setSuppliers)
       .catch((err) => console.error('Chargement des fournisseurs échoué :', err));
+  }, []);
+
+  // Catalogue d'approvisionnement (produits fournis par chaque fournisseur, avec prix).
+  const reloadSupplierProducts = React.useCallback(() => {
+    listSupplierProducts()
+      .then(setSupplierProducts)
+      .catch((err) => console.error('Chargement du catalogue fournisseur échoué :', err));
   }, []);
 
   const reloadSales = React.useCallback(() => {
@@ -261,6 +271,7 @@ export default function App() {
     reloadProducts();
     reloadMovements();
     reloadPartners();
+    reloadSupplierProducts();
     reloadSales();
     reloadAudits();
     reloadDeliveries();
@@ -276,6 +287,7 @@ export default function App() {
     reloadProducts,
     reloadMovements,
     reloadPartners,
+    reloadSupplierProducts,
     reloadSales,
     reloadAudits,
     reloadDeliveries,
@@ -610,8 +622,11 @@ export default function App() {
             <Partners
               suppliers={suppliers}
               clients={clients}
+              products={products}
+              supplierProducts={supplierProducts}
               user={currentUser}
               onRefresh={reloadPartners}
+              onRefreshSupplierProducts={reloadSupplierProducts}
               currencySymbol={currencySymbol}
               writePerms={settings?.writePermissions}
             />
@@ -622,6 +637,7 @@ export default function App() {
               purchases={purchases}
               suppliers={suppliers}
               products={products}
+              supplierProducts={supplierProducts}
               user={currentUser}
               onRefresh={reloadAfterPurchase}
               writePerms={settings?.writePermissions}

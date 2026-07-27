@@ -13,10 +13,13 @@ import {
   AlertCircle,
   FolderOpen,
   UserPlus,
-  Download
+  Download,
+  Package,
+  Plus as PlusIcon
 } from 'lucide-react';
-import { Supplier, Client, User } from '../types';
+import { Supplier, Client, User, Product, SupplierProduct } from '../types';
 import { savePartner, deletePartner } from '../services/partnersService';
+import { saveSupplierProduct, updateSupplierProduct, deleteSupplierProduct } from '../services/supplierProductsService';
 import { showAlert, showConfirm } from '../services/dialog';
 import { showToast } from '../services/toast';
 import { exportPdf } from '../services/exportPdf';
@@ -28,8 +31,11 @@ import { useMoney } from '../services/CurrencyContext';
 interface PartnersProps {
   suppliers: Supplier[];
   clients: Client[];
+  products: Product[];
+  supplierProducts: SupplierProduct[];
   user: User;
   onRefresh: () => void;
+  onRefreshSupplierProducts: () => void;
   currencySymbol: string;
   writePerms?: Record<string, string[]> | null;
 }
@@ -37,8 +43,11 @@ interface PartnersProps {
 export default function Partners({
   suppliers,
   clients,
+  products,
+  supplierProducts,
   user,
   onRefresh,
+  onRefreshSupplierProducts,
   currencySymbol,
   writePerms
 }: PartnersProps) {
@@ -68,6 +77,12 @@ export default function Partners({
   const [taxNumber, setTaxNumber] = useState('');
   const [balance, setBalance] = useState(0);
 
+  // Supplier Products (catalogue d'approvisionnement) Drawer State
+  const [activeCatalogSupplier, setActiveCatalogSupplier] = useState<Supplier | null>(null);
+  const [newCatProductId, setNewCatProductId] = useState('');
+  const [newCatPrice, setNewCatPrice] = useState<number>(0);
+  const [newCatRef, setNewCatRef] = useState('');
+
   // Supplier Documents Drawer State
   const [activeDocSupplier, setActiveDocSupplier] = useState<Supplier | null>(null);
   const [newDocName, setNewDocName] = useState('');
@@ -77,6 +92,81 @@ export default function Partners({
   ]);
 
   const canWrite = useMemo(() => hasWritePerm(user.role, 'partners', writePerms), [user.role, writePerms]);
+
+  // Produits déjà catalogués pour le fournisseur dont le panneau est ouvert.
+  const catalogItems = useMemo(
+    () => (activeCatalogSupplier ? supplierProducts.filter((sp) => sp.supplierId === activeCatalogSupplier.id) : []),
+    [activeCatalogSupplier, supplierProducts],
+  );
+
+  // Nombre de produits fournis, par fournisseur (badge dans le tableau).
+  const catalogCountBySupplier = useMemo(() => {
+    const m: Record<string, number> = {};
+    supplierProducts.forEach((sp) => { m[sp.supplierId] = (m[sp.supplierId] || 0) + 1; });
+    return m;
+  }, [supplierProducts]);
+
+  // Produits pas encore associés à ce fournisseur (proposés à l'ajout).
+  const productsToAdd = useMemo(() => {
+    const linked = new Set(catalogItems.map((sp) => sp.productId));
+    return products.filter((p) => !linked.has(p.id));
+  }, [catalogItems, products]);
+
+  const openCatalog = (s: Supplier) => {
+    setActiveCatalogSupplier(s);
+    setNewCatProductId('');
+    setNewCatPrice(0);
+    setNewCatRef('');
+  };
+
+  const handleAddCatalogProduct = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeCatalogSupplier || !newCatProductId) {
+      showAlert('Sélectionnez un produit.', { variant: 'warning' });
+      return;
+    }
+    try {
+      await saveSupplierProduct({
+        supplierId: activeCatalogSupplier.id,
+        productId: newCatProductId,
+        purchasePrice: Number(newCatPrice) || 0,
+        supplierRef: newCatRef || null,
+      });
+      setNewCatProductId('');
+      setNewCatPrice(0);
+      setNewCatRef('');
+      onRefreshSupplierProducts();
+      showToast('Produit ajouté au catalogue fournisseur.', { title: 'Fournisseurs' });
+    } catch (err: any) {
+      showAlert(err?.message || 'Ajout refusé (permissions insuffisantes).', { variant: 'error' });
+    }
+  };
+
+  const handleUpdateCatalogPrice = async (sp: SupplierProduct, price: number) => {
+    try {
+      await updateSupplierProduct(sp.id, { purchasePrice: Number(price) || 0 });
+      onRefreshSupplierProducts();
+    } catch (err: any) {
+      showAlert(err?.message || 'Mise à jour refusée.', { variant: 'error' });
+    }
+  };
+
+  const handleRemoveCatalogProduct = async (sp: SupplierProduct) => {
+    try {
+      await deleteSupplierProduct(sp.id);
+      onRefreshSupplierProducts();
+      showToast('Produit retiré du catalogue.', { title: 'Fournisseurs', type: 'info' });
+    } catch (err: any) {
+      showAlert(err?.message || 'Suppression refusée.', { variant: 'error' });
+    }
+  };
+
+  // Pré-remplit le prix d'achat proposé avec celui de la fiche article sélectionnée.
+  const onPickProductToAdd = (pid: string) => {
+    setNewCatProductId(pid);
+    const prod = products.find((p) => p.id === pid);
+    if (prod) setNewCatPrice(prod.purchasePrice || 0);
+  };
 
   // Handle open modal
   const openCreateModal = () => {
@@ -268,10 +358,22 @@ export default function Partners({
             </div>
           </>
         ) : (
-          <div className="flex justify-between gap-3">
-            <span className="text-slate-400 shrink-0">Interlocuteur</span>
-            <span className="text-slate-900 dark:text-slate-200 text-right">{vp.contactPerson || '-'}</span>
-          </div>
+          <>
+            <div className="flex justify-between gap-3">
+              <span className="text-slate-400 shrink-0">Interlocuteur</span>
+              <span className="text-slate-900 dark:text-slate-200 text-right">{vp.contactPerson || '-'}</span>
+            </div>
+            <div className="flex justify-between gap-3 items-center">
+              <span className="text-slate-400 shrink-0">Produits fournis</span>
+              <button
+                onClick={() => openCatalog(vp)}
+                className="text-cyan-500 font-semibold flex items-center gap-1 hover:underline"
+              >
+                <Package className="w-3.5 h-3.5" />
+                {catalogCountBySupplier[vp.id] || 0} — gérer
+              </button>
+            </div>
+          </>
         )}
         <div className="flex justify-between gap-3">
           <span className="text-slate-400 shrink-0">Statut</span>
@@ -454,6 +556,20 @@ export default function Partners({
                       <div className="flex justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
                         {partnerType === 'suppliers' && (
                           <button
+                            onClick={() => openCatalog(p)}
+                            className="relative p-1.5 bg-slate-100 hover:bg-cyan-500/10 text-slate-500 hover:text-cyan-500 dark:bg-slate-800/60 dark:text-slate-400 dark:hover:text-cyan-400 rounded-md transition duration-150"
+                            title="Produits fournis (catalogue)"
+                          >
+                            <Package className="w-3.5 h-3.5" />
+                            {catalogCountBySupplier[p.id] > 0 && (
+                              <span className="absolute -top-1 -right-1 bg-cyan-500 text-white text-[8px] font-bold rounded-full min-w-[14px] h-[14px] px-0.5 flex items-center justify-center">
+                                {catalogCountBySupplier[p.id]}
+                              </span>
+                            )}
+                          </button>
+                        )}
+                        {partnerType === 'suppliers' && (
+                          <button
                             onClick={() => setActiveDocSupplier(p)}
                             className="p-1.5 bg-slate-100 hover:bg-cyan-500/10 text-slate-500 hover:text-cyan-500 dark:bg-slate-800/60 dark:text-slate-400 dark:hover:text-cyan-400 rounded-md transition duration-150"
                             title="Gérer les documents"
@@ -505,6 +621,133 @@ export default function Partners({
           onChange={partnersPage.setPage}
         />
       </div>
+
+      {/* SUPPLIER PRODUCTS (CATALOGUE) DRAWER MODAL */}
+      {activeCatalogSupplier && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex justify-end">
+          <div className="bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 w-full max-w-md p-6 space-y-5 shadow-2xl h-full flex flex-col overflow-y-auto animate-slide-left text-xs">
+            <div className="flex justify-between items-center">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                <Package className="w-5 h-5 text-cyan-400" />
+                Produits fournis
+              </h3>
+              <button
+                onClick={() => setActiveCatalogSupplier(null)}
+                className="text-slate-400 hover:text-slate-900 dark:hover:text-white"
+              >
+                ✕
+              </button>
+            </div>
+            <p className="text-slate-500 dark:text-slate-400">
+              Produits fournis par{' '}
+              <strong className="text-slate-900 dark:text-white">{activeCatalogSupplier.companyName || activeCatalogSupplier.name}</strong>{' '}
+              et leur prix d'achat. Ces articles sont pré-remplis automatiquement lors d'une commande d'achat.
+            </p>
+
+            {/* Add product form */}
+            {canWrite && (
+              <form onSubmit={handleAddCatalogProduct} className="space-y-2 border border-slate-200 dark:border-slate-800 rounded-xl p-3 bg-slate-50 dark:bg-slate-950/20">
+                <label className="text-[10px] font-mono text-slate-500 uppercase tracking-widest">Ajouter un produit</label>
+                <select
+                  value={newCatProductId}
+                  onChange={(e) => onPickProductToAdd(e.target.value)}
+                  className="w-full bg-white dark:bg-slate-950/20 p-2 text-xs rounded-lg border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500"
+                >
+                  <option value="">— Sélectionner un produit —</option>
+                  {productsToAdd.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name} ({p.sku})</option>
+                  ))}
+                </select>
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    min={0}
+                    value={newCatPrice}
+                    onChange={(e) => setNewCatPrice(Number(e.target.value))}
+                    placeholder="Prix d'achat"
+                    title="Prix d'achat chez ce fournisseur"
+                    className="flex-1 bg-white dark:bg-slate-950/20 p-2 text-xs rounded-lg border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500"
+                  />
+                  <input
+                    type="text"
+                    value={newCatRef}
+                    onChange={(e) => setNewCatRef(e.target.value)}
+                    placeholder="Réf. fourn. (opt.)"
+                    className="flex-1 bg-white dark:bg-slate-950/20 p-2 text-xs rounded-lg border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500"
+                  />
+                  <button
+                    type="submit"
+                    className="px-3 py-2 bg-cyan-500 hover:bg-cyan-600 text-white font-bold rounded-lg cursor-pointer flex items-center gap-1"
+                  >
+                    <PlusIcon className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+                {productsToAdd.length === 0 && (
+                  <p className="text-[10px] text-slate-400">Tous les produits sont déjà catalogués pour ce fournisseur.</p>
+                )}
+              </form>
+            )}
+
+            {/* Catalogue listing */}
+            <div className="space-y-2 flex-1">
+              <h4 className="text-[10px] font-mono text-slate-500 uppercase tracking-widest">
+                Catalogue ({catalogItems.length}) :
+              </h4>
+              {catalogItems.length === 0 ? (
+                <p className="text-slate-500 py-6 text-center border border-dashed border-slate-200 dark:border-slate-800 rounded-xl">
+                  Aucun produit associé pour l'instant.
+                </p>
+              ) : (
+                catalogItems.map((sp) => (
+                  <div
+                    key={sp.id}
+                    className="p-2.5 bg-slate-50 dark:bg-slate-950/20 rounded-lg border border-slate-200 dark:border-slate-800/60 flex items-center justify-between gap-2"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <span className="font-semibold text-slate-900 dark:text-white block truncate">{sp.productName || sp.productId}</span>
+                      <span className="text-[9px] text-slate-400 font-mono">
+                        {sp.sku}{sp.supplierRef ? ` · réf. ${sp.supplierRef}` : ''} · Vente {sp.salePrice != null ? format(sp.salePrice) : '—'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <div className="relative">
+                        <input
+                          type="number"
+                          min={0}
+                          defaultValue={sp.purchasePrice}
+                          disabled={!canWrite}
+                          onBlur={(e) => {
+                            const v = Number(e.target.value) || 0;
+                            if (v !== sp.purchasePrice) handleUpdateCatalogPrice(sp, v);
+                          }}
+                          title="Prix d'achat (modifiable) — Entrée ou clic ailleurs pour enregistrer"
+                          className="w-24 bg-white dark:bg-slate-950/40 p-1.5 text-[11px] text-right font-mono rounded-lg border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500 disabled:opacity-60"
+                        />
+                      </div>
+                      {canWrite && (
+                        <button
+                          onClick={() => handleRemoveCatalogProduct(sp)}
+                          className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-500/10 rounded-md transition"
+                          title="Retirer du catalogue"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <button
+              onClick={() => setActiveCatalogSupplier(null)}
+              className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-white font-bold rounded-lg cursor-pointer"
+            >
+              Fermer
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* SUPPLIER DOCUMENTS DRAWER MODAL */}
       {activeDocSupplier && (

@@ -1,7 +1,7 @@
 # 📦 Vokatra-ko — Récapitulatif du projet
 
 > ERP de **gestion de stock, ventes, achats et comptabilité** — contexte **Madagascar** (devise Ariary).
-> Dernière mise à jour : **2026-07-23**.
+> Dernière mise à jour : **2026-07-27**.
 
 ---
 
@@ -49,10 +49,10 @@ npm run dev      # Front (Vite)  -> http://localhost:3000
 |---|---|---|
 | **Tableau de bord** | Dashboard | KPI, graphiques, alertes cliquables (rupture/périmés), **Performance commerciale** (7/30/90 j) : meilleures ventes, meilleurs clients, **Recettes / Dépenses / Solde** |
 | **Articles & Stocks** | products | Catalogue produits (CRUD, import image, catégories/sous-cat, marques, entrepôts), **unité de mesure en liste déroulante** (+ « Autre »), **code-barres EAN-13** (génération + rendu SVG scannable + **étiquette imprimable**), fiche article, ajustement rapide |
-| **Caisse POS** | pos | Encaissement, panier (quantité éditable au clavier + boutons +/−), remise, moyens de paiement (+ référence), **livraison**, **paiement partiel / avance**, reçu (ticket 80mm / A4) |
+| **Caisse POS** | pos | Encaissement, panier (quantité éditable au clavier + boutons +/−), remise, moyens de paiement (+ référence), **livraison**, **paiement partiel / avance**, **TVA optionnelle (case « Appliquer la TVA », désactivée par défaut → vente sans TVA)**, reçu (ticket 80mm / A4) |
 | **Créances Clients** | receivables | Avances/reste par vente, encaissements, **historique détaillé** des règlements, états payé/partiel/non payé, **établissement d'avoirs** (notes de crédit) |
-| **Clients & Fournisseurs** | partners | CRUD clients & fournisseurs, coffre-fort documents, fiche en ligne mobile |
-| **Achats** | purchases | Commandes fournisseurs, **réception valorisée** (→ stock), **suivi des règlements** (dette fournisseurs), détails |
+| **Clients & Fournisseurs** | partners | CRUD clients & fournisseurs, coffre-fort documents, fiche en ligne mobile, **catalogue « Produits fournis » par fournisseur (prix d'achat négocié, multi-fournisseurs) — panneau Package** |
+| **Achats** | purchases | Commandes fournisseurs, **pré-remplissage auto des produits du fournisseur sélectionné (avec son prix négocié)**, **réception valorisée** (→ stock), **suivi des règlements** (dette fournisseurs), détails |
 | **Réapprovisionnement** | reorder | Articles sous seuil mini, quantités suggérées, **création de commande d'achat** groupée par fournisseur, **indicateur « commande en cours »** (anti-doublon) |
 | **Dépenses** | expenses | Frais divers (transport, douane, taxes…), liés aux achats, statut payé/non payé |
 | **Livraisons** | deliveries | Livraisons client (type moto/voiture/camion…, tarif ajouté à la facture), statuts, chauffeur |
@@ -93,6 +93,7 @@ Système à **deux dimensions**, **configurable** depuis Configuration ERP et **
 | Produits | `GET/POST/PUT/DELETE /products` |
 | Mouvements | `GET/POST /movements` |
 | Clients / Fournisseurs | `GET/POST/PUT/DELETE /clients` · `/suppliers` |
+| Catalogue appro (fournisseur↔produit) | `GET /supplier-products` (filtre `?supplierId=`) · `POST` (upsert par (supplierId,productId)) · `PUT /:id` · `DELETE /:id` |
 | Ventes (POS) | `GET/POST /sales`, `POST /sales/:id/pay`, `POST /sales/:id/credit-note` (avoir) |
 | Règlements | `GET /payments` (filtres `?refId=` / `?partyId=`) |
 | Achats | `GET/POST /purchases`, `POST /purchases/:id/receive`, `POST /purchases/:id/pay`, `DELETE /purchases/:id` |
@@ -109,6 +110,7 @@ Système à **deux dimensions**, **configurable** depuis Configuration ERP et **
 ## 6. Modèle de données (tables Drizzle — `src/db/schema.ts`)
 
 `users`, `categories`, `brands`, `suppliers`, `clients`, `warehouses`, `products`,
+**`supplier_products`** (catalogue appro : `supplier_id` + `product_id` + `purchase_price` négocié + `supplier_ref`, unicité `(supplier_id, product_id)` — un produit peut avoir plusieurs fournisseurs),
 `stock_movements`, `inventory_audits`, `purchases` (+ `paid_amount`, `received_at`, **`expected_date`** = réception prévue),
 `sales` (+ `paid_amount`, **`invoice_number`** unique, **`related_sale_id`** = facture d'origine d'un avoir, **`due_date`** = échéance de créance), `payments` (kind `sale`/`purchase`/**`credit_note`**), `expenses`, `deliveries`, `audit_logs`,
 `document_counters` (compteurs de séquences légales — clés `invoice` **et `credit_note`**),
@@ -128,7 +130,7 @@ et côté client :
 ### Front — `src/services/` (clients d'API, `fetch` + JWT)
 - `api.ts` — wrapper fetch, JWT stocké dans `localStorage` (clé `stockflow_token`)
 - `authService.ts` — register / login / me / logout
-- Services métier : `categoriesService`, `productsService`, `movementsService`, `partnersService` (clients+fournisseurs), `salesService`, `auditsService`, `auditLogsService`, `catalogService` (marques+entrepôts), `settingsService` (+ services achats/dépenses/livraisons/règlements/utilisateurs)
+- Services métier : `categoriesService`, `productsService`, `movementsService`, `partnersService` (clients+fournisseurs), `supplierProductsService` (catalogue appro), `salesService`, `auditsService`, `auditLogsService`, `catalogService` (marques+entrepôts), `settingsService` (+ services achats/dépenses/livraisons/règlements/utilisateurs)
 - `permissions.ts` — **source de vérité RBAC** (partagée front + serveur)
 - `currency.ts` + `CurrencyContext.tsx` — devise base Ariary, affichage Ar ou € converti (`useMoney()`), taux + préférence en `localStorage`
 - `realtime.ts` — connexion **SSE** (`EventSource`) pour le temps réel
@@ -143,7 +145,7 @@ et côté client :
 - `auth-middleware.ts` — `signToken`, `verifyToken`, `requireAuth`, `requireRole`, `requireWrite(scope)` (lit la matrice de permissions en base)
 - `helpers.ts` — `generateId(prefix)`, `computeProductStatus()`, `writeAuditLog()` (publie aussi en SSE), `pickFields`/`pickProductFields` (anti-injection)
 - `events.ts` — bus SSE en mémoire (`publish`)
-- `routes/` : `auth`, `users`, `categories`, `products`, `movements`, `clients`, `suppliers`, `sales`, `payments`, `purchases`, `expenses`, `deliveries`, `audits`, `auditLogs`, `brands`, `warehouses`, `settings`, `events`
+- `routes/` : `auth`, `users`, `categories`, `products`, `movements`, `clients`, `suppliers`, `supplierProducts`, `sales`, `payments`, `purchases`, `expenses`, `deliveries`, `audits`, `auditLogs`, `brands`, `warehouses`, `settings`, `events`
 
 ### Base — `src/db/`
 - `schema.ts` — tables Drizzle (aligné sur `src/types.ts`, **source de vérité des types métier**)

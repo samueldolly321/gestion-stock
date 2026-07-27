@@ -50,6 +50,27 @@ export interface Supplier {
   createdAt: string;
 }
 
+// Ligne du catalogue d'approvisionnement : un produit fourni par un fournisseur donné,
+// avec le prix d'achat négocié chez lui. Les champs `product*` sont enrichis à la lecture
+// (jointure produits) pour l'affichage — ils ne sont pas stockés dans la table.
+export interface SupplierProduct {
+  id: string;
+  supplierId: string;
+  productId: string;
+  purchasePrice: number; // prix d'achat chez ce fournisseur
+  supplierRef?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  // Enrichis à la lecture (jointure) :
+  productName?: string;
+  sku?: string;
+  salePrice?: number;
+  vatRate?: number;
+  unit?: string;
+  quantity?: number;
+  supplierName?: string;
+}
+
 export interface Client {
   id: string;
   name: string;

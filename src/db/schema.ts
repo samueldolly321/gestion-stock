@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, boolean, doublePrecision, integer, jsonb } from 'drizzle-orm/pg-core';
+import { pgTable, text, timestamp, boolean, doublePrecision, integer, jsonb, unique } from 'drizzle-orm/pg-core';
 
 // Colonnes de dates communes : stockées en timestamp, renvoyées en chaîne ISO
 // pour rester compatibles avec le front (qui manipule des strings ISO).
@@ -114,6 +114,21 @@ export const products = pgTable('products', {
   createdAt,
   updatedAt,
 });
+
+// 7b. Supplier ↔ Products — catalogue d'approvisionnement (plusieurs fournisseurs par produit).
+// Chaque ligne = un produit fourni par un fournisseur, avec SON prix d'achat négocié.
+// Unicité (supplierId, productId) : un fournisseur ne référence un produit qu'une fois.
+export const supplierProducts = pgTable('supplier_products', {
+  id: text('id').primaryKey(),
+  supplierId: text('supplier_id').notNull(),
+  productId: text('product_id').notNull(),
+  purchasePrice: doublePrecision('purchase_price').default(0).notNull(), // prix d'achat chez CE fournisseur
+  supplierRef: text('supplier_ref'), // référence article chez le fournisseur (optionnel)
+  createdAt,
+  updatedAt,
+}, (t) => ({
+  uniqSupplierProduct: unique('uniq_supplier_product').on(t.supplierId, t.productId),
+}));
 
 // 8. Stock Movements
 export const stockMovements = pgTable('stock_movements', {

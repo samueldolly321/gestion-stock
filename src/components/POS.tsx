@@ -47,6 +47,7 @@ export default function POS({
   const [selectedClientId, setSelectedClientId] = useState<string>(clients[0]?.id || '');
   const [paymentMethod, setPaymentMethod] = useState<Sale['paymentMethod']>('cash');
   const [discountPercent, setDiscountPercent] = useState<number>(0);
+  const [applyVat, setApplyVat] = useState<boolean>(false); // TVA optionnelle (désactivée par défaut)
   const [notes, setNotes] = useState('');
   const [paymentRef, setPaymentRef] = useState(''); // réf. chèque / virement / TPE-CB
   const [deliveryEnabled, setDeliveryEnabled] = useState(false);
@@ -171,7 +172,8 @@ export default function POS({
     cart.forEach((item) => {
       const itemSubtotal = item.quantity * item.unitPrice;
       subtotal += itemSubtotal;
-      vatTotal += itemSubtotal * (item.tax / 100);
+      // La TVA n'est comptée que si l'option est activée (vente sans TVA sinon).
+      if (applyVat) vatTotal += itemSubtotal * (item.tax / 100);
     });
 
     const discountAmount = subtotal * (discountPercent / 100);
@@ -189,7 +191,7 @@ export default function POS({
       totalAmount,
       loyaltyPointsEarned
     };
-  }, [cart, discountPercent, deliveryEnabled, deliveryFee]);
+  }, [cart, discountPercent, deliveryEnabled, deliveryFee, applyVat]);
 
   // Submit checkout — un seul appel API : le serveur crée la vente,
   // déduit le stock et crédite la fidélité en transaction.
@@ -204,12 +206,16 @@ export default function POS({
       if (notes) noteParts.push(notes);
       const notesFinal = noteParts.join(' ').trim();
 
+      // Si la TVA n'est pas appliquée, on neutralise le taux sur chaque ligne
+      // (cohérence du reçu et des recalculs éventuels) et vatAmount = 0.
+      const itemsForSale = applyVat ? cart : cart.map((it) => ({ ...it, tax: 0 }));
+
       const created = await createSale({
         type: 'invoice',
         clientId: selectedClientId,
         clientName: selectedClient?.name || 'Client de Passage',
         status: 'delivered',
-        items: cart,
+        items: itemsForSale,
         vatAmount: totals.vatTotal,
         totalAmount: totals.totalAmount, // inclut le tarif de livraison
         paymentStatus: 'paid',
@@ -551,16 +557,34 @@ export default function POS({
             )}
           </div>
 
+          {/* Option TVA (désactivée par défaut) */}
+          <div className="border-t border-slate-200 dark:border-slate-800/60 pt-3 text-xs">
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={applyVat}
+                onChange={(e) => setApplyVat(e.target.checked)}
+                className="accent-cyan-500 w-3.5 h-3.5"
+              />
+              <span className="text-slate-700 dark:text-slate-200 font-semibold">
+                Appliquer la TVA
+              </span>
+              <span className="text-[10px] text-slate-400">(sinon vente sans TVA)</span>
+            </label>
+          </div>
+
           {/* Pricing calculations */}
           <div className="border-t border-slate-200 dark:border-slate-800/60 pt-4 space-y-2 text-xs font-mono text-slate-400">
             <div className="flex justify-between">
               <span>Sous-total HT :</span>
               <span className="text-slate-900 dark:text-white">{format(totals.subtotal)}</span>
             </div>
-            <div className="flex justify-between">
-              <span>TVA cumulée :</span>
-              <span className="text-slate-900 dark:text-white">{format(totals.vatTotal)}</span>
-            </div>
+            {applyVat && (
+              <div className="flex justify-between">
+                <span>TVA cumulée :</span>
+                <span className="text-slate-900 dark:text-white">{format(totals.vatTotal)}</span>
+              </div>
+            )}
             {totals.discountAmount > 0 && (
               <div className="flex justify-between text-red-400">
                 <span>Remise ({discountPercent}%) :</span>

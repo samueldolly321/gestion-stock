@@ -25,7 +25,7 @@ async function main() {
   console.log('→ Nettoyage des données métier (comptes conservés)...');
   await pool.query(
     `TRUNCATE stock_movements, sales, payments, deliveries, purchases, expenses, inventory_audits, audit_logs,
-              products, categories, brands, warehouses, suppliers, clients, settings, document_counters
+              products, supplier_products, categories, brands, warehouses, suppliers, clients, settings, document_counters
      RESTART IDENTITY CASCADE`,
   );
 
@@ -122,6 +122,24 @@ async function main() {
     }
   });
   await db.insert(schema.products).values(products);
+
+  // --- Catalogue d'approvisionnement (fournisseur ↔ produit, prix négocié) ---
+  // Chaque produit est fourni par son fournisseur principal (prix = prix d'achat de la fiche).
+  const supplierProductRows: any[] = products
+    .filter((p: any) => p.supplierId)
+    .map((p: any) => ({
+      id: `SPR-${p.id}`,
+      supplierId: p.supplierId,
+      productId: p.id,
+      purchasePrice: p.purchasePrice,
+    }));
+  // Quelques produits sont aussi disponibles chez un second fournisseur (prix différent)
+  // pour illustrer l'appro multi-fournisseurs.
+  supplierProductRows.push(
+    { id: 'SPR-ALT-1', supplierId: 'SUP-2', productId: 'PRD-1', purchasePrice: 920000 }, // Galaxy A54 aussi via Océan Indien
+    { id: 'SPR-ALT-2', supplierId: 'SUP-1', productId: 'PRD-5', purchasePrice: 715000 }, // TV LG aussi via Tana Import
+  );
+  await db.insert(schema.supplierProducts).values(supplierProductRows);
 
   // Date ISO à n jours dans le passé (utilisée pour dater mouvements, ventes, etc.).
   const daysAgo = (n: number) => {

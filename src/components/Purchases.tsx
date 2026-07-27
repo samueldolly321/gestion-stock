@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import {
   ShoppingBag, Plus, Trash2, PackageCheck, Wallet, Eye, X, Download, Truck,
 } from 'lucide-react';
-import { Purchase, Supplier, Product, User, PurchaseItem, PurchaseStatus } from '../types';
+import { Purchase, Supplier, Product, User, PurchaseItem, PurchaseStatus, SupplierProduct } from '../types';
 import { useMoney } from '../services/CurrencyContext';
 import { createPurchase, receivePurchase, payPurchase, deletePurchase } from '../services/purchasesService';
 import { canWrite as hasWritePerm } from '../services/permissions';
@@ -16,6 +16,7 @@ interface PurchasesProps {
   purchases: Purchase[];
   suppliers: Supplier[];
   products: Product[];
+  supplierProducts: SupplierProduct[];
   user: User;
   onRefresh: () => void;
   writePerms?: Record<string, string[]> | null;
@@ -34,7 +35,7 @@ const PAY_META: Record<string, { label: string; cls: string }> = {
 
 interface Line { productId: string; quantity: number; unitCost: number; tax: number }
 
-export default function Purchases({ purchases, suppliers, products, user, onRefresh, writePerms }: PurchasesProps) {
+export default function Purchases({ purchases, suppliers, products, supplierProducts, user, onRefresh, writePerms }: PurchasesProps) {
   const { format } = useMoney();
   const canWrite = useMemo(() => hasWritePerm(user.role, 'purchases', writePerms), [user.role, writePerms]);
 
@@ -80,22 +81,57 @@ export default function Purchases({ purchases, suppliers, products, user, onRefr
     return { subtotal, vat, total: subtotal + vat };
   }, [lines]);
 
+  // Produits catalogués pour le fournisseur sélectionné (avec son prix d'achat négocié).
+  const catalog = useMemo(
+    () => supplierProducts.filter((sp) => sp.supplierId === supplierId),
+    [supplierProducts, supplierId],
+  );
+
+  // Options proposées dans les listes déroulantes : le catalogue du fournisseur si
+  // renseigné, sinon tous les produits (repli pour ne jamais bloquer la saisie).
+  const optionProducts = useMemo(() => {
+    if (catalog.length) {
+      return catalog.map((sp) => ({ id: sp.productId, name: sp.productName || sp.sku || sp.productId }));
+    }
+    return products.map((p) => ({ id: p.id, name: p.name }));
+  }, [catalog, products]);
+
+  // Construit les lignes de commande à partir du catalogue d'un fournisseur :
+  // tous ses produits, quantité 1, coût = son prix négocié. Repli sur une ligne vide.
+  const linesForSupplier = (sid: string): Line[] => {
+    const cat = supplierProducts.filter((sp) => sp.supplierId === sid);
+    if (cat.length === 0) return [{ productId: '', quantity: 1, unitCost: 0, tax: 20 }];
+    return cat.map((sp) => {
+      const prod = products.find((p) => p.id === sp.productId);
+      return { productId: sp.productId, quantity: 1, unitCost: sp.purchasePrice, tax: prod ? prod.vatRate : 20 };
+    });
+  };
+
   const openCreate = () => {
-    setSupplierId(suppliers[0]?.id || '');
-    setLines([{ productId: '', quantity: 1, unitCost: 0, tax: 20 }]);
+    const sid = suppliers[0]?.id || '';
+    setSupplierId(sid);
+    setLines(linesForSupplier(sid));
     setNotes('');
     setExpectedDate('');
     setIsCreateOpen(true);
+  };
+
+  // Changer de fournisseur pré-remplit automatiquement ses produits.
+  const onSelectSupplier = (sid: string) => {
+    setSupplierId(sid);
+    setLines(linesForSupplier(sid));
   };
 
   const setLine = (i: number, patch: Partial<Line>) =>
     setLines((prev) => prev.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
 
   const onSelectProduct = (i: number, pid: string) => {
+    // Prix négocié chez ce fournisseur en priorité, sinon prix d'achat de la fiche article.
+    const sp = catalog.find((s) => s.productId === pid);
     const prod = products.find((p) => p.id === pid);
     setLine(i, {
       productId: pid,
-      unitCost: prod ? prod.purchasePrice : 0,
+      unitCost: sp ? sp.purchasePrice : prod ? prod.purchasePrice : 0,
       tax: prod ? prod.vatRate : 20,
     });
   };
@@ -305,10 +341,15 @@ export default function Purchases({ purchases, suppliers, products, user, onRefr
             <form onSubmit={handleCreate} className="p-5 space-y-4 max-h-[80vh] overflow-y-auto">
               <div>
                 <label className="text-slate-500 dark:text-slate-400 block mb-1">Fournisseur *</label>
-                <select value={supplierId} onChange={(e) => setSupplierId(e.target.value)} className={inputCls}>
+                <select value={supplierId} onChange={(e) => onSelectSupplier(e.target.value)} className={inputCls}>
                   <option value="">— Sélectionner —</option>
                   {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
+                {supplierId && catalog.length === 0 && (
+                  <p className="text-[10px] text-amber-500 mt-1">
+                    Aucun produit catalogué pour ce fournisseur. Ajoutez-en dans Clients &amp; Fournisseurs → Fournisseurs (bouton « Produits fournis »).
+                  </p>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -320,7 +361,7 @@ export default function Purchases({ purchases, suppliers, products, user, onRefr
                   <div key={i} className="grid grid-cols-12 gap-2 items-center">
                     <select value={l.productId} onChange={(e) => onSelectProduct(i, e.target.value)} className={`${inputCls} col-span-5`}>
                       <option value="">— Article —</option>
-                      {products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                      {optionProducts.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
                     </select>
                     <input type="number" min={1} value={l.quantity} onChange={(e) => setLine(i, { quantity: Number(e.target.value) })} className={`${inputCls} col-span-2`} title="Quantité" />
                     <input type="number" min={0} value={l.unitCost} onChange={(e) => setLine(i, { unitCost: Number(e.target.value) })} className={`${inputCls} col-span-3`} title="Coût unitaire" />
