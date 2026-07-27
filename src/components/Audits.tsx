@@ -248,6 +248,7 @@ export default function Audits({
 
           {/* Counts Input Table */}
           <div className="bg-white dark:bg-slate-950/40 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+            <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead>
                 <tr className="bg-slate-50 dark:bg-slate-950/65 text-[10px] font-mono text-slate-500 uppercase tracking-wider border-b border-slate-200 dark:border-slate-800">
@@ -300,6 +301,7 @@ export default function Audits({
                 })}
               </tbody>
             </table>
+            </div>
           </div>
         </div>
       )}
@@ -440,6 +442,7 @@ export default function Audits({
 
             <div className="p-5 overflow-y-auto space-y-4">
               <div className="bg-white dark:bg-slate-950/20 rounded-xl border border-slate-200 dark:border-slate-800/80 overflow-hidden">
+                <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
                   <thead>
                     <tr className="bg-slate-50 dark:bg-slate-950/65 text-[10px] font-mono text-slate-500 uppercase tracking-wider border-b border-slate-200 dark:border-slate-800 p-3">
@@ -476,6 +479,7 @@ export default function Audits({
                     ))}
                   </tbody>
                 </table>
+                </div>
               </div>
             </div>
 

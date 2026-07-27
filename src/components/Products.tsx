@@ -478,6 +478,7 @@ export default function Products({
       { label: 'Catégorie', value: (p: Product) => p.categoryName },
       { label: 'Sous-catégorie', value: (p: Product) => p.subCategoryName || '' },
       { label: 'Marque', value: (p: Product) => p.brandName || '' },
+      { label: 'Fournisseur', value: (p: Product) => p.supplierName || '' },
       { label: 'Prix achat', value: (p: Product) => p.purchasePrice },
       { label: 'Prix vente', value: (p: Product) => p.salePrice },
       { label: 'Quantité', value: (p: Product) => p.quantity },
@@ -675,6 +676,7 @@ export default function Products({
               <thead>
                 <tr className="bg-slate-50 dark:bg-slate-950/15 border-b border-slate-200 dark:border-slate-800/60 text-[10px] font-mono text-slate-400 uppercase tracking-wider">
                   <th className="py-3 px-4">Produit</th>
+                  <th className="py-3 px-4">Fournisseur</th>
                   <th className="py-3 px-4">SKU / Code-barres</th>
                   <th className="py-3 px-4">Catégorie</th>
                   <th className="py-3 px-4 text-right">Prix Achat</th>
@@ -687,7 +689,7 @@ export default function Products({
               <tbody className="divide-y divide-slate-200 dark:divide-slate-800/60 text-xs">
                 {filteredProducts.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="py-12 text-center text-slate-500">
+                    <td colSpan={9} className="py-12 text-center text-slate-500">
                       Aucun produit ne correspond aux filtres appliqués.
                     </td>
                   </tr>
@@ -709,6 +711,9 @@ export default function Products({
                           <span className="font-semibold text-slate-900 dark:text-white block truncate">{p.name}</span>
                           <span className="text-[10px] text-slate-400 block font-mono">ID: {p.id}</span>
                         </div>
+                      </td>
+                      <td className="py-3.5 px-4 text-slate-600 dark:text-slate-300 whitespace-nowrap">
+                        {p.supplierName || '—'}
                       </td>
                       <td className="py-3.5 px-4 font-mono text-[11px]">
                         <span className="text-cyan-400 block">{p.sku}</span>
@@ -799,7 +804,7 @@ export default function Products({
                     {/* Fiche article en ligne (mobile/tablette uniquement, sous le produit cliqué) */}
                     {viewProduct?.id === p.id && (
                       <tr className="xl:hidden">
-                        <td colSpan={8} className="p-3 bg-slate-50 dark:bg-slate-950/20 border-b border-slate-200 dark:border-slate-800/60">
+                        <td colSpan={9} className="p-3 bg-slate-50 dark:bg-slate-950/20 border-b border-slate-200 dark:border-slate-800/60">
                           {renderFiche(p)}
                         </td>
                       </tr>
