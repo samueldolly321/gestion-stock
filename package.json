@@ -12,6 +12,7 @@
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
     "doc": "node scripts/generate-doc.mjs",
+    "doc:sales": "node scripts/generate-argumentaire.mjs",
     "db:check": "tsx src/db/check-connection.ts",
     "db:seed": "tsx src/db/seed.ts",
     "db:generate": "drizzle-kit generate --config=src/db/drizzle.config.ts",
