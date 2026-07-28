@@ -13,6 +13,7 @@
     "lint": "tsc --noEmit",
     "doc": "node scripts/generate-doc.mjs",
     "doc:sales": "node scripts/generate-argumentaire.mjs",
+    "doc:flyer": "node scripts/generate-flyer.mjs",
     "db:check": "tsx src/db/check-connection.ts",
     "db:seed": "tsx src/db/seed.ts",
     "db:generate": "drizzle-kit generate --config=src/db/drizzle.config.ts",
