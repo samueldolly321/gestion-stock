@@ -252,13 +252,13 @@ export default function Dashboard({
       <AiSummaryCard />
 
       {/* Metrics Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         
         {/* Metric 1 */}
         <div className="bg-white dark:bg-slate-900/40 p-5 rounded-2xl border border-slate-200 dark:border-slate-800/80 shadow-sm flex items-center justify-between">
-          <div className="space-y-1">
+          <div className="space-y-1 min-w-0">
             <span className="text-[11px] font-medium text-slate-400 uppercase tracking-widest">Valorisation de Stock</span>
-            <h3 className="text-2xl font-bold font-mono text-slate-900 dark:text-white">
+            <h3 className="text-xl font-bold font-mono text-slate-900 dark:text-white break-words [overflow-wrap:anywhere] leading-tight">
               {format(metrics.totalValue)}
             </h3>
             <div className="flex items-center gap-1 text-[10px] text-emerald-500">
@@ -266,16 +266,16 @@ export default function Dashboard({
               <span>Valeur d'achat cumulée</span>
             </div>
           </div>
-          <div className="p-3 bg-cyan-500/10 border border-cyan-500/20 text-cyan-500 rounded-xl">
+          <div className="p-3 bg-cyan-500/10 border border-cyan-500/20 text-cyan-500 rounded-xl shrink-0">
             <Package className="w-5 h-5" />
           </div>
         </div>
 
         {/* Metric 2 */}
         <div className="bg-white dark:bg-slate-900/40 p-5 rounded-2xl border border-slate-200 dark:border-slate-800/80 shadow-sm flex items-center justify-between">
-          <div className="space-y-1">
+          <div className="space-y-1 min-w-0">
             <span className="text-[11px] font-medium text-slate-400 uppercase tracking-widest">Chiffre POS (Ventes)</span>
-            <h3 className="text-2xl font-bold font-mono text-slate-900 dark:text-white">
+            <h3 className="text-xl font-bold font-mono text-slate-900 dark:text-white break-words [overflow-wrap:anywhere] leading-tight">
               {format(metrics.totalSales)}
             </h3>
             <div className="flex items-center gap-1 text-[10px] text-indigo-400">
@@ -283,7 +283,7 @@ export default function Dashboard({
               <span>{metrics.totalTransactions} transactions comptabilisées</span>
             </div>
           </div>
-          <div className="p-3 bg-indigo-500/10 border border-indigo-500/20 text-indigo-500 rounded-xl">
+          <div className="p-3 bg-indigo-500/10 border border-indigo-500/20 text-indigo-500 rounded-xl shrink-0">
             <ShoppingBag className="w-5 h-5" />
           </div>
         </div>
@@ -294,7 +294,7 @@ export default function Dashboard({
           onClick={() => onNavigate('products', 'out_of_stock')}
           className="text-left bg-white dark:bg-slate-900/40 p-5 rounded-2xl border border-slate-200 dark:border-slate-800/80 shadow-sm flex items-center justify-between cursor-pointer hover:border-amber-500/50 hover:shadow-md transition group"
         >
-          <div className="space-y-1">
+          <div className="space-y-1 min-w-0">
             <span className="text-[11px] font-medium text-slate-400 uppercase tracking-widest">Alertes Rupture</span>
             <h3 className="text-2xl font-bold font-mono text-amber-500">
               {metrics.lowStockCount + metrics.outOfStockCount}
@@ -305,7 +305,7 @@ export default function Dashboard({
               <ChevronRight className="w-3 h-3" />
             </div>
           </div>
-          <div className="p-3 bg-amber-500/10 border border-amber-500/20 text-amber-500 rounded-xl animate-pulse">
+          <div className="p-3 bg-amber-500/10 border border-amber-500/20 text-amber-500 rounded-xl animate-pulse shrink-0">
             <Bell className="w-5 h-5" />
           </div>
         </button>
@@ -316,7 +316,7 @@ export default function Dashboard({
           onClick={() => onNavigate('products', 'expired')}
           className="text-left bg-white dark:bg-slate-900/40 p-5 rounded-2xl border border-slate-200 dark:border-slate-800/80 shadow-sm flex items-center justify-between cursor-pointer hover:border-red-500/50 hover:shadow-md transition group"
         >
-          <div className="space-y-1">
+          <div className="space-y-1 min-w-0">
             <span className="text-[11px] font-medium text-slate-400 uppercase tracking-widest">Produits Périmés</span>
             <h3 className="text-2xl font-bold font-mono text-red-500">
               {metrics.expiredCount}
@@ -327,7 +327,7 @@ export default function Dashboard({
               <ChevronRight className="w-3 h-3" />
             </div>
           </div>
-          <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-500 rounded-xl">
+          <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-500 rounded-xl shrink-0">
             <Archive className="w-5 h-5" />
           </div>
         </button>
@@ -445,10 +445,10 @@ export default function Dashboard({
         </div>
 
         {/* Bande Recettes / Dépenses / Solde sur la période */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
           <div className="bg-white dark:bg-slate-900/40 p-4 rounded-2xl border border-slate-200 dark:border-slate-800/80 shadow-sm">
             <span className="text-[10px] uppercase font-mono text-slate-400 flex items-center gap-1"><TrendingUp className="w-3.5 h-3.5 text-emerald-500" />Recettes (ventes)</span>
-            <h3 className="text-xl font-bold font-mono text-emerald-500 mt-1">{format(finance.recettes)}</h3>
+            <h3 className="text-xl font-bold font-mono text-emerald-500 mt-1 break-words [overflow-wrap:anywhere] leading-tight">{format(finance.recettes)}</h3>
           </div>
           <button
             type="button"
@@ -456,7 +456,7 @@ export default function Dashboard({
             className="text-left bg-white dark:bg-slate-900/40 p-4 rounded-2xl border border-slate-200 dark:border-slate-800/80 shadow-sm cursor-pointer hover:border-red-500/40 hover:shadow-md transition"
           >
             <span className="text-[10px] uppercase font-mono text-slate-400 flex items-center gap-1"><TrendingDown className="w-3.5 h-3.5 text-red-500" />Dépenses</span>
-            <h3 className="text-xl font-bold font-mono text-red-500 mt-1">{format(finance.depenses)}</h3>
+            <h3 className="text-xl font-bold font-mono text-red-500 mt-1 break-words [overflow-wrap:anywhere] leading-tight">{format(finance.depenses)}</h3>
             <p className="text-[10px] text-slate-400 font-mono mt-1">Achats {format(finance.achats)} · Frais {format(finance.divers)}</p>
           </button>
           <button
@@ -468,7 +468,7 @@ export default function Dashboard({
               Solde (recettes − dépenses)
               <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
             </span>
-            <h3 className={`text-xl font-bold font-mono mt-1 ${finance.solde >= 0 ? 'text-cyan-500' : 'text-red-500'}`}>{format(finance.solde)}</h3>
+            <h3 className={`text-xl font-bold font-mono mt-1 break-words [overflow-wrap:anywhere] leading-tight ${finance.solde >= 0 ? 'text-cyan-500' : 'text-red-500'}`}>{format(finance.solde)}</h3>
             <p className="text-[10px] text-slate-400 font-mono mt-1">Détail du calcul</p>
           </button>
         </div>

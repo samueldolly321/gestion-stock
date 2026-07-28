@@ -179,7 +179,7 @@ export default function Products({
     setImage(PRODUCT_IMAGES[Math.floor(Math.random() * PRODUCT_IMAGES.length)]);
     setExpirationDate('');
     setLotNumber('');
-    setSupplierId(suppliers[0]?.id || '');
+    setSupplierId(''); // le fournisseur est choisi explicitement dans le formulaire
     setLocationId(warehouses[0]?.id || '');
     setInitialQuantity(0);
     setIsModalOpen(true);
@@ -314,12 +314,15 @@ export default function Products({
     const file = e.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith('image/')) {
-      showAlert('Veuillez sélectionner un fichier image.', { variant: 'warning' });
+      showAlert('Veuillez sélectionner un fichier image (JPG, PNG, WEBP ou GIF).', { variant: 'warning' });
+      e.target.value = '';
       return;
     }
     const MAX = 2 * 1024 * 1024; // 2 Mo
     if (file.size > MAX) {
-      showAlert('Image trop volumineuse (max 2 Mo).', { variant: 'warning' });
+      const sizeMo = (file.size / (1024 * 1024)).toFixed(1);
+      showAlert(`Image trop volumineuse (${sizeMo} Mo) — 2 Mo maximum. Réduisez ou compressez l'image.`, { variant: 'warning' });
+      e.target.value = '';
       return;
     }
     const reader = new FileReader();
@@ -1134,6 +1137,23 @@ export default function Products({
                   </select>
                 </div>
 
+                {/* Supplier */}
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1">Fournisseur</label>
+                  <select
+                    value={supplierId}
+                    onChange={(e) => setSupplierId(e.target.value)}
+                    className="w-full bg-white dark:bg-slate-950/20 p-2.5 text-xs rounded-lg border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-gray-200 focus:outline-none"
+                  >
+                    <option value="">— Aucun —</option>
+                    {suppliers.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
                 {/* Warehouses */}
                 <div>
                   <div className="flex justify-between items-center mb-1">
@@ -1284,11 +1304,14 @@ export default function Products({
 
                     <div className="flex-1 min-w-0 space-y-2">
                       {/* Bouton d'import depuis l'ordinateur */}
-                      <label className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 hover:bg-slate-100 dark:bg-slate-950/20 dark:hover:bg-slate-800/50 text-slate-700 dark:text-slate-200 cursor-pointer transition">
-                        <ImageIcon className="w-3.5 h-3.5" />
-                        Importer une image
-                        <input type="file" accept="image/*" className="hidden" onChange={handleImageFile} />
-                      </label>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <label className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 hover:bg-slate-100 dark:bg-slate-950/20 dark:hover:bg-slate-800/50 text-slate-700 dark:text-slate-200 cursor-pointer transition">
+                          <ImageIcon className="w-3.5 h-3.5" />
+                          Importer une image
+                          <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="hidden" onChange={handleImageFile} />
+                        </label>
+                        <span className="text-[10px] text-slate-400">JPG, PNG, WEBP ou GIF — 2 Mo max</span>
+                      </div>
 
                       {/* Illustrations prédéfinies */}
                       <div className="flex gap-2 overflow-x-auto py-0.5">

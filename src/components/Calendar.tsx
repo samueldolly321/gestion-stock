@@ -226,7 +226,7 @@ export default function Calendar({ deliveries, purchases, sales, suppliers, prod
                     <button
                       onClick={() => openQuickAdd(key)}
                       title="Ajouter une commande fournisseur ou une livraison à cette date"
-                      className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 focus:opacity-100 transition text-slate-400 hover:text-cyan-500 rounded hover:bg-cyan-500/10 p-0.5"
+                      className="opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 focus:opacity-100 transition text-slate-400 hover:text-cyan-500 rounded hover:bg-cyan-500/10 p-0.5"
                     >
                       <Plus className="w-3.5 h-3.5" />
                     </button>

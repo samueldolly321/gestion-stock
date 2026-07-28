@@ -371,25 +371,24 @@ export default function POS({
                     key={p.id}
                     onClick={() => addToCart(p)}
                     disabled={isMax}
-                    className="p-3 bg-white hover:bg-slate-50 dark:bg-slate-900/40 dark:hover:bg-slate-800/60 disabled:opacity-40 border border-slate-200 dark:border-slate-800 rounded-xl transition duration-150 flex flex-col justify-between text-left h-36 cursor-pointer"
+                    className="p-3 bg-white hover:bg-slate-50 dark:bg-slate-900/40 dark:hover:bg-slate-800/60 disabled:opacity-40 border border-slate-200 dark:border-slate-800 rounded-xl transition duration-150 flex flex-col justify-between text-left cursor-pointer"
                   >
-                    <div className="flex gap-2.5 items-start">
-                      <img
-                        src={p.image || 'https://api.dicebear.com/7.x/identicon/svg'}
-                        alt={p.name}
-                        className="w-9 h-9 rounded-lg object-cover shrink-0"
-                        referrerPolicy="no-referrer"
-                      />
-                      <div className="min-w-0">
-                        <h4 className="text-xs font-bold text-slate-900 dark:text-white leading-tight truncate">{p.name}</h4>
-                        <span className="text-[9px] text-cyan-400 font-mono block mt-0.5">{p.sku}</span>
-                        {p.supplierName && (
-                          <span className="text-[9px] text-slate-400 block truncate">Fourn. : {p.supplierName}</span>
-                        )}
-                      </div>
+                    {/* Image du produit — bien en évidence */}
+                    <img
+                      src={p.image || 'https://api.dicebear.com/7.x/identicon/svg'}
+                      alt={p.name}
+                      className="w-full h-40 rounded-lg object-cover bg-slate-100 dark:bg-slate-800/40 mb-2.5"
+                      referrerPolicy="no-referrer"
+                    />
+                    <div className="min-w-0">
+                      <h4 className="text-sm font-bold text-slate-900 dark:text-white leading-tight truncate">{p.name}</h4>
+                      <span className="text-[9px] text-cyan-400 font-mono block mt-0.5">{p.sku}</span>
+                      {p.supplierName && (
+                        <span className="text-[9px] text-slate-400 block truncate">Fourn. : {p.supplierName}</span>
+                      )}
                     </div>
 
-                    <div className="mt-4 w-full">
+                    <div className="mt-3 w-full">
                       <div className="flex justify-between text-[10px] text-slate-400">
                         <span>Disponible :</span>
                         <span className="font-mono font-semibold text-slate-900 dark:text-slate-300">{p.quantity - quantityInCart}</span>
