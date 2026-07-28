@@ -1,7 +1,7 @@
 # 📦 Vokatra-ko — Récapitulatif du projet
 
 > ERP de **gestion de stock, ventes, achats et comptabilité** — contexte **Madagascar** (devise Ariary).
-> Dernière mise à jour : **2026-07-27**.
+> Dernière mise à jour : **2026-07-28**.
 
 ---
 
@@ -48,11 +48,11 @@ npm run dev      # Front (Vite)  -> http://localhost:3000
 | Module | Onglet | Contenu |
 |---|---|---|
 | **Tableau de bord** | Dashboard | KPI, graphiques, alertes cliquables (rupture/périmés), **Performance commerciale** (7/30/90 j) : meilleures ventes, meilleurs clients, **Recettes / Dépenses / Solde**, **carte « Résumé d'activité (IA) »** : résumé en langage naturel jour/mois généré par Claude (`POST /api/ai/summary`, clé `ANTHROPIC_API_KEY`) |
-| **Articles & Stocks** | products | Catalogue produits (CRUD, import image, catégories/sous-cat, marques, entrepôts), **unité de mesure en liste déroulante** (+ « Autre »), **code-barres EAN-13** (génération + rendu SVG scannable + **étiquette imprimable**), fiche article, ajustement rapide |
-| **Caisse POS** | pos | Encaissement, panier (quantité éditable au clavier + boutons +/−), **prix de vente éditable par ligne + tarif client auto-appliqué (blocage vente à perte < prix d'achat)**, remise, moyens de paiement (+ référence), **livraison**, **paiement partiel / avance**, **TVA optionnelle (case « Appliquer la TVA », désactivée par défaut → vente sans TVA)**, reçu (ticket 80mm / A4) |
+| **Articles & Stocks** | products | Catalogue produits (CRUD, import image **avec limite 2 Mo**, catégories/sous-cat, marques, entrepôts), **champ Fournisseur** (à côté de Marque), **unité de base en liste déroulante** (+ « Autre »), **conditionnement « vente en gros » (1 carton = N pièces, prix carton achat/vente)**, **code-barres EAN-13** (génération + rendu SVG scannable + **étiquette imprimable**), fiche article **avec historique des mouvements**, ajustement rapide **+ bouton « Créer un achat » (transforme une entrée en commande fournisseur réceptionnée)** |
+| **Caisse POS** | pos | Encaissement, **image produit en grand sur les cartes**, panier (quantité éditable au clavier + boutons +/−), **vente à la pièce OU au carton par ligne**, **prix de vente éditable par ligne + tarif client auto-appliqué (blocage vente à perte < prix d'achat)**, remise, moyens de paiement (+ référence), **livraison**, **paiement partiel / avance**, **TVA optionnelle (case « Appliquer la TVA », désactivée par défaut → vente sans TVA)**, reçu (ticket 80mm / A4) |
 | **Créances Clients** | receivables | Avances/reste par vente, encaissements, **historique détaillé** des règlements, états payé/partiel/non payé, **établissement d'avoirs** (notes de crédit) |
 | **Clients & Fournisseurs** | partners | CRUD clients & fournisseurs, coffre-fort documents, fiche en ligne mobile, **catalogue « Produits fournis » par fournisseur (prix d'achat négocié, multi-fournisseurs) — panneau Package**, **« Tarifs » de vente par client (prix négocié par produit, panneau Tag) appliqués en caisse** |
-| **Achats** | purchases | Commandes fournisseurs, **pré-remplissage auto des produits du fournisseur sélectionné (avec son prix négocié)**, **réception valorisée** (→ stock), **suivi des règlements** (dette fournisseurs), détails |
+| **Achats** | purchases | Commandes fournisseurs, **colonne « Produits » (nom + quantité)**, **saisie à la pièce ou au carton par ligne**, **pré-remplissage auto des produits du fournisseur sélectionné (avec son prix négocié)**, **réception valorisée** (→ stock), **suivi des règlements** (dette fournisseurs), détails |
 | **Ventes** | sales | **Journal des ventes** : filtre Jour/Mois/Année + navigation, cartes de synthèse (nb ventes, CA TTC, encaissé, reste dû), recherche, **détail d'une vente + réimpression du reçu** (ticket 80mm / A4), export PDF/Excel |
 | **Réapprovisionnement** | reorder | Articles sous seuil mini, quantités suggérées, **création de commande d'achat** groupée par fournisseur, **indicateur « commande en cours »** (anti-doublon) |
 | **Dépenses** | expenses | Frais divers (transport, douane, taxes…), liés aux achats, statut payé/non payé |
@@ -62,7 +62,7 @@ npm run dev      # Front (Vite)  -> http://localhost:3000
 | **Historique des Flux** | movements | Registre inaltérable des mouvements de stock (dont retours d'avoirs) |
 | **Comptabilité** | accounting | **État de TVA** (collectée/déductible/nette) + **compte de résultat** (CA HT, COGS, marge, résultat net) par mois/trimestre/année, exports PDF/Excel |
 | **Utilisateurs** | users | Gestion des comptes (création, rôles, activation, reset mot de passe) — SA/Admin |
-| **Configuration ERP** | settings | Raison sociale, NIF/Stat, logo (initiales), devise/taux, thème, **matrice de permissions** |
+| **Configuration ERP** | settings | Raison sociale, NIF/Stat, logo (initiales), devise/taux, thème, **matrice de permissions**, **pages « À propos » & « Confidentialité » éditables (affichées sur le portail de connexion)** |
 
 Tous les tableaux : **recherche, filtres, pagination (20/page), export PDF & Excel** (avec en-tête raison sociale).
 
@@ -104,7 +104,7 @@ Système à **deux dimensions**, **configurable** depuis Configuration ERP et **
 | Inventaires | `GET/POST /audits`, `POST /audits/:id/validate`, `POST /audits/:id/cancel` |
 | Journal | `GET /audit-logs` |
 | Marques / Entrepôts | `GET/POST/PUT/DELETE /brands` · `/warehouses` |
-| Réglages | `GET /settings`, `PUT /settings` |
+| Réglages | `GET /settings`, `PUT /settings`, **`GET /settings/public`** (sans auth : marque + pages À propos/Confidentialité pour le portail) |
 | Temps réel | `GET /events?token=JWT` (SSE) |
 
 ---
@@ -114,10 +114,11 @@ Système à **deux dimensions**, **configurable** depuis Configuration ERP et **
 `users`, `categories`, `brands`, `suppliers`, `clients`, `warehouses`, `products`,
 **`supplier_products`** (catalogue appro : `supplier_id` + `product_id` + `purchase_price` négocié + `supplier_ref`, unicité `(supplier_id, product_id)` — un produit peut avoir plusieurs fournisseurs),
 **`client_prices`** (tarifs de vente par client : `client_id` + `product_id` + `sale_price`, unicité `(client_id, product_id)` — prix de vente différent par client, appliqué en caisse),
-`stock_movements`, `inventory_audits`, `purchases` (+ `paid_amount`, `received_at`, **`expected_date`** = réception prévue),
+`products` (+ **conditionnement gros** : `pack_size`, `pack_label`, `pack_purchase_price`, `pack_sale_price` — 1 carton = `pack_size` pièces ; le stock reste compté en pièces),
+`stock_movements`, `inventory_audits`, `purchases` (+ `paid_amount`, `received_at`, **`expected_date`** = réception prévue ; items enrichis de `unit_label`/`pack_qty` pour l'affichage carton),
 `sales` (+ `paid_amount`, **`invoice_number`** unique, **`related_sale_id`** = facture d'origine d'un avoir, **`due_date`** = échéance de créance), `payments` (kind `sale`/`purchase`/**`credit_note`**), `expenses`, `deliveries`, `audit_logs`,
 `document_counters` (compteurs de séquences légales — clés `invoice` **et `credit_note`**),
-`settings` (+ `role_permissions`, `write_permissions`, `logo_initials`, **`invoice_prefix`**, **`credit_note_prefix`**, **`invoice_padding`**).
+`settings` (+ `role_permissions`, `write_permissions`, `logo_initials`, **`invoice_prefix`**, **`credit_note_prefix`**, **`invoice_padding`**, **`about_text`**, **`privacy_text`** = pages éditables du portail).
 
 Un **avoir** = ligne `sales` `type='return'` (montants négatifs, n° `AV-…`, `related_sale_id`). Mouvement de stock `entry_return` à la réintégration.
 

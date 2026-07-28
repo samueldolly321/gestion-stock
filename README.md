@@ -6,7 +6,7 @@ Authentification maison (JWT, mots de passe hachés bcrypt) — aucune dépendan
 
 ## Modules
 
-Authentification & rôles (RBAC) · Catégories & sous-catégories · Articles & stocks · Mouvements de stock · Caisse POS (avec impression ticket/A4) · Clients & fournisseurs · Audits d'inventaire · Marques & entrepôts · Réglages entreprise · Journal d'audit · Notifications temps réel (SSE).
+Authentification & rôles (RBAC) · Catégories & sous-catégories · Articles & stocks · **Vente en gros (conditionnement carton ↔ pièces)** · Mouvements de stock (+ historique par article) · Caisse POS (impression ticket/A4, vente pièce ou carton) · Achats & fournisseurs (catalogue multi-fournisseurs, réception valorisée) · Tarifs de vente par client · Ventes & comptabilité (TVA, facturation, avoirs) · Clients & fournisseurs · Audits d'inventaire · Marques & entrepôts · Réglages entreprise (+ pages À propos / Confidentialité éditables) · Journal d'audit · Notifications temps réel (SSE).
 
 ## Documentation
 

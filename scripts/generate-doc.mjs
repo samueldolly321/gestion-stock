@@ -111,12 +111,12 @@ A(
 );
 const tabs = [
   ['Tableau de bord', 'Vue d\'ensemble : indicateurs clés (KPI), graphiques, alertes cliquables (ruptures, périmés), performance commerciale (7/30/90 jours), recettes/dépenses/solde, et la carte « Résumé d\'activité (IA) ».'],
-  ['Articles & Stocks', 'Le catalogue produits : création/modification, catégories & sous-catégories, marques, entrepôts, unité de mesure, code-barres EAN-13 (génération + étiquette imprimable), colonne fournisseur, ajustement rapide de stock.'],
-  ['Caisse POS', 'La vente au comptoir : panier, quantités, remise, moyens de paiement, livraison, paiement partiel/à crédit, TVA optionnelle, prix éditable par ligne (tarif client appliqué automatiquement, vente à perte bloquée), impression du reçu (ticket 80 mm ou facture A4).'],
+  ['Articles & Stocks', 'Le catalogue produits : création/modification, catégories & sous-catégories, marques, entrepôts, champ fournisseur, unité de base, conditionnement « vente en gros » (1 carton = N pièces, prix carton), import d\'image (limite 2 Mo), code-barres EAN-13 (génération + étiquette imprimable), fiche produit avec historique des mouvements, ajustement rapide de stock (avec bouton « Créer un achat » qui transforme une entrée en commande fournisseur réceptionnée).'],
+  ['Caisse POS', 'La vente au comptoir : image produit mise en avant, panier, quantités, vente à la pièce ou au carton par ligne, remise, moyens de paiement, livraison, paiement partiel/à crédit, TVA optionnelle, prix éditable par ligne (tarif client appliqué automatiquement, vente à perte bloquée), impression du reçu (ticket 80 mm ou facture A4).'],
   ['Ventes', 'Le journal de toutes les ventes : filtre Jour/Mois/Année (ou dates personnalisées), synthèse (nb ventes, CA, encaissé, reste dû), détail d\'une vente et réimpression du reçu, export PDF/Excel.'],
   ['Créances Clients', 'Ce que les clients doivent : avances et reste dû par vente, encaissements, historique des règlements, et établissement d\'avoirs (notes de crédit).'],
   ['Clients & Fournisseurs', 'Les tiers commerciaux : fiches clients (fidélité, encours) et fournisseurs (coffre-fort documents). Panneau « Produits fournis » par fournisseur (prix négocié) et panneau « Tarifs » par client (prix de vente négocié).'],
-  ['Achats', 'Les commandes fournisseurs : création (produits pré-remplis selon le fournisseur), réception valorisée (met à jour le stock et le prix d\'achat moyen), suivi des règlements (dette fournisseurs). TVA optionnelle, filtre par date.'],
+  ['Achats', 'Les commandes fournisseurs : création (produits pré-remplis selon le fournisseur), colonne « Produits » (nom + quantité), saisie à la pièce ou au carton, réception valorisée (met à jour le stock et le prix d\'achat moyen), suivi des règlements (dette fournisseurs). TVA optionnelle, filtre par date.'],
   ['Réapprovisionnement', 'Les articles sous le seuil minimum : quantités suggérées et création groupée de commandes d\'achat par fournisseur (avec anti-doublon).'],
   ['Dépenses', 'Les frais divers (transport, douane, taxes, carburant…), liés ou non à un achat, avec statut payé/non payé.'],
   ['Livraisons', 'Les livraisons chez le client : type de transport (moto, voiture, camion…), tarif ajouté à la facture, statut, chauffeur, date planifiée.'],
@@ -125,7 +125,7 @@ const tabs = [
   ['Historique des Flux', 'Le registre inaltérable de tous les mouvements de stock (entrées, sorties, retours…).'],
   ['Comptabilité', 'États de TVA et compte de résultat (voir section dédiée).'],
   ['Utilisateurs', 'La gestion des comptes : création, rôles, activation/désactivation, réinitialisation de mot de passe (Super Admin / Admin).'],
-  ['Configuration ERP', 'Les réglages : raison sociale, nom de marque, logo (initiales), NIF/Stat, devise et taux, thème, numérotation des factures/avoirs, et la matrice des permissions par rôle.'],
+  ['Configuration ERP', 'Les réglages : raison sociale, nom de marque, logo (initiales), NIF/Stat, devise et taux, thème, numérotation des factures/avoirs, la matrice des permissions par rôle, et les pages « À propos » / « Confidentialité » éditables (affichées sur le portail de connexion).'],
 ];
 for (const [name, desc] of tabs) {
   A(new Paragraph({ spacing: { before: 100, after: 20 }, children: [new TextRun({ text: name, bold: true, color: CY })] }), p(desc));
@@ -188,6 +188,7 @@ A(
   h1('8. Tarification (fournisseurs & clients)'),
   bullet([b('Prix d\'achat par fournisseur'), r(' : un même produit peut être fourni par plusieurs fournisseurs, chacun avec son prix négocié (panneau « Produits fournis »). Ces produits se pré-remplissent lors d\'une commande d\'achat.')]),
   bullet([b('Prix de vente par client'), r(' : on peut définir un prix de vente spécifique par client et par produit (panneau « Tarifs »). En caisse, sélectionner le client applique automatiquement ses tarifs.')]),
+  bullet([b('Vente en gros (carton)'), r(' : un article peut définir un conditionnement (1 carton = N pièces) avec un prix carton. On achète et on vend à la pièce ou au carton ; le stock reste compté en pièces et se convertit automatiquement.')]),
   bullet([b('Garde-fou vente à perte'), r(' : impossible de vendre sous le prix d\'achat — bloqué à l\'encaissement (côté serveur également).')]),
 );
 
