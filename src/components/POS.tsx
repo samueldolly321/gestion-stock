@@ -449,6 +449,7 @@ export default function POS({
                       <div className="flex justify-between items-end mt-1.5 pt-1.5 border-t border-slate-200 dark:border-slate-800/50">
                         <span className="text-xs font-bold font-mono text-cyan-400">
                           {format(p.salePrice)}
+                          <span className="text-[9px] font-normal text-slate-400"> /pce</span>
                         </span>
                         {quantityInCart > 0 && (
                           <span className="text-[10px] px-1.5 py-0.5 bg-cyan-500/10 text-cyan-400 font-mono rounded">
@@ -456,6 +457,12 @@ export default function POS({
                           </span>
                         )}
                       </div>
+                      {hasPack(p.packSize) && (
+                        <div className="flex justify-between items-center mt-1 text-[10px] font-mono text-amber-600 dark:text-amber-400">
+                          <span>{p.packLabel || 'Carton'} ×{packSizeOf(p.packSize)}</span>
+                          <span className="font-bold">{format(p.packSalePrice != null ? p.packSalePrice : p.salePrice * packSizeOf(p.packSize))}</span>
+                        </div>
+                      )}
                     </div>
                   </button>
                 );
