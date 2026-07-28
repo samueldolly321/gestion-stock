@@ -100,6 +100,12 @@ export const products = pgTable('products', {
   dimensions: text('dimensions'),
   volume: doublePrecision('volume'),
   unit: text('unit').default('Unités').notNull(),
+  // Conditionnement (vente en gros) : 1 carton = packSize pièces (base unit).
+  // packSize=1 → pas de conditionnement (comportement inchangé).
+  packSize: integer('pack_size').default(1).notNull(),
+  packLabel: text('pack_label'), // ex. « Carton », « Pack »
+  packPurchasePrice: doublePrecision('pack_purchase_price'), // prix d'achat au carton (optionnel)
+  packSalePrice: doublePrecision('pack_sale_price'), // prix de vente au carton (optionnel)
   minStock: integer('min_stock').default(5).notNull(),
   maxStock: integer('max_stock').default(100).notNull(),
   image: text('image'),

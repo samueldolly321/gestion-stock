@@ -30,6 +30,11 @@ function pickProductFields(body: any) {
     dimensions: body.dimensions ?? null,
     volume: body.volume != null ? Number(body.volume) : null,
     unit: body.unit || 'Unités',
+    // Conditionnement (vente en gros). packSize ≥ 1 ; prix carton optionnels.
+    packSize: Math.max(1, Math.floor(Number(body.packSize) || 1)),
+    packLabel: body.packLabel ?? null,
+    packPurchasePrice: body.packPurchasePrice != null && body.packPurchasePrice !== '' ? Number(body.packPurchasePrice) : null,
+    packSalePrice: body.packSalePrice != null && body.packSalePrice !== '' ? Number(body.packSalePrice) : null,
     minStock: Number(body.minStock) || 0,
     maxStock: Number(body.maxStock) || 0,
     image: body.image ?? null,

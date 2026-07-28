@@ -6,6 +6,7 @@ import { Purchase, Supplier, Product, User, PurchaseItem, PurchaseStatus, Suppli
 import { useMoney } from '../services/CurrencyContext';
 import { createPurchase, receivePurchase, payPurchase, deletePurchase } from '../services/purchasesService';
 import { canWrite as hasWritePerm } from '../services/permissions';
+import { hasPack, packSizeOf } from '../services/pack';
 import { showAlert, showConfirm } from '../services/dialog';
 import { showToast } from '../services/toast';
 import { exportPdf } from '../services/exportPdf';
@@ -33,7 +34,8 @@ const PAY_META: Record<string, { label: string; cls: string }> = {
   paid: { label: 'Payé', cls: 'bg-emerald-500/10 text-emerald-500' },
 };
 
-interface Line { productId: string; quantity: number; unitCost: number; tax: number }
+// unit = unité de SAISIE de la ligne ('piece' ou 'pack'). Convertie en pièces à la création.
+interface Line { productId: string; quantity: number; unitCost: number; tax: number; unit: 'piece' | 'pack' }
 
 export default function Purchases({ purchases, suppliers, products, supplierProducts, user, onRefresh, writePerms }: PurchasesProps) {
   const { format } = useMoney();
@@ -67,7 +69,7 @@ export default function Purchases({ purchases, suppliers, products, supplierProd
   // Modal création
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [supplierId, setSupplierId] = useState('');
-  const [lines, setLines] = useState<Line[]>([{ productId: '', quantity: 1, unitCost: 0, tax: 20 }]);
+  const [lines, setLines] = useState<Line[]>([{ productId: '', quantity: 1, unitCost: 0, tax: 20, unit: 'piece' }]);
   const [notes, setNotes] = useState('');
   const [expectedDate, setExpectedDate] = useState(''); // date de réception prévue (calendrier)
   const [applyVat, setApplyVat] = useState(false); // TVA optionnelle (désactivée par défaut)
@@ -127,8 +129,8 @@ export default function Purchases({ purchases, suppliers, products, supplierProd
   // tous ses produits, quantité 1, coût = son prix négocié / d'achat. Repli sur une ligne vide.
   const linesForSupplier = (sid: string): Line[] => {
     const cat = buildCatalog(sid);
-    if (cat.length === 0) return [{ productId: '', quantity: 1, unitCost: 0, tax: 20 }];
-    return cat.map((c) => ({ productId: c.productId, quantity: 1, unitCost: c.purchasePrice, tax: c.vatRate }));
+    if (cat.length === 0) return [{ productId: '', quantity: 1, unitCost: 0, tax: 20, unit: 'piece' }];
+    return cat.map((c) => ({ productId: c.productId, quantity: 1, unitCost: c.purchasePrice, tax: c.vatRate, unit: 'piece' as const }));
   };
 
   const openCreate = () => {
@@ -156,9 +158,23 @@ export default function Purchases({ purchases, suppliers, products, supplierProd
     const prod = products.find((p) => p.id === pid);
     setLine(i, {
       productId: pid,
+      unit: 'piece', // repart à la pièce ; l'utilisateur bascule au carton si besoin
       unitCost: c ? c.purchasePrice : prod ? prod.purchasePrice : 0,
       tax: c ? c.vatRate : prod ? prod.vatRate : 20,
     });
+  };
+
+  // Bascule pièce ↔ carton : recalcule le coût par défaut dans la nouvelle unité.
+  const onSelectUnit = (i: number, unit: 'piece' | 'pack') => {
+    const line = lines[i];
+    const prod = products.find((p) => p.id === line.productId);
+    const size = packSizeOf(prod?.packSize);
+    const c = catalog.find((s) => s.productId === line.productId);
+    const piecePrice = c ? c.purchasePrice : prod ? prod.purchasePrice : 0;
+    const unitCost = unit === 'pack'
+      ? (prod?.packPurchasePrice != null ? Number(prod.packPurchasePrice) : piecePrice * size)
+      : piecePrice;
+    setLine(i, { unit, unitCost });
   };
 
   const handleCreate = async (e: React.FormEvent) => {
@@ -167,8 +183,13 @@ export default function Purchases({ purchases, suppliers, products, supplierProd
       .filter((l) => l.productId && Number(l.quantity) > 0)
       .map((l) => {
         const prod = products.find((p) => p.id === l.productId);
-        const quantity = Number(l.quantity) || 0;
-        const unitCost = Number(l.unitCost) || 0;
+        const size = packSizeOf(prod?.packSize);
+        const isPack = l.unit === 'pack' && size > 1;
+        const enteredQty = Number(l.quantity) || 0;
+        const enteredCost = Number(l.unitCost) || 0;
+        // Conversion en unité de base (pièces) : le stock et le PMP restent en pièces.
+        const quantity = isPack ? enteredQty * size : enteredQty;
+        const unitCost = isPack ? enteredCost / size : enteredCost;
         return {
           productId: l.productId,
           productName: prod?.name,
@@ -177,6 +198,8 @@ export default function Purchases({ purchases, suppliers, products, supplierProd
           unitCost,
           tax: applyVat ? (Number(l.tax) || 0) : 0, // TVA neutralisée si l'option est décochée
           total: quantity * unitCost,
+          unitLabel: isPack ? (prod?.packLabel || 'Carton') : null,
+          packQty: isPack ? enteredQty : null,
         };
       });
     if (!supplierId) { showAlert('Sélectionnez un fournisseur.', { variant: 'warning' }); return; }
@@ -389,20 +412,37 @@ export default function Purchases({ purchases, suppliers, products, supplierProd
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
                   <label className="text-slate-500 dark:text-slate-400">Articles</label>
-                  <button type="button" onClick={() => setLines((p) => [...p, { productId: '', quantity: 1, unitCost: 0, tax: 20 }])} className="text-[11px] text-cyan-500 hover:underline flex items-center gap-0.5"><Plus className="w-3 h-3" /> Ligne</button>
+                  <button type="button" onClick={() => setLines((p) => [...p, { productId: '', quantity: 1, unitCost: 0, tax: 20, unit: 'piece' }])} className="text-[11px] text-cyan-500 hover:underline flex items-center gap-0.5"><Plus className="w-3 h-3" /> Ligne</button>
                 </div>
-                {lines.map((l, i) => (
+                {lines.map((l, i) => {
+                  const prod = products.find((p) => p.id === l.productId);
+                  const size = packSizeOf(prod?.packSize);
+                  const canPack = hasPack(prod?.packSize);
+                  const isPack = l.unit === 'pack' && canPack;
+                  return (
                   <div key={i} className="grid grid-cols-12 gap-2 items-center">
-                    <select value={l.productId} onChange={(e) => onSelectProduct(i, e.target.value)} className={`${inputCls} col-span-5`}>
+                    <select value={l.productId} onChange={(e) => onSelectProduct(i, e.target.value)} className={`${inputCls} col-span-4`}>
                       <option value="">— Article —</option>
                       {optionProducts.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
                     </select>
-                    <input type="number" min={1} value={l.quantity} onChange={(e) => setLine(i, { quantity: Number(e.target.value) })} className={`${inputCls} col-span-2`} title="Quantité" />
-                    <input type="number" min={0} value={l.unitCost} onChange={(e) => setLine(i, { unitCost: Number(e.target.value) })} className={`${inputCls} col-span-3`} title="Coût unitaire" />
+                    {canPack ? (
+                      <select value={l.unit} onChange={(e) => onSelectUnit(i, e.target.value as 'piece' | 'pack')} className={`${inputCls} col-span-2`} title="Unité de saisie">
+                        <option value="piece">Pièce</option>
+                        <option value="pack">{(prod?.packLabel || 'Carton')} ×{size}</option>
+                      </select>
+                    ) : (
+                      <span className="col-span-2 text-[10px] font-mono text-slate-400 text-center">Pièce</span>
+                    )}
+                    <input type="number" min={1} value={l.quantity} onChange={(e) => setLine(i, { quantity: Number(e.target.value) })} className={`${inputCls} col-span-2`} title={isPack ? 'Nombre de cartons' : 'Quantité (pièces)'} />
+                    <input type="number" min={0} value={l.unitCost} onChange={(e) => setLine(i, { unitCost: Number(e.target.value) })} className={`${inputCls} col-span-2`} title={isPack ? 'Coût par carton' : 'Coût par pièce'} />
                     <span className="col-span-1 text-[10px] font-mono text-slate-400 text-center">{applyVat ? l.tax : 0}%</span>
                     <button type="button" onClick={() => setLines((p) => p.filter((_, idx) => idx !== i))} className="col-span-1 text-slate-400 hover:text-red-500 flex justify-center"><Trash2 className="w-3.5 h-3.5" /></button>
+                    {isPack && (Number(l.quantity) || 0) > 0 && (
+                      <span className="col-span-12 text-[10px] text-cyan-500 font-mono -mt-1">= {(Number(l.quantity) || 0) * size} pièces en stock (coût {format(((Number(l.unitCost) || 0) / size))}/pièce)</span>
+                    )}
                   </div>
-                ))}
+                  );
+                })}
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -480,7 +520,7 @@ export default function Purchases({ purchases, suppliers, products, supplierProd
             <div className="p-5 overflow-y-auto space-y-2">
               {(viewTarget.items || []).map((it: PurchaseItem, i) => (
                 <div key={i} className="flex justify-between items-center p-2.5 bg-slate-50 dark:bg-slate-950/25 border border-slate-200 dark:border-slate-800/40 rounded-lg">
-                  <div className="min-w-0"><span className="font-semibold text-slate-900 dark:text-white block truncate">{it.productName || it.productId}</span><span className="text-[10px] text-slate-400">{it.quantity} × {format(it.unitCost)}</span></div>
+                  <div className="min-w-0"><span className="font-semibold text-slate-900 dark:text-white block truncate">{it.productName || it.productId}</span><span className="text-[10px] text-slate-400">{it.packQty && it.unitLabel ? `${it.packQty} ${it.unitLabel} (${it.quantity} pcs) × ${format(it.unitCost)}` : `${it.quantity} × ${format(it.unitCost)}`}</span></div>
                   <span className="font-mono font-bold text-slate-900 dark:text-white">{format(it.total)}</span>
                 </div>
               ))}

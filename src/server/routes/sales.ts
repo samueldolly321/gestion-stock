@@ -69,6 +69,9 @@ salesRouter.post('/', requireAuth, requireRole(...CASHIER_ROLES), async (req: Au
         discount: Number(it.discount) || 0,
         tax,
         total: lineHT,
+        // Affichage « vente en gros » (n'affecte ni stock ni montants : quantity est en pièces).
+        unitLabel: it.unitLabel ?? null,
+        packQty: it.packQty != null ? Math.round(Number(it.packQty)) : null,
       });
     }
     const discountAmount = subtotal * (discountPercent / 100);

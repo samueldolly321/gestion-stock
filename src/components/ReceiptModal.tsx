@@ -47,7 +47,11 @@ export default function ReceiptModal({ sale, company, onClose }: ReceiptModalPro
             <div key={item.productId} className="flex justify-between items-start">
               <div>
                 <span>{item.productName}</span>
-                <span className="text-[9px] text-slate-500 block">{item.quantity} x {format(item.unitPrice)}</span>
+                <span className="text-[9px] text-slate-500 block">
+                  {item.packQty && item.unitLabel
+                    ? `${item.packQty} ${item.unitLabel} (${item.quantity} pcs) x ${format(item.unitPrice)}`
+                    : `${item.quantity} x ${format(item.unitPrice)}`}
+                </span>
               </div>
               <span className="font-mono">{format(item.quantity * item.unitPrice)}</span>
             </div>

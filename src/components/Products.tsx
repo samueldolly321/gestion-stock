@@ -36,12 +36,15 @@ import { exportPdf } from '../services/exportPdf';
 import { exportExcel } from '../services/exportExcel';
 import Pagination, { usePagination } from './Pagination';
 import { canWrite as hasWritePerm } from '../services/permissions';
+import { hasPack, packBreakdown } from '../services/pack';
 import BarcodeSVG from './Barcode';
 import { generateEan13 } from '../services/barcode';
 import { getExportCompany } from '../services/exportContext';
 
 // Unités de mesure proposées dans le formulaire produit (+ « Autre… » pour saisie libre).
-const UNIT_OPTIONS = ['Litre', 'cl', 'Kg', 'mg', 'Pièces', 'Unités', 'Bouteilles', 'Cartons', 'Packs', 'Pots', 'Sacs'];
+// Unité de BASE (le détail) dans laquelle le stock est compté. Le regroupement « Carton / Pack »
+// est géré par la section Conditionnement — d'où l'absence de « Cartons/Packs » ici (évite la confusion).
+const UNIT_OPTIONS = ['Pièces', 'Unités', 'Litre', 'cl', 'Kg', 'mg', 'Bouteilles', 'Pots', 'Sacs'];
 
 interface ProductsProps {
   products: Product[];
@@ -108,6 +111,11 @@ export default function Products({
   const [salePrice, setSalePrice] = useState(0);
   const [vatRate, setVatRate] = useState(20);
   const [unit, setUnit] = useState('Pièces');
+  // Conditionnement (vente en gros) : 1 carton = packSize pièces.
+  const [packSize, setPackSize] = useState(1);
+  const [packLabel, setPackLabel] = useState('Carton');
+  const [packPurchasePrice, setPackPurchasePrice] = useState<number | ''>('');
+  const [packSalePrice, setPackSalePrice] = useState<number | ''>('');
   const [minStock, setMinStock] = useState(5);
   const [maxStock, setMaxStock] = useState(100);
   const [image, setImage] = useState(PRODUCT_IMAGES[0]);
@@ -174,6 +182,10 @@ export default function Products({
     setSalePrice(0);
     setVatRate(20);
     setUnit('Pièces');
+    setPackSize(1);
+    setPackLabel('Carton');
+    setPackPurchasePrice('');
+    setPackSalePrice('');
     setMinStock(5);
     setMaxStock(100);
     setImage(PRODUCT_IMAGES[Math.floor(Math.random() * PRODUCT_IMAGES.length)]);
@@ -199,6 +211,10 @@ export default function Products({
     setSalePrice(p.salePrice);
     setVatRate(p.vatRate);
     setUnit(p.unit);
+    setPackSize(p.packSize && p.packSize > 1 ? p.packSize : 1);
+    setPackLabel(p.packLabel || 'Carton');
+    setPackPurchasePrice(p.packPurchasePrice ?? '');
+    setPackSalePrice(p.packSalePrice ?? '');
     setMinStock(p.minStock);
     setMaxStock(p.maxStock);
     setImage(p.image || PRODUCT_IMAGES[0]);
@@ -242,6 +258,10 @@ export default function Products({
       salePrice: Number(salePrice),
       vatRate: Number(vatRate),
       unit,
+      packSize: Math.max(1, Math.floor(Number(packSize) || 1)),
+      packLabel: (Number(packSize) || 1) > 1 ? (packLabel.trim() || 'Carton') : null,
+      packPurchasePrice: packPurchasePrice === '' ? null : Number(packPurchasePrice),
+      packSalePrice: packSalePrice === '' ? null : Number(packSalePrice),
       minStock: Number(minStock),
       maxStock: Number(maxStock),
       image,
@@ -743,6 +763,9 @@ export default function Products({
                         >
                           {p.quantity} {p.unit}
                         </span>
+                        {hasPack(p.packSize) && (
+                          <span className="block text-[9px] text-slate-400 font-mono mt-0.5">{packBreakdown(p.quantity, p.packSize, p.packLabel)}</span>
+                        )}
                       </td>
                       <td className="py-3.5 px-4 text-center">
                         <span
@@ -959,6 +982,16 @@ export default function Products({
                     </button>
                   </div>
                 </div>
+
+                {adjustType === 'entry_reception' && (
+                  <div className="flex gap-2 items-start text-[10px] leading-snug rounded-lg border border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300 p-2.5">
+                    <span className="shrink-0">💡</span>
+                    <span>
+                      Cette entrée <strong>ajuste seulement le stock</strong> (inventaire, correction, stock de départ) — elle n'enregistre <strong>aucune dépense</strong>.
+                      Si vous <strong>réapprovisionnez chez un fournisseur</strong>, passez plutôt par <strong>Achats → Nouvelle commande</strong> puis <strong>Réceptionnez</strong> : le stock montera <em>et</em> la dépense/la dette fournisseur seront enregistrées.
+                    </span>
+                  </div>
+                )}
 
                 <div>
                   <label className="text-slate-500 dark:text-slate-400 block mb-1">Quantité :</label>
@@ -1224,7 +1257,7 @@ export default function Products({
 
                 {/* Unit */}
                 <div>
-                  <label className="text-xs text-slate-400 block mb-1">Unité de mesure</label>
+                  <label className="text-xs text-slate-400 block mb-1">Unité de base (détail)</label>
                   <select
                     value={UNIT_OPTIONS.includes(unit) ? unit : '__other__'}
                     onChange={(e) => setUnit(e.target.value === '__other__' ? '' : e.target.value)}
@@ -1242,6 +1275,64 @@ export default function Products({
                       className="w-full mt-2 bg-white dark:bg-slate-950/20 p-2.5 text-xs rounded-lg border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500"
                       placeholder="Saisir l'unité personnalisée (ex. Sacs, Pots…)"
                     />
+                  )}
+                </div>
+
+                {/* Conditionnement — vente en gros (carton ↔ pièces) */}
+                <div className="col-span-1 md:col-span-2 rounded-lg border border-slate-200 dark:border-slate-800 p-3 bg-slate-50/60 dark:bg-slate-950/20">
+                  <label className="text-xs font-semibold text-slate-600 dark:text-slate-300 block mb-0.5">Conditionnement (vente en gros)</label>
+                  <p className="text-[10px] text-slate-400 mb-2.5">Le stock reste compté en pièces. Laissez la taille à 1 s'il n'y a pas de conditionnement.</p>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div>
+                      <label className="text-[10px] text-slate-400 block mb-1">Pièces / carton</label>
+                      <input
+                        type="number"
+                        min={1}
+                        value={packSize}
+                        onChange={(e) => setPackSize(Math.max(1, Math.floor(Number(e.target.value) || 1)))}
+                        className="w-full bg-white dark:bg-slate-950/20 p-2.5 text-xs rounded-lg border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-slate-400 block mb-1">Nom du colis</label>
+                      <input
+                        type="text"
+                        value={packLabel}
+                        onChange={(e) => setPackLabel(e.target.value)}
+                        disabled={packSize <= 1}
+                        placeholder="Carton"
+                        className="w-full bg-white dark:bg-slate-950/20 p-2.5 text-xs rounded-lg border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500 disabled:opacity-50"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-slate-400 block mb-1">Prix d'achat / carton</label>
+                      <input
+                        type="number"
+                        step="any"
+                        min={0}
+                        value={packPurchasePrice}
+                        onChange={(e) => setPackPurchasePrice(e.target.value === '' ? '' : Number(e.target.value))}
+                        disabled={packSize <= 1}
+                        placeholder="optionnel"
+                        className="w-full bg-white dark:bg-slate-950/20 p-2.5 text-xs rounded-lg border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500 disabled:opacity-50"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-slate-400 block mb-1">Prix de vente / carton</label>
+                      <input
+                        type="number"
+                        step="any"
+                        min={0}
+                        value={packSalePrice}
+                        onChange={(e) => setPackSalePrice(e.target.value === '' ? '' : Number(e.target.value))}
+                        disabled={packSize <= 1}
+                        placeholder="optionnel"
+                        className="w-full bg-white dark:bg-slate-950/20 p-2.5 text-xs rounded-lg border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500 disabled:opacity-50"
+                      />
+                    </div>
+                  </div>
+                  {packSize > 1 && (
+                    <p className="text-[10px] text-cyan-500 mt-2">1 {packLabel.trim() || 'Carton'} = {packSize} {unit || 'pièces'}.</p>
                   )}
                 </div>
 

@@ -17,6 +17,7 @@ import {
   Truck
 } from 'lucide-react';
 import { Product, Client, ClientPrice, Sale, User, TransactionItem, DeliveryType } from '../types';
+import { packSizeOf, hasPack } from '../services/pack';
 import { createSale } from '../services/salesService';
 import { createDelivery, DELIVERY_TYPES, defaultFeeFor, deliveryTypeLabel } from '../services/deliveriesService';
 import ReceiptModal from './ReceiptModal';
@@ -34,6 +35,14 @@ interface POSProps {
   company?: { name?: string; address?: string; phone?: string; taxId?: string };
 }
 
+// Ligne de panier : quantity est TOUJOURS en pièces, unitPrice TOUJOURS à la pièce.
+// saleUnit/packSize ne servent qu'à la saisie et à l'affichage (carton ↔ pièces).
+interface CartLine extends TransactionItem {
+  saleUnit: 'piece' | 'pack';
+  packSize: number;
+  packLabel?: string | null;
+}
+
 export default function POS({
   products,
   clients,
@@ -44,7 +53,7 @@ export default function POS({
   company
 }: POSProps) {
   const [searchTerm, setSearchTerm] = useState('');
-  const [cart, setCart] = useState<TransactionItem[]>([]);
+  const [cart, setCart] = useState<CartLine[]>([]);
   const [selectedClientId, setSelectedClientId] = useState<string>(clients[0]?.id || '');
   const [paymentMethod, setPaymentMethod] = useState<Sale['paymentMethod']>('cash');
   const [discountPercent, setDiscountPercent] = useState<number>(0);
@@ -74,11 +83,18 @@ export default function POS({
     return clients.find((c) => c.id === selectedClientId) || null;
   }, [clients, selectedClientId]);
 
-  // Prix de vente applicable au client sélectionné : tarif négocié si défini, sinon prix par défaut.
-  const priceForClient = (product: Product): number => {
+  // Prix de vente À LA PIÈCE applicable au client : tarif négocié si défini, sinon prix par défaut.
+  // En mode carton, si un prix de vente au carton est renseigné, on en déduit le prix/pièce.
+  const perPiecePrice = (product: Product, saleUnit: 'piece' | 'pack' = 'piece'): number => {
     const cp = clientPrices.find((c) => c.clientId === selectedClientId && c.productId === product.id);
-    return cp ? cp.salePrice : product.salePrice;
+    if (cp) return cp.salePrice; // le tarif client (par pièce) est prioritaire
+    const size = packSizeOf(product.packSize);
+    if (saleUnit === 'pack' && size > 1 && product.packSalePrice != null) {
+      return Number(product.packSalePrice) / size;
+    }
+    return product.salePrice;
   };
+  const priceForClient = (product: Product): number => perPiecePrice(product, 'piece');
   // Un tarif négocié existe-t-il pour ce produit et ce client ?
   const hasClientPrice = (productId: string): boolean =>
     clientPrices.some((c) => c.clientId === selectedClientId && c.productId === productId);
@@ -89,8 +105,7 @@ export default function POS({
       prev.map((item) => {
         const prod = products.find((p) => p.id === item.productId);
         if (!prod) return item;
-        const cp = clientPrices.find((c) => c.clientId === selectedClientId && c.productId === prod.id);
-        const newPrice = cp ? cp.salePrice : prod.salePrice;
+        const newPrice = perPiecePrice(prod, item.saleUnit);
         return { ...item, unitPrice: newPrice, total: item.quantity * newPrice * (1 - item.discount / 100) };
       }),
     );
@@ -109,26 +124,28 @@ export default function POS({
     });
   }, [products, searchTerm]);
 
+  // Pas de progression (+/-) d'une ligne : 1 carton si la ligne est en mode carton, sinon 1 pièce.
+  const stepFor = (item: CartLine) => (item.saleUnit === 'pack' ? item.packSize : 1);
+
   // Add product to cart
   const addToCart = (product: Product) => {
-    // Check if product quantity limit reached
     const cartItem = cart.find((item) => item.productId === product.id);
-    if (cartItem && cartItem.quantity >= product.quantity) {
-      showAlert(`Stock insuffisant. Seulement ${product.quantity} disponibles.`, { variant: 'warning' });
-      return;
-    }
-
     if (cartItem) {
+      const step = stepFor(cartItem);
+      if (cartItem.quantity + step > product.quantity) {
+        showAlert(`Stock insuffisant. Seulement ${product.quantity} disponibles.`, { variant: 'warning' });
+        return;
+      }
       setCart(
         cart.map((item) =>
           item.productId === product.id
-            ? { ...item, quantity: item.quantity + 1, total: (item.quantity + 1) * item.unitPrice }
+            ? { ...item, quantity: item.quantity + step, total: (item.quantity + step) * item.unitPrice * (1 - item.discount / 100) }
             : item
         )
       );
     } else {
-      const price = priceForClient(product); // tarif négocié du client si défini
-      const newItem: TransactionItem = {
+      const price = priceForClient(product); // tarif négocié du client si défini (par pièce)
+      const newItem: CartLine = {
         productId: product.id,
         productName: product.name,
         sku: product.sku,
@@ -136,10 +153,31 @@ export default function POS({
         unitPrice: price,
         discount: 0,
         tax: product.vatRate,
-        total: price
+        total: price,
+        saleUnit: 'piece',
+        packSize: packSizeOf(product.packSize),
+        packLabel: product.packLabel ?? null,
       };
       setCart([...cart, newItem]);
     }
+  };
+
+  // Bascule pièce ↔ carton pour une ligne. Recalcule le prix/pièce et arrondit la quantité
+  // à un multiple de la taille de colis (au moins 1 colis).
+  const setSaleUnit = (productId: string, saleUnit: 'piece' | 'pack') => {
+    const prod = products.find((p) => p.id === productId);
+    if (!prod) return;
+    const size = packSizeOf(prod.packSize);
+    setCart(cart.map((item) => {
+      if (item.productId !== productId) return item;
+      const newPrice = perPiecePrice(prod, saleUnit);
+      let qty = item.quantity;
+      if (saleUnit === 'pack') {
+        qty = Math.max(size, Math.round(item.quantity / size) * size); // multiple de la taille de colis
+        if (qty > prod.quantity) qty = Math.max(size, Math.floor(prod.quantity / size) * size);
+      }
+      return { ...item, saleUnit, unitPrice: newPrice, quantity: qty, total: qty * newPrice * (1 - item.discount / 100) };
+    }));
   };
 
   // Adjust quantity in cart
@@ -151,7 +189,7 @@ export default function POS({
       cart
         .map((item) => {
           if (item.productId === productId) {
-            const newQty = item.quantity + delta;
+            const newQty = item.quantity + delta * stepFor(item); // 1 pièce ou 1 carton
             if (newQty <= 0) return null;
             if (newQty > p.quantity) {
               showAlert(`Quantité limitée au stock disponible (${p.quantity}).`, { variant: 'warning' });
@@ -165,19 +203,28 @@ export default function POS({
           }
           return item;
         })
-        .filter(Boolean) as TransactionItem[]
+        .filter(Boolean) as CartLine[]
     );
   };
 
-  // Définit une quantité absolue (saisie directe au clavier). Bornée à [1, stock].
+  // Définit une quantité absolue (saisie directe au clavier). En mode carton, la valeur
+  // saisie est un nombre de cartons ; convertie en pièces. Toujours bornée au stock.
   const setQuantity = (productId: string, value: number | string) => {
     const p = products.find((prod) => prod.id === productId);
-    if (!p) return;
-    let q = Math.floor(Number(value) || 0);
-    q = Math.max(1, Math.min(q, p.quantity));
-    setCart(cart.map((item) => item.productId === productId
-      ? { ...item, quantity: q, total: q * item.unitPrice * (1 - item.discount / 100) }
-      : item));
+    const item = cart.find((i) => i.productId === productId);
+    if (!p || !item) return;
+    let pieces: number;
+    if (item.saleUnit === 'pack') {
+      const size = item.packSize;
+      const cartons = Math.max(1, Math.floor(Number(value) || 0));
+      const maxPieces = Math.max(size, Math.floor(p.quantity / size) * size);
+      pieces = Math.min(cartons * size, maxPieces);
+    } else {
+      pieces = Math.max(1, Math.min(Math.floor(Number(value) || 0), p.quantity));
+    }
+    setCart(cart.map((it) => it.productId === productId
+      ? { ...it, quantity: pieces, total: pieces * it.unitPrice * (1 - it.discount / 100) }
+      : it));
   };
 
   // Définit le prix de vente unitaire d'une ligne (négociation par client au comptoir).
@@ -259,7 +306,13 @@ export default function POS({
 
       // Si la TVA n'est pas appliquée, on neutralise le taux sur chaque ligne
       // (cohérence du reçu et des recalculs éventuels) et vatAmount = 0.
-      const itemsForSale = applyVat ? cart : cart.map((it) => ({ ...it, tax: 0 }));
+      // On transmet aussi le libellé/nombre de cartons (affichage reçu) ; quantity reste en pièces.
+      const itemsForSale = cart.map((it) => ({
+        ...it,
+        tax: applyVat ? it.tax : 0,
+        unitLabel: it.saleUnit === 'pack' ? (it.packLabel || 'Carton') : null,
+        packQty: it.saleUnit === 'pack' ? Math.round(it.quantity / it.packSize) : null,
+      }));
 
       const created = await createSale({
         type: 'invoice',
@@ -469,6 +522,21 @@ export default function POS({
                         </span>
                       )}
                     </div>
+                    {/* Unité de vente : pièce ou carton (uniquement si le produit a un conditionnement) */}
+                    {hasPack(item.packSize) && (
+                      <div className="flex items-center gap-1.5 mt-1">
+                        <select
+                          value={item.saleUnit}
+                          onChange={(e) => setSaleUnit(item.productId, e.target.value as 'piece' | 'pack')}
+                          className="text-[9px] font-mono bg-transparent border border-slate-200 dark:border-slate-700 rounded px-1 py-0.5 text-slate-600 dark:text-slate-300 focus:outline-none focus:border-cyan-500"
+                          title="Vendre à la pièce ou au carton"
+                        >
+                          <option value="piece">Pièce</option>
+                          <option value="pack">{item.packLabel || 'Carton'} ×{item.packSize}</option>
+                        </select>
+                        <span className="text-[9px] text-slate-400 font-mono">= {item.quantity} pcs</span>
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex items-center gap-2 shrink-0">
@@ -481,9 +549,10 @@ export default function POS({
                     <input
                       type="number"
                       min={1}
-                      value={item.quantity}
+                      value={item.saleUnit === 'pack' ? Math.round(item.quantity / item.packSize) : item.quantity}
                       onFocus={(e) => e.target.select()}
                       onChange={(e) => setQuantity(item.productId, e.target.value)}
+                      title={item.saleUnit === 'pack' ? 'Nombre de cartons' : 'Nombre de pièces'}
                       className="font-mono text-xs font-bold text-slate-900 dark:text-white w-10 text-center bg-transparent border border-slate-200 dark:border-slate-700 rounded p-0.5 focus:outline-none focus:border-cyan-500"
                     />
                     <button

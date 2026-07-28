@@ -22,6 +22,9 @@ function pickItems(raw: any): any[] {
         unitCost,
         tax: Number(it.tax) || 0,
         total: quantity * unitCost,
+        // Affichage « achat en gros » (n'affecte pas le stock : quantity est déjà en pièces).
+        unitLabel: it.unitLabel ?? null,
+        packQty: it.packQty != null ? Number(it.packQty) : null,
       };
     });
 }

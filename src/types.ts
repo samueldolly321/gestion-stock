@@ -170,11 +170,14 @@ export interface TransactionItem {
   productId: string;
   productName: string;
   sku: string;
-  quantity: number;
-  unitPrice: number;
+  quantity: number; // TOUJOURS en pièces (unité de base) — stock/comptabilité inchangés
+  unitPrice: number; // prix à la pièce
   discount: number; // percentage or flat
   tax: number; // VAT percentage
   total: number;
+  // Affichage « vente en gros » (n'affecte ni le stock ni les montants — quantity reste en pièces) :
+  unitLabel?: string | null; // ex. « Carton » si la ligne a été saisie au carton
+  packQty?: number | null; // nombre de cartons saisis (packQty × packSize = quantity)
 }
 
 export interface Sale {
@@ -243,10 +246,13 @@ export interface PurchaseItem {
   productId: string;
   productName?: string;
   sku?: string;
-  quantity: number;
-  unitCost: number; // coût d'achat unitaire (Ariary)
+  quantity: number; // TOUJOURS en pièces (unité de base)
+  unitCost: number; // coût d'achat à la pièce (Ariary)
   tax: number; // % TVA
   total: number; // quantity * unitCost (HT)
+  // Affichage « achat en gros » (n'affecte ni le stock ni les montants) :
+  unitLabel?: string | null; // ex. « Carton » si saisi au carton
+  packQty?: number | null; // nombre de cartons saisis (packQty × packSize = quantity)
 }
 
 export type PurchaseStatus = 'ordered' | 'received' | 'cancelled';
@@ -310,6 +316,11 @@ export interface Product {
   dimensions?: string; // L x W x H
   volume?: number; // m3
   unit: string; // e.g. Units, Liters, Kg, Boxes
+  // Conditionnement (vente en gros) : 1 carton = packSize pièces. packSize=1 → aucun conditionnement.
+  packSize?: number;
+  packLabel?: string | null; // ex. « Carton »
+  packPurchasePrice?: number | null; // prix d'achat au carton (optionnel)
+  packSalePrice?: number | null; // prix de vente au carton (optionnel)
   minStock: number;
   maxStock: number;
   image?: string;

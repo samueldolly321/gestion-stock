@@ -228,7 +228,7 @@ export default function Sales({ sales, user, currencySymbol, company }: SalesPro
             <div className="p-5 overflow-y-auto space-y-2">
               {(viewTarget.items || []).map((it: TransactionItem, i) => (
                 <div key={i} className="flex justify-between items-center p-2.5 bg-slate-50 dark:bg-slate-950/25 border border-slate-200 dark:border-slate-800/40 rounded-lg">
-                  <div className="min-w-0"><span className="font-semibold text-slate-900 dark:text-white block truncate">{it.productName || it.productId}</span><span className="text-[10px] text-slate-400">{it.quantity} × {format(it.unitPrice)}</span></div>
+                  <div className="min-w-0"><span className="font-semibold text-slate-900 dark:text-white block truncate">{it.productName || it.productId}</span><span className="text-[10px] text-slate-400">{it.packQty && it.unitLabel ? `${it.packQty} ${it.unitLabel} (${it.quantity} pcs) × ${format(it.unitPrice)}` : `${it.quantity} × ${format(it.unitPrice)}`}</span></div>
                   <span className="font-mono font-bold text-slate-900 dark:text-white">{format(it.quantity * it.unitPrice)}</span>
                 </div>
               ))}
