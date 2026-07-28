@@ -8,6 +8,17 @@ Authentification maison (JWT, mots de passe hachés bcrypt) — aucune dépendan
 
 Authentification & rôles (RBAC) · Catégories & sous-catégories · Articles & stocks · Mouvements de stock · Caisse POS (avec impression ticket/A4) · Clients & fournisseurs · Audits d'inventaire · Marques & entrepôts · Réglages entreprise · Journal d'audit · Notifications temps réel (SSE).
 
+## Documentation
+
+| Document | Contenu |
+|---|---|
+| [`GUIDE_INSTALLATION.md`](GUIDE_INSTALLATION.md) | Installation complète pas-à-pas sur un PC Windows (Node, PostgreSQL, base de données, `.env`, lancement, dépannage). **Commence ici pour installer le projet.** |
+| [`GUIDE_RENDER.md`](GUIDE_RENDER.md) | Déploiement en production sur Render. |
+| `DOCUMENTATION_PROJET.docx` | Documentation fonctionnelle : tous les onglets, la comptabilité, les rôles… |
+| [`RECAP.md`](RECAP.md) | Journal technique détaillé des évolutions. |
+
+> ⚡ Tu connais déjà l'environnement ? Le [récapitulatif express](GUIDE_INSTALLATION.md#9-récapitulatif-express-si-tu-connais-déjà) du guide d'installation liste toutes les commandes d'un coup.
+
 ## Prérequis
 
 - **Node.js** 20+
