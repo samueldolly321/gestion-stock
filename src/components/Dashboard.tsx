@@ -222,15 +222,21 @@ export default function Dashboard({
   return (
     <div className="space-y-6">
       
-      {/* Header Banner */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-gradient-to-r from-slate-50 to-cyan-50/60 dark:from-slate-900/60 dark:to-cyan-950/20 p-6 rounded-2xl border border-slate-200 dark:border-slate-200/10 backdrop-blur-md shadow-sm">
-        <div>
-          <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">Tableau de Bord Stratégique</h2>
-          <p className="text-xs text-slate-400 mt-0.5">
+      {/* Header Banner — hero avec image de fond (thème logistique) */}
+      <div className="relative overflow-hidden flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-6 rounded-2xl border border-slate-200 dark:border-slate-200/10 shadow-sm">
+        <div
+          className="absolute inset-0 bg-cover bg-center"
+          style={{ backgroundImage: "url('https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=1600&q=80')" }}
+          aria-hidden="true"
+        ></div>
+        <div className="absolute inset-0 bg-gradient-to-r from-slate-900/92 via-slate-900/75 to-cyan-900/50" aria-hidden="true"></div>
+        <div className="relative z-10">
+          <h2 className="text-xl font-bold tracking-tight text-white">Tableau de Bord Stratégique</h2>
+          <p className="text-xs text-slate-300 mt-0.5">
             Suivi opérationnel des flux logistiques, valorisation des entrepôts et indicateurs de performance.
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="relative z-10 flex gap-2">
           <button
             onClick={() => onNavigate('pos')}
             className="px-4 py-2 bg-cyan-500 hover:bg-cyan-600 text-white font-semibold text-xs rounded-lg transition duration-150 cursor-pointer flex items-center gap-1.5"

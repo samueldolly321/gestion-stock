@@ -506,13 +506,19 @@ export default function App() {
                       setActiveTab(item.id);
                       setMobileMenuOpen(false);
                     }}
-                    className={`w-full py-2.5 px-3.5 rounded-xl text-xs font-bold transition flex items-center gap-3 cursor-pointer ${
+                    className={`group w-full py-2 px-3 rounded-xl text-xs font-bold transition flex items-center gap-3 cursor-pointer ${
                       isSelected
-                        ? 'bg-cyan-500 text-white shadow-md shadow-cyan-500/10'
+                        ? 'bg-cyan-500 text-white shadow-md shadow-cyan-500/20'
                         : 'text-slate-400 hover:text-white hover:bg-slate-800/40'
                     }`}
                   >
-                    <Icon className="w-4.5 h-4.5 shrink-0" />
+                    <span className={`p-1.5 rounded-lg shrink-0 transition ${
+                      isSelected
+                        ? 'bg-white/20 text-white'
+                        : 'bg-slate-200/70 dark:bg-slate-800/70 text-slate-500 dark:text-slate-300 group-hover:bg-cyan-500/20 group-hover:text-cyan-400'
+                    }`}>
+                      <Icon className="w-4 h-4" />
+                    </span>
                     <span>{item.label}</span>
                   </button>
                 );
@@ -578,6 +584,7 @@ export default function App() {
               brands={brands}
               user={currentUser}
               onRefresh={reloadCatalog}
+              onRefreshPurchases={reloadAfterPurchase}
               currencySymbol={currencySymbol}
               initialStatus={productFilter}
               writePerms={settings?.writePermissions}

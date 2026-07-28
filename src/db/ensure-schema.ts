@@ -38,6 +38,10 @@ export async function ensureSchema(): Promise<void> {
   // Colonne `brand_name` sur settings (nom de marque de la barre latérale, administrable).
   await db.execute(sql`ALTER TABLE settings ADD COLUMN IF NOT EXISTS brand_name text;`);
 
+  // Pages éditables « À propos » / « Confidentialité » (portail de connexion).
+  await db.execute(sql`ALTER TABLE settings ADD COLUMN IF NOT EXISTS about_text text;`);
+  await db.execute(sql`ALTER TABLE settings ADD COLUMN IF NOT EXISTS privacy_text text;`);
+
   // Conditionnement (vente en gros) sur products : carton ↔ pièces.
   await db.execute(sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS pack_size integer DEFAULT 1 NOT NULL;`);
   await db.execute(sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS pack_label text;`);

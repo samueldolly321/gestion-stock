@@ -1,20 +1,37 @@
 import React, { useState, useEffect } from 'react';
 import { User } from '../types';
 import { register, login, isRegistrationOpen } from '../services/authService';
+import { getPublicPages, type PublicPages } from '../services/settingsService';
 import {
   LogIn,
-  Sparkles,
+  Boxes,
   AlertCircle,
   ShieldAlert,
   Mail,
   Lock,
   UserPlus,
   Info,
+  ShoppingCart,
+  BarChart3,
+  ShieldCheck,
+  ScanBarcode,
+  X,
 } from 'lucide-react';
+
+// Atouts de la plateforme affichés dans le panneau gauche du portail.
+const FEATURES = [
+  { icon: Boxes, title: 'Stock & multi-entrepôts', desc: 'Articles, seuils d’alerte, code-barres EAN-13, ventes en gros (carton).' },
+  { icon: ShoppingCart, title: 'Caisse & ventes', desc: 'Point de vente rapide, impression de tickets, tarifs par client.' },
+  { icon: BarChart3, title: 'Pilotage & comptabilité', desc: 'Tableau de bord, TVA, résultat, résumé d’activité par IA.' },
+  { icon: ShieldCheck, title: 'Sécurité & rôles', desc: 'Contrôle d’accès (RBAC) par module et par utilisateur.' },
+];
 
 interface AuthPageProps {
   onLoginSuccess: (user: User) => void;
 }
+
+// Image de fond libre de droits (Unsplash) — thème entrepôt / logistique.
+const LOGIN_BG = 'https://images.unsplash.com/photo-1553413077-190dd305871c?auto=format&fit=crop&w=1600&q=80';
 
 export default function AuthPage({ onLoginSuccess }: AuthPageProps) {
   const [loading, setLoading] = useState(false);
@@ -34,6 +51,13 @@ export default function AuthPage({ onLoginSuccess }: AuthPageProps) {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [fullName, setFullName] = useState('');
+
+  // Pages publiques éditables (À propos / Confidentialité) + modale de lecture.
+  const [pages, setPages] = useState<PublicPages | null>(null);
+  const [modalPage, setModalPage] = useState<null | 'about' | 'privacy'>(null);
+  useEffect(() => {
+    getPublicPages().then(setPages).catch(() => setPages(null));
+  }, []);
 
   const handleEmailAuthSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -76,13 +100,16 @@ export default function AuthPage({ onLoginSuccess }: AuthPageProps) {
     <div className="min-h-dvh flex flex-col md:flex-row bg-[#0b0f19] text-gray-100 font-sans selection:bg-cyan-500 selection:text-black">
 
       {/* Left pane: Branding & Design */}
-      <div className="w-full md:w-5/12 bg-gradient-to-br from-slate-900 via-[#0d1527] to-[#080d1a] p-8 md:p-12 flex flex-col justify-between border-b md:border-b-0 md:border-r border-slate-800/80 relative overflow-hidden">
+      <div className="w-full md:w-1/2 bg-gradient-to-br from-slate-900 via-[#0d1527] to-[#080d1a] p-8 md:p-12 flex flex-col justify-between border-b md:border-b-0 md:border-r border-slate-800/80 relative overflow-hidden">
+        {/* Image de fond + voiles pour garder le texte lisible */}
+        <div className="absolute inset-0 bg-cover bg-center opacity-25" style={{ backgroundImage: `url(${LOGIN_BG})` }} aria-hidden="true"></div>
+        <div className="absolute inset-0 bg-gradient-to-br from-slate-900/85 via-[#0d1527]/85 to-[#080d1a]/95" aria-hidden="true"></div>
         <div className="absolute top-0 right-0 w-96 h-96 bg-cyan-500/10 rounded-full filter blur-3xl opacity-40"></div>
         <div className="absolute -bottom-10 -left-10 w-96 h-96 bg-indigo-500/10 rounded-full filter blur-3xl opacity-40"></div>
 
         <div className="flex items-center gap-3 relative z-10">
-          <div className="p-2.5 bg-cyan-500/10 border border-cyan-500/30 rounded-xl">
-            <Sparkles className="w-6 h-6 text-cyan-400 animate-pulse" />
+          <div className="p-2.5 bg-cyan-500/10 border border-cyan-500/30 rounded-xl shadow-lg shadow-cyan-500/20">
+            <Boxes className="w-6 h-6 text-cyan-400" />
           </div>
           <div>
             <h1 className="text-xl font-bold tracking-tight bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent">
@@ -100,36 +127,57 @@ export default function AuthPage({ onLoginSuccess }: AuthPageProps) {
             Une plateforme conçue pour automatiser vos inventaires, centraliser vos terminaux de vente, et sécuriser votre comptabilité.
           </p>
 
-          <div className="mt-8 space-y-4 max-w-sm">
-            <div className="flex gap-3 items-start text-xs text-gray-300 bg-slate-800/40 p-3 rounded-lg border border-slate-700/30">
-              <div className="p-1 rounded bg-cyan-400/10 text-cyan-400 mt-0.5">✔</div>
-              <div>
-                <strong className="text-white">Sécurité RBAC Granulaire</strong>
-                <p className="text-[11px] text-gray-400 mt-0.5">8 rôles métier distincts de Magasinier à Auditeur fiscal.</p>
-              </div>
+          <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-xl">
+            {FEATURES.map((f) => {
+              const Icon = f.icon;
+              return (
+                <div key={f.title} className="flex gap-3 items-start text-xs text-gray-300 bg-slate-800/40 p-3 rounded-xl border border-slate-700/30 hover:border-cyan-500/40 transition">
+                  <div className="p-2 rounded-lg bg-cyan-400/10 text-cyan-400 shrink-0">
+                    <Icon className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <strong className="text-white block leading-tight">{f.title}</strong>
+                    <p className="text-[11px] text-gray-400 mt-0.5 leading-snug">{f.desc}</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="mt-5 flex items-start gap-3 text-xs text-gray-300 bg-cyan-950/20 p-3 rounded-xl border border-cyan-500/20 max-w-xl">
+            <div className="p-2 rounded-lg bg-cyan-400/10 text-cyan-400 shrink-0">
+              <ScanBarcode className="w-4 h-4" />
             </div>
-            <div className="flex gap-3 items-start text-xs text-gray-300 bg-slate-800/40 p-3 rounded-lg border border-slate-700/30">
-              <div className="p-1 rounded bg-indigo-400/10 text-indigo-400 mt-0.5">✔</div>
-              <div>
-                <strong className="text-white">Base PostgreSQL dédiée</strong>
-                <p className="text-[11px] text-gray-400 mt-0.5">Vos données hébergées sur votre propre base, sans dépendance cloud.</p>
-              </div>
+            <div>
+              <strong className="text-white">Vos données restent chez vous</strong>
+              <p className="text-[11px] text-gray-400 mt-0.5 leading-snug">Hébergement sur votre propre base de données, en local ou sur votre serveur — sans dépendance à un cloud tiers.</p>
             </div>
           </div>
         </div>
 
-        <div className="text-[11px] text-slate-500 font-mono relative z-10 flex justify-between items-center">
-          <span>© 2026 Vokatra-ko</span>
-          <span className="flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block"></span>
-            PostgreSQL
-          </span>
+        <div className="text-[11px] text-slate-500 font-mono relative z-10 flex flex-wrap gap-x-4 gap-y-1 justify-between items-center">
+          <span>© 2026 {pages?.brandName || 'Vokatra-ko'}</span>
+          <div className="flex items-center gap-3">
+            {pages?.aboutText && (
+              <button type="button" onClick={() => setModalPage('about')} className="hover:text-cyan-400 transition cursor-pointer">À propos</button>
+            )}
+            {pages?.privacyText && (
+              <button type="button" onClick={() => setModalPage('privacy')} className="hover:text-cyan-400 transition cursor-pointer">Confidentialité</button>
+            )}
+            <span className="flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block"></span>
+              PostgreSQL
+            </span>
+          </div>
         </div>
       </div>
 
       {/* Right pane: Login inputs */}
       <div className="flex-1 flex flex-col justify-center p-6 md:p-16 bg-[#070b12] relative overflow-y-auto">
-        <div className="max-w-md w-full mx-auto space-y-6">
+        {/* Fond visuel très discret derrière le formulaire */}
+        <div className="absolute inset-0 bg-cover bg-center opacity-[0.05]" style={{ backgroundImage: `url(${LOGIN_BG})` }} aria-hidden="true"></div>
+        <div className="absolute inset-0 bg-gradient-to-t from-[#070b12] via-[#070b12]/70 to-transparent" aria-hidden="true"></div>
+        <div className="max-w-md w-full mx-auto space-y-6 relative z-10">
 
           {/* Main heading */}
           <div>
@@ -297,6 +345,24 @@ export default function AuthPage({ onLoginSuccess }: AuthPageProps) {
 
         </div>
       </div>
+
+      {/* Modale « À propos » / « Confidentialité » (contenu éditable dans Configuration ERP) */}
+      {modalPage && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setModalPage(null)}>
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg max-h-[85vh] flex flex-col shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center p-4 border-b border-slate-800">
+              <h3 className="font-bold text-white flex items-center gap-2">
+                {modalPage === 'about' ? <Info className="w-4 h-4 text-cyan-400" /> : <ShieldCheck className="w-4 h-4 text-cyan-400" />}
+                {modalPage === 'about' ? 'À propos' : 'Confidentialité'}
+              </h3>
+              <button onClick={() => setModalPage(null)} className="text-slate-400 hover:text-white cursor-pointer"><X className="w-4 h-4" /></button>
+            </div>
+            <div className="p-5 overflow-y-auto text-sm text-slate-300 leading-relaxed whitespace-pre-wrap">
+              {(modalPage === 'about' ? pages?.aboutText : pages?.privacyText) || 'Aucun contenu.'}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

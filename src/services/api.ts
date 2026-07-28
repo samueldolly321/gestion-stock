@@ -23,7 +23,10 @@ export async function apiFetch<T = any>(path: string, options: RequestInit = {})
   };
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
-  const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
+  // `no-store` : jamais de réponse GET servie depuis le cache du navigateur.
+  // Évite d'afficher des données périmées (ex. un achat qui n'apparaissait qu'après
+  // plusieurs rafraîchissements). Les données d'un ERP doivent toujours être fraîches.
+  const res = await fetch(`${API_BASE}${path}`, { cache: 'no-store', ...options, headers });
   const data = await res.json().catch(() => ({}));
 
   if (!res.ok) {

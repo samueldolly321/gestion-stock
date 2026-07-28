@@ -21,14 +21,16 @@ import {
   X,
   FolderTree,
   Download,
-  Printer
+  Printer,
+  ShoppingBag
 } from 'lucide-react';
-import { Product, Category, Brand, Supplier, User, Warehouse as WarehouseType } from '../types';
+import { Product, Category, Brand, Supplier, User, Warehouse as WarehouseType, StockMovement } from '../types';
 import { generateId } from '../services/ids';
 import { useMoney } from '../services/CurrencyContext';
 import { createCategory, deleteCategory } from '../services/categoriesService';
 import { createProduct, updateProduct, deleteProduct } from '../services/productsService';
-import { createMovement } from '../services/movementsService';
+import { createMovement, listMovements } from '../services/movementsService';
+import { createPurchase, receivePurchase } from '../services/purchasesService';
 import { createBrand, deleteBrand, createWarehouse, deleteWarehouse } from '../services/catalogService';
 import { showAlert, showConfirm } from '../services/dialog';
 import { showToast } from '../services/toast';
@@ -54,10 +56,21 @@ interface ProductsProps {
   warehouses: WarehouseType[];
   user: User;
   onRefresh: () => void;
+  onRefreshPurchases?: () => void; // recharge aussi les achats (après « Créer un achat »)
   currencySymbol: string;
   initialStatus?: string; // filtre de statut appliqué à l'arrivée (depuis le Dashboard)
   writePerms?: Record<string, string[]> | null;
 }
+
+// Libellés d'affichage des mouvements de stock (historique par article).
+const MOVE_META: Record<string, { label: string; sign: string; cls: string }> = {
+  entry_reception: { label: 'Entrée / Réception', sign: '+', cls: 'text-emerald-500' },
+  entry_return: { label: 'Retour (avoir)', sign: '+', cls: 'text-emerald-500' },
+  exit_sale: { label: 'Sortie / Vente', sign: '−', cls: 'text-red-500' },
+  waste_loss: { label: 'Perte / Casse', sign: '−', cls: 'text-red-500' },
+  transfer: { label: 'Transfert', sign: '', cls: 'text-slate-400' },
+  adjustment: { label: 'Ajustement', sign: '', cls: 'text-amber-500' },
+};
 
 // Beautiful image presets to select for products
 const PRODUCT_IMAGES = [
@@ -78,6 +91,7 @@ export default function Products({
   warehouses,
   user,
   onRefresh,
+  onRefreshPurchases,
   currencySymbol,
   initialStatus,
   writePerms
@@ -131,6 +145,20 @@ export default function Products({
 
   // Active product detail sidebar
   const [viewProduct, setViewProduct] = useState<Product | null>(null);
+  // Historique des mouvements de l'article affiché (fiche détail).
+  const [historyMoves, setHistoryMoves] = useState<StockMovement[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyKey, setHistoryKey] = useState(0); // bump pour recharger l'historique après un mouvement
+  React.useEffect(() => {
+    if (!viewProduct) { setHistoryMoves([]); return; }
+    let cancelled = false;
+    setHistoryLoading(true);
+    listMovements()
+      .then((all) => { if (!cancelled) setHistoryMoves(all.filter((m) => m.productId === viewProduct.id)); })
+      .catch(() => { if (!cancelled) setHistoryMoves([]); })
+      .finally(() => { if (!cancelled) setHistoryLoading(false); });
+    return () => { cancelled = true; };
+  }, [viewProduct, historyKey]);
   const [labelProduct, setLabelProduct] = useState<Product | null>(null); // étiquette code-barres à imprimer
 
   // Quick Adjustment State
@@ -138,6 +166,7 @@ export default function Products({
   const [adjustQty, setAdjustQty] = useState(1);
   const [adjustReason, setAdjustReason] = useState('Ajustement manuel inventaire');
   const [adjustType, setAdjustType] = useState<'entry_reception' | 'exit_sale'>('entry_reception');
+  const [purchaseBusy, setPurchaseBusy] = useState(false);
 
   // Gestion des catégories / sous-catégories
   const [isCatModalOpen, setIsCatModalOpen] = useState(false);
@@ -369,10 +398,59 @@ export default function Products({
         costTotal: adjustingProduct.purchasePrice * Number(adjustQty),
       });
       setAdjustingProduct(null);
+      setHistoryKey((k) => k + 1);
       onRefresh();
       showToast('Stock ajusté.', { title: 'Mouvements' });
     } catch (err: any) {
       showAlert(err?.message || 'Erreur de modification du stock.', { variant: 'error' });
+    }
+  };
+
+  // Transforme l'entrée en véritable ACHAT : crée une commande fournisseur puis la réceptionne.
+  // → le stock monte ET la dépense / la dette fournisseur sont enregistrées (contrairement au
+  //   simple mouvement d'ajustement). Alternative au bouton « Confirmer le Mouvement ».
+  const handleCreatePurchaseFromEntry = async () => {
+    const p = adjustingProduct;
+    if (!p) return;
+    if (!p.supplierId) {
+      showAlert(
+        "Ce produit n'a pas de fournisseur. Renseignez-le dans la fiche article (champ Fournisseur), ou créez la commande depuis l'onglet Achats.",
+        { variant: 'warning' },
+      );
+      return;
+    }
+    const qty = Math.max(1, Math.floor(Number(adjustQty) || 0));
+    const ok = await showConfirm(
+      `Créer un achat de ${qty} ${p.unit} « ${p.name} » chez ${p.supplierName || 'ce fournisseur'} au prix d'achat de ${format(p.purchasePrice)} l'unité, puis le réceptionner en stock ?\n\nLe stock augmentera et la dépense (dette fournisseur) sera enregistrée.`,
+      { title: 'Créer un achat', variant: 'info', confirmText: 'Créer et réceptionner' },
+    );
+    if (!ok) return;
+    setPurchaseBusy(true);
+    try {
+      const created = await createPurchase({
+        supplierId: p.supplierId,
+        supplierName: p.supplierName,
+        items: [{
+          productId: p.id,
+          productName: p.name,
+          sku: p.sku,
+          quantity: qty,
+          unitCost: p.purchasePrice,
+          tax: 0,
+          total: qty * p.purchasePrice,
+        }],
+        notes: adjustReason && adjustReason !== 'Ajustement manuel inventaire' ? adjustReason : 'Réapprovisionnement (depuis Articles)',
+      });
+      await receivePurchase(created.id); // réception → +stock, PMP, dette fournisseur
+      setAdjustingProduct(null);
+      setHistoryKey((k) => k + 1);
+      onRefresh();
+      onRefreshPurchases?.(); // rafraîchit la liste des achats (sinon visible seulement après reload)
+      showToast(`Achat créé et réceptionné : +${qty} ${p.unit}. Dépense enregistrée.`, { title: 'Achats' });
+    } catch (err: any) {
+      showAlert(err?.message || "Erreur lors de la création de l'achat.", { variant: 'error' });
+    } finally {
+      setPurchaseBusy(false);
     }
   };
 
@@ -471,7 +549,7 @@ export default function Products({
     }
   };
 
-  // Filtered products list
+  // Filtered products list — toujours les plus récents en premier.
   const filteredProducts = useMemo(() => {
     return products.filter((p) => {
       const matchSearch =
@@ -489,7 +567,7 @@ export default function Products({
       else if (selectedStatus === 'expired') matchStatus = p.status === 'expired';
 
       return matchSearch && matchCat && matchWarehouse && matchStatus;
-    });
+    }).sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
   }, [products, searchTerm, selectedCategory, selectedWarehouse, selectedStatus]);
 
   const productsPage = usePagination<Product>(filteredProducts);
@@ -931,6 +1009,34 @@ export default function Products({
                 <QrCode className="w-16 h-16 text-slate-400" />
                 <span className="text-[10px] font-mono text-slate-500 mt-1">{viewProduct.sku}-QR</span>
               </div>
+
+              {/* Historique des mouvements (entrées / sorties / ajustements) — plus récents en premier */}
+              <div className="mt-5 pt-3.5 border-t border-slate-200 dark:border-slate-800/60">
+                <h5 className="text-[10px] font-mono uppercase tracking-widest text-slate-400 mb-2">Historique des mouvements</h5>
+                {historyLoading ? (
+                  <p className="text-[11px] text-slate-500">Chargement…</p>
+                ) : historyMoves.length === 0 ? (
+                  <p className="text-[11px] text-slate-500">Aucun mouvement enregistré pour cet article.</p>
+                ) : (
+                  <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
+                    {historyMoves.map((m) => {
+                      const meta = MOVE_META[m.type] || { label: m.type, sign: '', cls: 'text-slate-400' };
+                      return (
+                        <div key={m.id} className="flex items-center justify-between gap-2 text-[11px] p-2 rounded-lg bg-slate-50 dark:bg-slate-950/25 border border-slate-200 dark:border-slate-800/40">
+                          <div className="min-w-0">
+                            <span className={`font-semibold ${meta.cls}`}>{meta.label}</span>
+                            <span className="text-slate-400 block truncate" title={m.reason || ''}>{m.reason || '—'}</span>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <span className={`font-mono font-bold ${meta.cls}`}>{meta.sign}{m.quantity}</span>
+                            <span className="text-[9px] text-slate-400 block">{new Date(m.createdAt).toLocaleDateString()} {new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
           ) : (
             <div className="bg-slate-50 dark:bg-slate-900/20 p-6 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800/80 text-center text-xs text-slate-500">
@@ -984,12 +1090,23 @@ export default function Products({
                 </div>
 
                 {adjustType === 'entry_reception' && (
-                  <div className="flex gap-2 items-start text-[10px] leading-snug rounded-lg border border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300 p-2.5">
-                    <span className="shrink-0">💡</span>
-                    <span>
-                      Cette entrée <strong>ajuste seulement le stock</strong> (inventaire, correction, stock de départ) — elle n'enregistre <strong>aucune dépense</strong>.
-                      Si vous <strong>réapprovisionnez chez un fournisseur</strong>, passez plutôt par <strong>Achats → Nouvelle commande</strong> puis <strong>Réceptionnez</strong> : le stock montera <em>et</em> la dépense/la dette fournisseur seront enregistrées.
-                    </span>
+                  <div className="space-y-2">
+                    <div className="flex gap-2 items-start text-[10px] leading-snug rounded-lg border border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300 p-2.5">
+                      <span className="shrink-0">💡</span>
+                      <span>
+                        Cette entrée <strong>ajuste seulement le stock</strong> (inventaire, correction, stock de départ) — elle n'enregistre <strong>aucune dépense</strong>.
+                        Si vous <strong>réapprovisionnez chez un fournisseur</strong>, cliquez sur « Créer un achat » ci-dessous : le stock montera <em>et</em> la dépense/la dette fournisseur seront enregistrées.
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleCreatePurchaseFromEntry}
+                      disabled={purchaseBusy}
+                      className="w-full py-2 border border-amber-500/40 text-amber-700 dark:text-amber-300 hover:bg-amber-500/10 disabled:opacity-50 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer"
+                    >
+                      <ShoppingBag className="w-3.5 h-3.5" />
+                      {purchaseBusy ? 'Création…' : 'Créer un achat (fournisseur + dépense)'}
+                    </button>
                   </div>
                 )}
 

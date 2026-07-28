@@ -367,6 +367,8 @@ export interface Setting {
   defaultLanguage: 'fr' | 'en';
   alertLowStock: boolean;
   alertExpirationDays: number;
+  aboutText?: string | null; // page « À propos » (éditable)
+  privacyText?: string | null; // page « Confidentialité » (éditable)
   rolePermissions?: Record<string, string[]> | null;
   writePermissions?: Record<string, string[]> | null;
   updatedAt: string;

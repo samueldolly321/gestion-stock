@@ -12,7 +12,8 @@ import {
   Trash2,
   RefreshCw,
   Eye,
-  Lock
+  Lock,
+  Info
 } from 'lucide-react';
 import { Setting, User } from '../types';
 import { useMoney } from '../services/CurrencyContext';
@@ -55,6 +56,8 @@ export default function Settings({
   const [invoicePrefix, setInvoicePrefix] = useState(settings?.invoicePrefix || 'FAC');
   const [creditNotePrefix, setCreditNotePrefix] = useState(settings?.creditNotePrefix || 'AV');
   const [invoicePadding, setInvoicePadding] = useState(settings?.invoicePadding || 6);
+  const [aboutText, setAboutText] = useState(settings?.aboutText || '');
+  const [privacyText, setPrivacyText] = useState(settings?.privacyText || '');
   // Matrice RBAC : rôle -> onglets autorisés (repli sur les défauts).
   const [rolePermissions, setRolePermissions] = useState<Record<string, string[]>>(
     settings?.rolePermissions || DEFAULT_ROLE_TABS,
@@ -101,6 +104,8 @@ export default function Settings({
     setInvoicePrefix(settings.invoicePrefix || 'FAC');
     setCreditNotePrefix(settings.creditNotePrefix || 'AV');
     setInvoicePadding(settings.invoicePadding ?? 6);
+    setAboutText(settings.aboutText || '');
+    setPrivacyText(settings.privacyText || '');
     setRolePermissions(settings.rolePermissions || DEFAULT_ROLE_TABS);
     setWritePermissions(settings.writePermissions || DEFAULT_WRITE_PERMS);
   }, [settings]);
@@ -141,6 +146,8 @@ export default function Settings({
         invoicePrefix,
         creditNotePrefix,
         invoicePadding: Number(invoicePadding),
+        aboutText: aboutText || null,
+        privacyText: privacyText || null,
         currency: displayCurrency,
         currencySymbol: displayCurrency === 'EUR' ? '€' : 'Ar',
         defaultLanguage: 'fr',
@@ -382,6 +389,39 @@ export default function Settings({
                   className="w-full bg-white dark:bg-slate-950/20 p-2 text-xs rounded-lg border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none"
                 />
                 <p className="text-[10px] text-slate-400 mt-1">Aperçu : {(invoicePrefix || 'FAC')}-{String(1).padStart(Math.min(10, Math.max(1, Number(invoicePadding) || 6)), '0')}</p>
+              </div>
+            </div>
+
+            {/* Pages institutionnelles éditables (affichées sur le portail de connexion) */}
+            <div className="mt-6 pt-5 border-t border-slate-200 dark:border-slate-800">
+              <div className="flex items-center gap-2 mb-1">
+                <Info className="w-4 h-4 text-cyan-500" />
+                <h4 className="text-sm font-bold text-slate-900 dark:text-white">Pages « À propos » &amp; « Confidentialité »</h4>
+              </div>
+              <p className="text-[11px] text-slate-400 mb-3">
+                Ces textes sont accessibles publiquement depuis le portail de connexion (liens en bas de page). Laissez vide pour masquer le lien.
+              </p>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-[11px] font-mono uppercase text-slate-400 tracking-wider block mb-1">À propos</label>
+                  <textarea
+                    value={aboutText}
+                    onChange={(e) => setAboutText(e.target.value)}
+                    rows={5}
+                    placeholder="Présentez votre entreprise, votre activité, votre mission…"
+                    className="w-full bg-white dark:bg-slate-950/20 p-2.5 text-xs rounded-lg border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500 leading-relaxed"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-mono uppercase text-slate-400 tracking-wider block mb-1">Confidentialité</label>
+                  <textarea
+                    value={privacyText}
+                    onChange={(e) => setPrivacyText(e.target.value)}
+                    rows={5}
+                    placeholder="Décrivez votre politique de confidentialité et le traitement des données…"
+                    className="w-full bg-white dark:bg-slate-950/20 p-2.5 text-xs rounded-lg border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500 leading-relaxed"
+                  />
+                </div>
               </div>
             </div>
           </div>

@@ -9,6 +9,35 @@ export const settingsRouter = Router();
 
 const MANAGE_ROLES = ['Super Admin', 'Admin', 'Manager'];
 
+// Contenus par défaut si l'administrateur n'a pas encore personnalisé les pages.
+const DEFAULT_ABOUT =
+  "Vokatra-ko est une solution de gestion de stock et de point de vente (ERP) pensée pour les commerces, grossistes et magasins.\n\n" +
+  "Elle réunit la gestion des articles, des achats et des ventes, la comptabilité et le pilotage de l'activité au sein d'une seule plateforme, hébergée sur votre propre base de données.\n\n" +
+  "Ce texte est personnalisable dans Configuration ERP.";
+const DEFAULT_PRIVACY =
+  "Vos données sont hébergées sur votre propre base de données (PostgreSQL) : elles restent sous votre contrôle, sans dépendance à un cloud tiers.\n\n" +
+  "Les mots de passe sont stockés de façon sécurisée (hachage) et l'accès aux fonctionnalités est contrôlé par un système de rôles (RBAC).\n\n" +
+  "Ce texte est personnalisable dans Configuration ERP.";
+
+/**
+ * GET /api/settings/public — infos publiques (sans authentification) pour le portail de
+ * connexion : marque + pages « À propos » / « Confidentialité ». Aucune donnée sensible.
+ */
+settingsRouter.get('/public', async (_req, res) => {
+  try {
+    const [row] = await db.select().from(settings).where(eq(settings.id, 'global')).limit(1);
+    res.json({
+      brandName: row?.brandName ?? null,
+      companyName: row?.companyName ?? null,
+      aboutText: row?.aboutText || DEFAULT_ABOUT,
+      privacyText: row?.privacyText || DEFAULT_PRIVACY,
+    });
+  } catch (err) {
+    console.error('get public settings error:', err);
+    res.json({ brandName: null, companyName: null, aboutText: DEFAULT_ABOUT, privacyText: DEFAULT_PRIVACY });
+  }
+});
+
 /** GET /api/settings — renvoie les réglages globaux (ou null si jamais enregistrés). */
 settingsRouter.get('/', requireAuth, async (_req, res) => {
   try {
@@ -43,6 +72,8 @@ settingsRouter.put('/', requireAuth, requireRole(...MANAGE_ROLES), async (req: A
       defaultLanguage: b.defaultLanguage || 'fr',
       alertLowStock: b.alertLowStock !== false,
       alertExpirationDays: Number(b.alertExpirationDays) || 0,
+      aboutText: b.aboutText != null ? String(b.aboutText).slice(0, 8000) : null,
+      privacyText: b.privacyText != null ? String(b.privacyText).slice(0, 8000) : null,
       rolePermissions: b.rolePermissions && typeof b.rolePermissions === 'object' ? b.rolePermissions : null,
       writePermissions: b.writePermissions && typeof b.writePermissions === 'object' ? b.writePermissions : null,
       updatedAt: new Date().toISOString(),

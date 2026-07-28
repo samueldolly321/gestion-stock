@@ -325,6 +325,9 @@ export const settings = pgTable('settings', {
   defaultLanguage: text('default_language').default('fr').notNull(),
   alertLowStock: boolean('alert_low_stock').default(true).notNull(),
   alertExpirationDays: integer('alert_expiration_days').default(30).notNull(),
+  // Pages institutionnelles éditables (affichées sur le portail de connexion).
+  aboutText: text('about_text'),
+  privacyText: text('privacy_text'),
   // Matrice RBAC personnalisée : rôle -> liste d'onglets autorisés (null = défauts).
   rolePermissions: jsonb('role_permissions').$type<Record<string, string[]>>(),
   // Droits d'écriture : rôle -> modules où créer/éditer/supprimer est permis.

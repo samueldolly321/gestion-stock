@@ -56,7 +56,7 @@ export default function Purchases({ purchases, suppliers, products, supplierProd
       const t = new Date(p.createdAt).getTime();
       const okDate = (from === null || t >= from) && (to === null || t <= to);
       return match && st && okDate;
-    });
+    }).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()); // récents d'abord
   }, [purchases, search, statusFilter, dateFrom, dateTo]);
   const page = usePagination<Purchase>(filtered);
 
@@ -274,6 +274,18 @@ export default function Purchases({ purchases, suppliers, products, supplierProd
 
   const inputCls = 'w-full bg-white dark:bg-slate-950/20 p-2 text-xs rounded-lg border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500';
 
+  // Résumé des articles d'une commande : « Souris ×100, Clavier ×5 Carton ».
+  const itemsSummary = (p: Purchase): string => {
+    const items = p.items || [];
+    if (!items.length) return '—';
+    return items
+      .map((it) => {
+        const qty = it.packQty && it.unitLabel ? `${it.packQty} ${it.unitLabel}` : `${it.quantity}`;
+        return `${it.productName || it.productId} ×${qty}`;
+      })
+      .join(', ');
+  };
+
   return (
     <div className="space-y-6">
       {/* Title + dette */}
@@ -330,8 +342,8 @@ export default function Purchases({ purchases, suppliers, products, supplierProd
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50 dark:bg-slate-950/20 border-b border-slate-200 dark:border-slate-800/60 text-[10px] font-mono text-slate-400 uppercase tracking-wider">
-                <th className="py-3 px-4">Réf</th>
                 <th className="py-3 px-4">Fournisseur</th>
+                <th className="py-3 px-4">Produits</th>
                 <th className="py-3 px-4">Date</th>
                 <th className="py-3 px-4 text-right">Total TTC</th>
                 <th className="py-3 px-4 text-right hidden md:table-cell">Reste dû</th>
@@ -348,8 +360,10 @@ export default function Purchases({ purchases, suppliers, products, supplierProd
                   const reste = p.totalAmount - (p.paidAmount || 0);
                   return (
                     <tr key={p.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/10 transition">
-                      <td className="py-3 px-4 font-mono font-bold text-[11px] text-cyan-500">{p.id}</td>
                       <td className="py-3 px-4 font-semibold text-slate-900 dark:text-white">{p.supplierName || '—'}</td>
+                      <td className="py-3 px-4 max-w-[220px]">
+                        <span className="block truncate text-slate-700 dark:text-slate-200" title={itemsSummary(p)}>{itemsSummary(p)}</span>
+                      </td>
                       <td className="py-3 px-4 font-mono text-[11px] text-slate-400 whitespace-nowrap">{new Date(p.createdAt).toLocaleDateString()}</td>
                       <td className="py-3 px-4 text-right font-mono font-bold text-slate-900 dark:text-white">{format(p.totalAmount)}</td>
                       <td className="py-3 px-4 text-right hidden md:table-cell font-mono">{reste > 0 ? <span className="text-red-500 font-bold">{format(reste)}</span> : <span className="text-emerald-500">0</span>}</td>
