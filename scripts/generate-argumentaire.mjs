@@ -144,7 +144,7 @@ const doc = new Document({
       p([b('« Je vends en gros ET au détail. » '), r('C\'est prévu : achat/vente au carton ou à la pièce, conversion automatique du stock.')]),
 
       h1('10. Passons à l\'étape suivante'),
-      p([b('Contact : '), r('[votre nom / téléphone / e-mail]')]),
+      p([b('Contact : '), r('Samuel · 034 21 890 51 · hariniainasamuelandrianirina@gmail.com')]),
       bullet('Démonstration gratuite sur votre activité réelle.'),
       bullet('Installation d\'essai avec vos propres produits.'),
       bullet('Devis adapté à la taille de votre commerce.'),

@@ -47,7 +47,7 @@ const doc = new Document({
       center([b('Pour qui ? ', { color: CY }), r('Boutiques • Supérettes • Grossistes / demi-gros • Distributeurs multi-dépôts')], { after: 100 }),
 
       center([b('Demandez une démonstration gratuite sur votre activité.', { size: 22 })], { after: 30 }),
-      center([r('Contact : ', { size: 20 }), r('[votre nom / téléphone / e-mail]', { size: 20, italics: true, color: GREY })], { after: 80 }),
+      center([r('Contact : ', { size: 20 }), b('Samuel · 034 21 890 51 · hariniainasamuelandrianirina@gmail.com', { size: 20, color: CY })], { after: 80 }),
       center([b('Vokatra-ko — votre commerce sous contrôle, en un coup d\'œil.', { italics: true, color: CY })]),
     ],
   }],

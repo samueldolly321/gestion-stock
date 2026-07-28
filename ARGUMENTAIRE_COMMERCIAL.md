@@ -134,7 +134,7 @@ C'est prévu : achat/vente au carton **ou** à la pièce, avec conversion automa
 
 ## 10. Passons à l'étape suivante
 
-📞 **Contact :** _[votre nom / téléphone / e-mail]_
+📞 **Contact :** Samuel · 034 21 890 51 · hariniainasamuelandrianirina@gmail.com
 
 - **Démonstration gratuite** sur votre activité réelle.
 - **Installation d'essai** avec vos propres produits.

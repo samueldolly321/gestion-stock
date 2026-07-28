@@ -33,6 +33,6 @@ Boutiques • Supérettes • Grossistes / demi-gros • Distributeurs multi-dé
 ---
 
 **Demandez une démonstration gratuite sur votre activité.**
-📞 Contact : _[votre nom / téléphone / e-mail]_
+📞 Contact : Samuel · 034 21 890 51 · hariniainasamuelandrianirina@gmail.com
 
 > Vokatra-ko — votre commerce sous contrôle, en un coup d'œil.
