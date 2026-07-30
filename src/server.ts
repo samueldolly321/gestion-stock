@@ -32,6 +32,7 @@ import { expensesRouter } from './server/routes/expenses.ts';
 import { paymentsRouter } from './server/routes/payments.ts';
 import { eventsRouter } from './server/routes/events.ts';
 import { aiRouter } from './server/routes/ai.ts';
+import { adminRouter } from './server/routes/admin.ts';
 
 const app = express();
 // Derrière le proxy Render : permet à req.ip de refléter l'IP réelle du client
@@ -98,6 +99,9 @@ app.use('/api/events', eventsRouter);
 
 // Assistant IA (résumé d'activité)
 app.use('/api/ai', aiRouter);
+
+// Administration sensible (remise à zéro des chiffres) — Super Admin uniquement
+app.use('/api/admin', adminRouter);
 
 // Vérifie que l'API tourne et que la base répond.
 app.get('/api/health', async (_req, res) => {

@@ -13,11 +13,13 @@ import {
   RefreshCw,
   Eye,
   Lock,
-  Info
+  Info,
+  AlertTriangle
 } from 'lucide-react';
 import { Setting, User } from '../types';
 import { useMoney } from '../services/CurrencyContext';
 import { saveSettings } from '../services/settingsService';
+import { resetFigures } from '../services/adminService';
 import { showAlert } from '../services/dialog';
 import { showToast } from '../services/toast';
 import { setExportCompany } from '../services/exportContext';
@@ -67,6 +69,27 @@ export default function Settings({
   );
 
   const [saveLoading, setSaveLoading] = useState(false);
+
+  // Remise à zéro des chiffres (Super Admin uniquement).
+  const isSuperAdmin = user.role === 'Super Admin';
+  const [resetOpen, setResetOpen] = useState(false);
+  const [resetConfirm, setResetConfirm] = useState('');
+  const [resetBusy, setResetBusy] = useState(false);
+  const RESET_PHRASE = 'REINITIALISER';
+
+  const handleResetFigures = async () => {
+    if (resetConfirm.trim().toUpperCase() !== RESET_PHRASE) return;
+    setResetBusy(true);
+    try {
+      await resetFigures(resetConfirm.trim().toUpperCase());
+      showToast('Chiffres remis à zéro. Rechargement…', { title: 'Configuration' });
+      // Rechargement complet pour refléter les données remises à zéro partout.
+      setTimeout(() => window.location.reload(), 800);
+    } catch (err: any) {
+      showAlert(err?.message || 'Erreur lors de la remise à zéro.', { variant: 'error' });
+      setResetBusy(false);
+    }
+  };
 
   const canManage = ['Super Admin', 'Admin', 'Manager'].includes(user.role);
 
@@ -545,6 +568,87 @@ export default function Settings({
             </div>
 
           </form>
+
+          {/* Zone de danger — Super Admin uniquement */}
+          {isSuperAdmin && (
+            <div className="mt-8 border border-red-300 dark:border-red-900/60 rounded-2xl overflow-hidden">
+              <div className="bg-red-50 dark:bg-red-950/20 px-5 py-3 border-b border-red-200 dark:border-red-900/60 flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-red-500" />
+                <h3 className="text-sm font-bold text-red-700 dark:text-red-300">Zone de danger</h3>
+              </div>
+              <div className="p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div className="text-xs text-slate-600 dark:text-slate-300 max-w-xl">
+                  <p className="font-semibold text-slate-900 dark:text-white mb-1">Remettre les chiffres à zéro</p>
+                  <p>
+                    Pour démarrer « propre ». <strong>Conserve</strong> le catalogue produits, les clients
+                    et les fournisseurs ; <strong>remet à zéro</strong> le stock, les soldes/fidélité clients,
+                    et efface ventes, achats, règlements, dépenses, livraisons, inventaires, mouvements,
+                    journal et compteurs de factures. <strong>Irréversible.</strong>
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => { setResetConfirm(''); setResetOpen(true); }}
+                  className="shrink-0 px-4 py-2.5 bg-red-500 hover:bg-red-600 text-white text-xs font-bold rounded-xl transition cursor-pointer flex items-center gap-1.5"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Remettre à zéro
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Modale de confirmation de la remise à zéro */}
+          {resetOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => !resetBusy && setResetOpen(false)}>
+              <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-md shadow-2xl border border-red-200 dark:border-red-900/60" onClick={(e) => e.stopPropagation()}>
+                <div className="px-5 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center gap-2">
+                  <AlertTriangle className="w-5 h-5 text-red-500" />
+                  <h3 className="font-bold text-slate-900 dark:text-white">Confirmer la remise à zéro</h3>
+                </div>
+                <div className="p-5 space-y-4 text-xs text-slate-600 dark:text-slate-300">
+                  <p>
+                    Cette action est <strong className="text-red-600 dark:text-red-400">irréversible</strong>.
+                    Les clients, fournisseurs et le catalogue produits sont conservés ; tout le reste
+                    (stock, ventes, achats, règlements, soldes clients…) est remis à zéro.
+                  </p>
+                  <div>
+                    <label className="block mb-1 text-slate-500 dark:text-slate-400">
+                      Pour confirmer, tape <strong className="text-slate-900 dark:text-white font-mono">{RESET_PHRASE}</strong> :
+                    </label>
+                    <input
+                      type="text"
+                      value={resetConfirm}
+                      onChange={(e) => setResetConfirm(e.target.value)}
+                      autoFocus
+                      disabled={resetBusy}
+                      placeholder={RESET_PHRASE}
+                      className="w-full bg-white dark:bg-slate-950/40 p-2.5 rounded-lg border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-mono tracking-wider focus:outline-none focus:border-red-500"
+                    />
+                  </div>
+                </div>
+                <div className="px-5 py-4 border-t border-slate-200 dark:border-slate-800 flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setResetOpen(false)}
+                    disabled={resetBusy}
+                    className="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition cursor-pointer disabled:opacity-50"
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleResetFigures}
+                    disabled={resetBusy || resetConfirm.trim().toUpperCase() !== RESET_PHRASE}
+                    className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white text-xs font-bold rounded-lg transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    {resetBusy ? 'En cours…' : 'Confirmer la remise à zéro'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
     </div>
   );
