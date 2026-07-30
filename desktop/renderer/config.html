@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline';" />
+  <title>Vokatra-ko — Connexion au serveur</title>
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; height: 100vh; display: flex; align-items: center; justify-content: center;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      background: radial-gradient(1200px 600px at 50% -10%, #10233f 0%, #0b0f19 60%);
+      color: #e5eefc;
+    }
+    .card {
+      width: 420px; max-width: 92vw; background: #0f1626; border: 1px solid #1e2b45;
+      border-radius: 18px; padding: 28px; box-shadow: 0 24px 60px rgba(0,0,0,.5);
+    }
+    .logo {
+      width: 52px; height: 52px; border-radius: 14px; margin: 0 auto 16px;
+      background: linear-gradient(135deg, #0047ab, #82c8e5); color: #fff; font-weight: 800;
+      display: flex; align-items: center; justify-content: center; font-size: 20px;
+    }
+    h1 { font-size: 18px; text-align: center; margin: 0 0 6px; }
+    p.sub { text-align: center; color: #93a4c3; font-size: 12px; margin: 0 0 22px; line-height: 1.5; }
+    label { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: #8296b8; margin-bottom: 6px; }
+    input {
+      width: 100%; padding: 12px 14px; border-radius: 10px; border: 1px solid #26364f;
+      background: #0a1120; color: #fff; font-size: 14px; outline: none;
+    }
+    input:focus { border-color: #2f7fd1; }
+    .hint { font-size: 11px; color: #6f82a3; margin-top: 8px; }
+    button {
+      width: 100%; margin-top: 20px; padding: 13px; border: 0; border-radius: 10px; cursor: pointer;
+      background: #0a63d6; color: #fff; font-size: 14px; font-weight: 700;
+    }
+    button:hover { background: #0a72f0; }
+    button:disabled { opacity: .5; cursor: not-allowed; }
+    .err { color: #ff9b9b; font-size: 12px; margin-top: 12px; min-height: 16px; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">VK</div>
+    <h1>Connexion au serveur</h1>
+    <p class="sub">Saisis l'adresse du PC serveur Vokatra-ko sur ton réseau local.<br />Elle t'est communiquée par l'administrateur.</p>
+
+    <label for="url">Adresse du serveur</label>
+    <input id="url" type="text" placeholder="http://192.168.1.10:3001" autocomplete="off" spellcheck="false" />
+    <div class="hint">Exemple : <b>http://192.168.1.10:3001</b> — l'IP est celle du PC serveur, le port est 3001.</div>
+
+    <button id="save">Se connecter</button>
+    <div class="err" id="err"></div>
+  </div>
+
+  <script>
+    const input = document.getElementById('url');
+    const btn = document.getElementById('save');
+    const err = document.getElementById('err');
+
+    // Pré-remplit avec l'adresse déjà enregistrée, le cas échéant.
+    window.desktop.getServerUrl().then((u) => { if (u) input.value = u; });
+
+    async function save() {
+      err.textContent = '';
+      const raw = input.value.trim();
+      if (!raw) { err.textContent = 'Entre une adresse.'; return; }
+      btn.disabled = true;
+      try {
+        await window.desktop.setServerUrl(raw); // le process principal recharge la fenêtre sur cette URL
+      } catch (e) {
+        err.textContent = 'Adresse invalide.';
+        btn.disabled = false;
+      }
+    }
+
+    btn.addEventListener('click', save);
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') save(); });
+  </script>
+</body>
+</html>

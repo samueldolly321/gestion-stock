@@ -1,0 +1,40 @@
+{
+  "name": "vokatra-ko-desktop",
+  "version": "1.0.0",
+  "description": "Client bureau (Electron) de Vokatra-ko — se connecte au serveur local du réseau.",
+  "author": "Vokatra-ko",
+  "private": true,
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win",
+    "dist:portable": "electron-builder --win zip"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "mg.vokatra.desktop",
+    "productName": "Vokatra-ko",
+    "directories": {
+      "output": "dist-installer"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "renderer/**/*"
+    ],
+    "win": {
+      "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Vokatra-ko"
+    }
+  }
+}
