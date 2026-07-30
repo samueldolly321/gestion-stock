@@ -36,7 +36,7 @@ npm run dev      # Front (Vite)  -> http://localhost:3000
 - `npm run db:check` — teste la connexion + liste les tables
 - `npm run db:push` — (re)crée/mets à jour les tables depuis `src/db/schema.ts`
 - `npm run db:seed` — **données de démo** (rejouable ; vide les tables métier, garde les comptes users)
-- `npm run db:reset-figures` — **remise à zéro des chiffres** (mise en service) : garde catalogue produits + clients + fournisseurs + tarifs + users + réglages, remet à zéro stock/soldes clients et purge ventes/achats/règlements/dépenses/livraisons/inventaires/mouvements/journal/compteurs. **Aperçu par défaut ; exécute réellement seulement avec `-- --confirm`**. En prod : Shell Render.
+- `npm run db:reset-figures` — **remise à zéro des chiffres** (mise en service) : garde catalogue produits + clients + fournisseurs + tarifs + users + réglages, remet à zéro stock/soldes clients et purge ventes/achats/règlements/dépenses/livraisons/inventaires/mouvements/journal/compteurs. **Aperçu par défaut ; exécute réellement seulement avec `-- --confirm`**. *(Alternative sans accès serveur : bouton in-app « Zone de danger » de Configuration ERP, réservé au Super Admin.)*
 - `npm run reset-password -- <email> <nouveau_mdp>` — **récupération de mot de passe** de secours (débloque un Super Admin qui a oublié son mot de passe ; hache en bcrypt, réactive le compte). En prod : à lancer depuis le Shell Render.
 
 ### Compte de test
@@ -65,7 +65,7 @@ npm run dev      # Front (Vite)  -> http://localhost:3000
 | **Historique des Flux** | movements | Registre inaltérable des mouvements de stock (dont retours d'avoirs) |
 | **Comptabilité** | accounting | **État de TVA** (collectée/déductible/nette) + **compte de résultat** (CA HT, COGS, marge, résultat net) par mois/trimestre/année, exports PDF/Excel |
 | **Utilisateurs** | users | Gestion des comptes (création, rôles, activation, reset mot de passe) — SA/Admin |
-| **Configuration ERP** | settings | Raison sociale, NIF/Stat, logo (initiales), devise/taux, thème, **matrice de permissions**, **pages « À propos » & « Confidentialité » éditables (affichées sur le portail de connexion)** |
+| **Configuration ERP** | settings | Raison sociale, NIF/Stat, logo (initiales), devise/taux, thème, **matrice de permissions**, **pages « À propos » & « Confidentialité » éditables (affichées sur le portail de connexion)**, **« Zone de danger » (Super Admin) : bouton « Remettre les chiffres à zéro » avec confirmation par saisie de `REINITIALISER`** |
 
 Tous les tableaux : **recherche, filtres, pagination (20/page), export PDF & Excel** (avec en-tête raison sociale).
 
@@ -108,6 +108,7 @@ Système à **deux dimensions**, **configurable** depuis Configuration ERP et **
 | Journal | `GET /audit-logs` |
 | Marques / Entrepôts | `GET/POST/PUT/DELETE /brands` · `/warehouses` |
 | Réglages | `GET /settings`, `PUT /settings`, **`GET /settings/public`** (sans auth : marque + pages À propos/Confidentialité pour le portail) |
+| Administration | **`POST /admin/reset-figures`** (Super Admin uniquement : remise à zéro des chiffres ; corps `{confirm:'REINITIALISER'}` revérifié serveur) |
 | Temps réel | `GET /events?token=JWT` (SSE) |
 
 ---
@@ -137,7 +138,7 @@ et côté client :
 ### Front — `src/services/` (clients d'API, `fetch` + JWT)
 - `api.ts` — wrapper fetch, JWT stocké dans `localStorage` (clé `stockflow_token`)
 - `authService.ts` — register / login / me / logout
-- Services métier : `categoriesService`, `productsService`, `movementsService`, `partnersService` (clients+fournisseurs), `supplierProductsService` (catalogue appro), `salesService`, `auditsService`, `auditLogsService`, `catalogService` (marques+entrepôts), `settingsService` (+ services achats/dépenses/livraisons/règlements/utilisateurs)
+- Services métier : `categoriesService`, `productsService`, `movementsService`, `partnersService` (clients+fournisseurs), `supplierProductsService` (catalogue appro), `salesService`, `auditsService`, `auditLogsService`, `catalogService` (marques+entrepôts), `settingsService`, `adminService` (remise à zéro des chiffres) (+ services achats/dépenses/livraisons/règlements/utilisateurs)
 - `permissions.ts` — **source de vérité RBAC** (partagée front + serveur)
 - `currency.ts` + `CurrencyContext.tsx` — devise base Ariary, affichage Ar ou € converti (`useMoney()`), taux + préférence en `localStorage`
 - `realtime.ts` — connexion **SSE** (`EventSource`) pour le temps réel
@@ -153,7 +154,8 @@ et côté client :
 - `helpers.ts` — `generateId(prefix)`, `computeProductStatus()`, `writeAuditLog()` (publie aussi en SSE), `pickFields`/`pickProductFields` (anti-injection)
 - `events.ts` — bus SSE en mémoire (`publish`)
 - `login-rate-limit.ts` — limiteur anti-force-brute du login (en mémoire, sans dépendance ; clé IP+e-mail)
-- `routes/` : `auth`, `users`, `categories`, `products`, `movements`, `clients`, `suppliers`, `supplierProducts`, `clientPrices`, `sales`, `payments`, `purchases`, `expenses`, `deliveries`, `audits`, `auditLogs`, `brands`, `warehouses`, `settings`, `events`
+- `reset-figures.ts` — cœur de la remise à zéro des chiffres (transaction), partagé par la route admin
+- `routes/` : `auth`, `users`, `categories`, `products`, `movements`, `clients`, `suppliers`, `supplierProducts`, `clientPrices`, `sales`, `payments`, `purchases`, `expenses`, `deliveries`, `audits`, `auditLogs`, `brands`, `warehouses`, `settings`, `events`, `admin` (remise à zéro — Super Admin)
 - `ensure-schema.ts` — migrations idempotentes appliquées au **démarrage** du serveur (Render ne crée pas les tables ; port 5432 souvent bloqué en local) : crée `supplier_products`, `client_prices`, colonne `settings.brand_name`, **conversion des colonnes de quantité `integer` → `double precision`** (guardée : ne convertit que si encore en `integer`, pas de rewrite à chaque boot).
 - `reset-password.ts` — script de récupération de mot de passe (`npm run reset-password -- <email> <mdp>`), hors application (accès serveur requis).
 
@@ -207,7 +209,7 @@ et côté client :
 - [x] **Comptabilité corrigée** — CA HT **exclut les frais de livraison** (`totalAmount − TVA − livraison`) ; **COGS au coût historique** (`stock_movements.costTotal` des `exit_sale`, net des `entry_return`) au lieu du prix d'achat courant.
 - [x] **Récupération de mot de passe (sans e-mail)** — reset par un Admin depuis l'onglet Utilisateurs (employés) + **commande de secours `npm run reset-password`** pour débloquer un Super Admin (documentée dans `GUIDE_RENDER.md`, plus exposée sur le portail) ; lien « Mot de passe oublié ? » explicatif sur le portail. (Pas d'infra e-mail : choix assumé pour le contexte.)
 - [x] **Anti-force-brute sur le login** — limiteur en mémoire (`src/server/login-rate-limit.ts`) : 5 échecs par (IP, e-mail) sur 15 min → blocage 15 min (HTTP 429 + `Retry-After`), reset au succès. `trust proxy` activé (IP réelle derrière Render).
-- [x] **Remise à zéro des chiffres** — `npm run db:reset-figures` (`src/db/reset-figures.ts`) : conserve produits/clients/fournisseurs/tarifs, remet stock + soldes clients à 0 et purge les transactions ; sécurisée par `--confirm`, atomique.
+- [x] **Remise à zéro des chiffres** — conserve produits/clients/fournisseurs/tarifs, remet stock + soldes clients à 0 et purge les transactions ; atomique. **Deux voies** : bouton in-app « Zone de danger » de Configuration ERP (Super Admin, saisie `REINITIALISER`) via `POST /admin/reset-figures` (`src/server/reset-figures.ts` + `routes/admin.ts`) — **ne nécessite pas le Shell Render** (payant) ; ou CLI `npm run db:reset-figures -- --confirm` (`src/db/reset-figures.ts`) si accès serveur.
 - [x] **Quantités décimales (poids/volume)** — `products.quantity`/`min_stock`/`max_stock` + `stock_movements.quantity` en `double precision` ; retrait des `Math.floor` sur les quantités (POS + avoirs serveur) et `step="any"` sur les champs quantité (Caisse, Achats, Réappro, Calendrier, fiche article, avoirs). Migration auto au boot (`ensure-schema.ts`).
 - [ ] Sécurité prod restante : HTTPS (fourni par Render), changement mot de passe forcé au 1er login
 - [ ] Tests automatisés, sauvegardes, mode hors-ligne (PWA)
