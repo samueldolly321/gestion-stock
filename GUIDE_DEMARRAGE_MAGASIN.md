@@ -36,7 +36,11 @@ en **réseau local** (fonctionne **sans Internet**).
 - [ ] **1 PC serveur** correct qui reste allumé aux heures d'ouverture.
 - [ ] **3-4 PC caissiers** (Windows).
 - [ ] **1 box / routeur / switch** reliant tous les postes (même réseau).
-      *Idéal : câbles Ethernet pour les caisses (plus stable que le Wi-Fi).*
+      **Pas besoin d'Internet** : un routeur **sans connexion Internet**, simplement
+      allumé, suffit (il ne sert qu'à relier les postes en local).
+      **Wi-Fi ou câble** au choix, tant que tout le monde est sur le **même réseau**.
+      *⚠️ Éviter le Wi-Fi « Invité/Guest » (il isole les appareils). Idéal : câbles
+      Ethernet pour les caisses, plus stable que le Wi-Fi.*
 - [ ] **1 onduleur (UPS)** sur le PC serveur — **fortement recommandé** (coupures
       de courant → protège la base de données).
 - [ ] **1 clé USB / disque externe** pour les sauvegardes.

@@ -171,6 +171,7 @@ Alternative **hors ligne, multi-postes** au déploiement Render (données locale
   - ⚠️ L'installeur NSIS exige le **Mode développeur Windows** (ou admin) — sinon échec « lien symbolique » à l'extraction des outils de signature ; la version portable n'a pas cette contrainte.
   - ⚠️ Ne pas laisser de dépendance `react-example: file:..` dans `desktop/package.json` (npm peut l'ajouter) : elle empaquette tout le projet parent (installeur qui gonfle à ~500 Mo).
 - `serveur-local.cmd` (racine) — lanceur du serveur sur le PC hôte (build au 1er run puis `npm start`).
+- **Réseau** : un **simple routeur/box suffit, même SANS Internet** (le routeur ne sert qu'à relier les postes en LAN). **Wi-Fi ou câble** OK tant que tous sont sur le **même réseau** — éviter le Wi-Fi « invité » (isolation client/AP isolation à désactiver). IP du serveur à **fixer** (réservation DHCP / IP statique) car en Wi-Fi elle peut changer au redémarrage. Câble Ethernet sur le PC serveur conseillé (confort/stabilité, non obligatoire).
 - **Guides** : `GUIDE_RESEAU_LOCAL.md` (mise en place technique serveur + clients, pare-feu, IP, sauvegardes) et `GUIDE_DEMARRAGE_MAGASIN.md` (fiche pas-à-pas « magasin » : 1 serveur + chef + 3-4 caissiers, rôles, routine, sauvegardes).
 
 ---

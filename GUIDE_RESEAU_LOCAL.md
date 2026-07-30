@@ -28,8 +28,16 @@ réseau local** (Wi-Fi / câble via la box ou un routeur).
 
 - **1 PC serveur** qui reste **allumé** pendant les heures de travail (idéalement
   ne se met pas en veille). C'est lui qui garde les données.
-- Tous les postes sur le **même réseau** (même box / routeur).
-- Idéalement, une **adresse IP fixe** pour le PC serveur (voir §A-6).
+- **1 routeur / box** reliant tous les postes. **Pas besoin d'Internet** : le
+  routeur sert uniquement à créer le réseau local. Un routeur **sans connexion
+  Internet**, simplement allumé, suffit.
+- Tous les postes sur le **même réseau** (**Wi-Fi ou câble**). ⚠️ Éviter le Wi-Fi
+  **« Invité / Guest »** : il isole souvent les appareils entre eux (option
+  *isolation client / AP isolation* à laisser **désactivée**). Utiliser le réseau principal.
+- Idéalement, une **adresse IP fixe** pour le PC serveur (voir §A-7) — surtout en
+  Wi-Fi, où l'adresse peut changer au redémarrage.
+- *(Confort)* un **câble Ethernet** sur le PC serveur rend les échanges plus stables
+  qu'en Wi-Fi — recommandé si possible, non obligatoire.
 
 ---
 
