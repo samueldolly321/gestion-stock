@@ -5,6 +5,7 @@ import { db } from '../../db/index.ts';
 import { users } from '../../db/schema.ts';
 import { signToken, requireAuth, type AuthedRequest } from '../auth-middleware.ts';
 import { generateId, writeAuditLog } from '../helpers.ts';
+import { loginRateStatus, recordLoginFailure, recordLoginSuccess } from '../login-rate-limit.ts';
 
 export const authRouter = Router();
 
@@ -105,14 +106,31 @@ authRouter.post('/login', async (req, res) => {
       return res.status(400).json({ error: 'E-mail et mot de passe requis.' });
     }
 
+    const normalizedEmail = String(email).toLowerCase().trim();
+    // Clé anti-force-brute : IP du client (réelle derrière le proxy Render grâce à
+    // « trust proxy ») + e-mail visé → protège chaque compte individuellement.
+    const ip = req.ip || req.socket.remoteAddress || 'unknown';
+    const rlKey = `${ip}|${normalizedEmail}`;
+    const now = Date.now();
+
+    // Trop de tentatives récentes ? Refus immédiat (429) sans même toucher la base.
+    const rl = loginRateStatus(rlKey, now);
+    if (rl.blocked) {
+      res.setHeader('Retry-After', String(rl.retryAfter));
+      return res.status(429).json({
+        error: `Trop de tentatives de connexion. Réessayez dans ${Math.ceil(rl.retryAfter / 60)} min.`,
+      });
+    }
+
     const [user] = await db
       .select()
       .from(users)
-      .where(eq(users.email, String(email).toLowerCase().trim()))
+      .where(eq(users.email, normalizedEmail))
       .limit(1);
 
     // Message générique pour ne pas révéler si l'e-mail existe.
     if (!user || !user.passwordHash) {
+      recordLoginFailure(rlKey, now);
       return res.status(401).json({ error: 'Identifiants invalides.' });
     }
     if (!user.active) {
@@ -121,8 +139,12 @@ authRouter.post('/login', async (req, res) => {
 
     const ok = await bcrypt.compare(password, user.passwordHash);
     if (!ok) {
+      recordLoginFailure(rlKey, now);
       return res.status(401).json({ error: 'Identifiants invalides.' });
     }
+
+    // Succès : on efface les échecs accumulés pour cette clé.
+    recordLoginSuccess(rlKey);
 
     await writeAuditLog({
       userId: user.id,

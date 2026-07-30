@@ -62,6 +62,33 @@ Si tu veux les données d'exemple (produits, ventes, etc.) :
 
 ---
 
+## Réinitialiser un mot de passe (récupération de secours)
+
+Réservé au **responsable technique** (nécessite un accès au service). À utiliser
+quand un **Super Admin** a oublié son mot de passe et que personne ne peut le
+débloquer depuis l'onglet *Utilisateurs*.
+
+1. Onglet **Shell** du service `vokatra-ko` sur Render.
+2. Lance :
+
+   ```bash
+   npm run reset-password -- <email> <nouveau_mot_de_passe>
+   ```
+
+   Exemple : `npm run reset-password -- proprietaire@exemple.com MonNouveauMdp123`
+
+Le script hache le mot de passe (bcrypt), réactive le compte si besoin, et refuse
+si l'e-mail est introuvable ou si le mot de passe fait moins de 6 caractères.
+
+> ⚠️ Cette commande n'est **pas** exposée dans l'application : elle exige un accès
+> serveur, qui constitue la vraie barrière de sécurité. Ne la communique pas aux
+> utilisateurs finaux.
+
+> Pour les **employés** (comptes non Super Admin), pas besoin de cette commande :
+> un Admin/Super Admin réinitialise leur mot de passe depuis l'onglet *Utilisateurs*.
+
+---
+
 ## Redéploiements automatiques
 
 À chaque `git push` sur la branche **main**, Render **redéploie automatiquement**

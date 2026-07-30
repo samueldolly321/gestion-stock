@@ -34,6 +34,9 @@ import { eventsRouter } from './server/routes/events.ts';
 import { aiRouter } from './server/routes/ai.ts';
 
 const app = express();
+// Derrière le proxy Render : permet à req.ip de refléter l'IP réelle du client
+// (via X-Forwarded-For) — utilisé par le limiteur anti-force-brute du login.
+app.set('trust proxy', 1);
 app.use(express.json());
 
 // CORS simple pour le dev (front sur :3000, API sur :3001)
