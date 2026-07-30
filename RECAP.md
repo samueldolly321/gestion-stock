@@ -17,7 +17,7 @@
 | **Devise** | Base **Ariary (MGA)**, affichage Ar ou € converti (taux configurable) |
 | **Temps réel** | Server-Sent Events (SSE) — toasts + notifications navigateur |
 | **Dépôt** | GitHub `samueldolly321/gestion-stock` (branche `main`) |
-| **Déploiement** | ✅ **En ligne sur Render** (Blueprint `render.yaml` — 1 web service `vokatra-ko` qui sert API + front, + base PostgreSQL `vokatra-ko-db`) |
+| **Déploiement** | ✅ **En ligne sur Render** (Blueprint `render.yaml` — 1 web service `vokatra-ko` qui sert API + front, + base PostgreSQL `vokatra-ko-db`) **· ou 🖥️ en réseau local hors ligne** (1 PC serveur + client bureau Electron sur les postes — dossier `desktop/`) |
 
 > Historique : l'app tournait à l'origine sur **Firebase/Firestore** (générée par Google AI Studio), puis **migrée intégralement vers PostgreSQL** — Firebase a été entièrement retiré. Noms successifs : **StockFlow → Invenzo → Vokatra-ko** (nom actuel).
 
@@ -164,6 +164,15 @@ et côté client :
 - `index.ts` — pool `pg` + instance Drizzle
 - `drizzle.config.ts`, `check-connection.ts`, `seed.ts`, `reset-figures.ts` (remise à zéro des chiffres), `reset-password.ts` (récupération de mot de passe)
 
+### Version bureau (Electron) & déploiement réseau local — `desktop/`
+Alternative **hors ligne, multi-postes** au déploiement Render (données locales, séparées du cloud).
+- **Principe** : **1 PC serveur** fait tourner l'app existante (PostgreSQL + Express + front buildé, port 3001) ; les postes clients s'y connectent par le **réseau local**. `API_BASE = '/api'` étant relatif, le front chargé depuis `http://<ip>:3001` appelle automatiquement le bon serveur (même origine, pas de CORS). Le temps réel (SSE) et le partage des données sont natifs.
+- `desktop/` — **client Electron** : `main.js` (fenêtre + mémorisation de l'URL du serveur + gestion « serveur injoignable »), `preload.js` (pont sécurisé), `renderer/config.html` (saisie de l'adresse du serveur au 1er lancement). Build via **electron-builder** : `npm run dist` → installeur Windows NSIS (`.exe` ~82 Mo) ; `npm run dist:portable` → version portable `.zip`. Sortie dans `desktop/dist-installer/` (ignoré par git).
+  - ⚠️ L'installeur NSIS exige le **Mode développeur Windows** (ou admin) — sinon échec « lien symbolique » à l'extraction des outils de signature ; la version portable n'a pas cette contrainte.
+  - ⚠️ Ne pas laisser de dépendance `react-example: file:..` dans `desktop/package.json` (npm peut l'ajouter) : elle empaquette tout le projet parent (installeur qui gonfle à ~500 Mo).
+- `serveur-local.cmd` (racine) — lanceur du serveur sur le PC hôte (build au 1er run puis `npm start`).
+- **Guides** : `GUIDE_RESEAU_LOCAL.md` (mise en place technique serveur + clients, pare-feu, IP, sauvegardes) et `GUIDE_DEMARRAGE_MAGASIN.md` (fiche pas-à-pas « magasin » : 1 serveur + chef + 3-4 caissiers, rôles, routine, sauvegardes).
+
 ---
 
 ## 8. Fonctionnalités transverses
@@ -212,7 +221,8 @@ et côté client :
 - [x] **Remise à zéro des chiffres** — conserve produits/clients/fournisseurs/tarifs, remet stock + soldes clients à 0 et purge les transactions ; atomique. **Deux voies** : bouton in-app « Zone de danger » de Configuration ERP (Super Admin, saisie `REINITIALISER`) via `POST /admin/reset-figures` (`src/server/reset-figures.ts` + `routes/admin.ts`) — **ne nécessite pas le Shell Render** (payant) ; ou CLI `npm run db:reset-figures -- --confirm` (`src/db/reset-figures.ts`) si accès serveur.
 - [x] **Quantités décimales (poids/volume)** — `products.quantity`/`min_stock`/`max_stock` + `stock_movements.quantity` en `double precision` ; retrait des `Math.floor` sur les quantités (POS + avoirs serveur) et `step="any"` sur les champs quantité (Caisse, Achats, Réappro, Calendrier, fiche article, avoirs). Migration auto au boot (`ensure-schema.ts`).
 - [ ] Sécurité prod restante : HTTPS (fourni par Render), changement mot de passe forcé au 1er login
-- [ ] Tests automatisés, sauvegardes, mode hors-ligne (PWA)
+- [x] **Version bureau & fonctionnement hors ligne (réseau local)** — client **Electron** (`desktop/`) + **serveur local** (1 PC hôte : Postgres + Express) : plusieurs postes partagent les mêmes données **sans Internet** sur le réseau local. Installeur Windows (`npm run dist`) ou portable (`npm run dist:portable`). Guides `GUIDE_RESEAU_LOCAL.md` & `GUIDE_DEMARRAGE_MAGASIN.md`. *(Séparé de la version en ligne Render, sans synchro — choix assumé.)*
+- [ ] Tests automatisés, sauvegardes automatiques, PWA installable (option navigateur)
 - [x] **Versionnage git + déploiement Render — FAIT & EN LIGNE.** Repo GitHub `samueldolly321/gestion-stock` ; **déployé sur Render** via Blueprint `render.yaml` (auto-redeploy à chaque `git push` sur `main`). Single web service : l'API Express sert aussi le front buildé (`dist/`) sur la même origine ; base via `DATABASE_URL`+SSL. Script prod `npm start` (`tsx src/server.ts`). Guides `GUIDE_INSTALLATION.md` (local) & `GUIDE_RENDER.md` (cloud).
 
 ---
