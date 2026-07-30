@@ -62,6 +62,35 @@ Si tu veux les données d'exemple (produits, ventes, etc.) :
 
 ---
 
+## Remettre les chiffres à zéro (mise en service)
+
+Pour repartir « propre » **en conservant** le catalogue produits, les clients et
+les fournisseurs, mais en remettant à zéro le stock et toutes les transactions.
+
+**Conservé** : produits (stock remis à 0), catégories/marques/entrepôts, clients
+& fournisseurs (fiches), tarifs négociés, utilisateurs, réglages.
+**Remis à zéro** : stock des produits, soldes & fidélité clients, ventes, achats,
+règlements, dépenses, livraisons, inventaires, mouvements, journal d'audit,
+compteurs de factures/avoirs.
+
+1. Onglet **Shell** du service `vokatra-ko` sur Render.
+2. D'abord une **simulation** (n'écrit rien, montre ce qui sera effacé) :
+
+   ```bash
+   npm run db:reset-figures
+   ```
+
+3. Si le récapitulatif te convient, **exécute réellement** :
+
+   ```bash
+   npm run db:reset-figures -- --confirm
+   ```
+
+> ⚠️ Opération **irréversible**. Fais une sauvegarde (`pg_dump`) avant si tu peux.
+> Sans `--confirm`, la commande ne fait qu'afficher l'aperçu — aucun risque.
+
+---
+
 ## Réinitialiser un mot de passe (récupération de secours)
 
 Réservé au **responsable technique** (nécessite un accès au service). À utiliser
