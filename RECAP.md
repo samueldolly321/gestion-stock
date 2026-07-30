@@ -36,6 +36,7 @@ npm run dev      # Front (Vite)  -> http://localhost:3000
 - `npm run db:check` — teste la connexion + liste les tables
 - `npm run db:push` — (re)crée/mets à jour les tables depuis `src/db/schema.ts`
 - `npm run db:seed` — **données de démo** (rejouable ; vide les tables métier, garde les comptes users)
+- `npm run db:reset-figures` — **remise à zéro des chiffres** (mise en service) : garde catalogue produits + clients + fournisseurs + tarifs + users + réglages, remet à zéro stock/soldes clients et purge ventes/achats/règlements/dépenses/livraisons/inventaires/mouvements/journal/compteurs. **Aperçu par défaut ; exécute réellement seulement avec `-- --confirm`**. En prod : Shell Render.
 - `npm run reset-password -- <email> <nouveau_mdp>` — **récupération de mot de passe** de secours (débloque un Super Admin qui a oublié son mot de passe ; hache en bcrypt, réactive le compte). En prod : à lancer depuis le Shell Render.
 
 ### Compte de test
@@ -151,6 +152,7 @@ et côté client :
 - `auth-middleware.ts` — `signToken`, `verifyToken`, `requireAuth`, `requireRole`, `requireWrite(scope)` (lit la matrice de permissions en base)
 - `helpers.ts` — `generateId(prefix)`, `computeProductStatus()`, `writeAuditLog()` (publie aussi en SSE), `pickFields`/`pickProductFields` (anti-injection)
 - `events.ts` — bus SSE en mémoire (`publish`)
+- `login-rate-limit.ts` — limiteur anti-force-brute du login (en mémoire, sans dépendance ; clé IP+e-mail)
 - `routes/` : `auth`, `users`, `categories`, `products`, `movements`, `clients`, `suppliers`, `supplierProducts`, `clientPrices`, `sales`, `payments`, `purchases`, `expenses`, `deliveries`, `audits`, `auditLogs`, `brands`, `warehouses`, `settings`, `events`
 - `ensure-schema.ts` — migrations idempotentes appliquées au **démarrage** du serveur (Render ne crée pas les tables ; port 5432 souvent bloqué en local) : crée `supplier_products`, `client_prices`, colonne `settings.brand_name`, **conversion des colonnes de quantité `integer` → `double precision`** (guardée : ne convertit que si encore en `integer`, pas de rewrite à chaque boot).
 - `reset-password.ts` — script de récupération de mot de passe (`npm run reset-password -- <email> <mdp>`), hors application (accès serveur requis).
@@ -158,7 +160,7 @@ et côté client :
 ### Base — `src/db/`
 - `schema.ts` — tables Drizzle (aligné sur `src/types.ts`, **source de vérité des types métier**)
 - `index.ts` — pool `pg` + instance Drizzle
-- `drizzle.config.ts`, `check-connection.ts`, `seed.ts`
+- `drizzle.config.ts`, `check-connection.ts`, `seed.ts`, `reset-figures.ts` (remise à zéro des chiffres), `reset-password.ts` (récupération de mot de passe)
 
 ---
 
@@ -203,9 +205,11 @@ et côté client :
 - [x] **RBAC en lecture** — middleware `requireAnyTab(...)` (`auth-middleware.ts`) sur les GET sensibles (`sales`, `payments`, `purchases`, `client-prices`, `supplier-products`, `expenses`) : lit `rolePermissions`, refuse (403) si le rôle n'a aucun onglet consommant la donnée.
 - [x] **JWT durci + simulateur verrouillé** — le serveur **refuse de démarrer** si `JWT_SECRET` est absent/faible en prod ; le **simulateur de rôle n'est visible que pour le Super Admin réel** (`realRole` immuable issu du JWT) et n'est plus qu'une prévisualisation UI (les droits serveur restent ceux du compte). Bouton « Charger Données Démo » (stub) retiré.
 - [x] **Comptabilité corrigée** — CA HT **exclut les frais de livraison** (`totalAmount − TVA − livraison`) ; **COGS au coût historique** (`stock_movements.costTotal` des `exit_sale`, net des `entry_return`) au lieu du prix d'achat courant.
-- [x] **Récupération de mot de passe (sans e-mail)** — reset par un Admin depuis l'onglet Utilisateurs (employés) + **commande de secours `npm run reset-password`** pour débloquer un Super Admin ; lien « Mot de passe oublié ? » explicatif sur le portail de connexion. (Pas d'infra e-mail : choix assumé pour le contexte.)
+- [x] **Récupération de mot de passe (sans e-mail)** — reset par un Admin depuis l'onglet Utilisateurs (employés) + **commande de secours `npm run reset-password`** pour débloquer un Super Admin (documentée dans `GUIDE_RENDER.md`, plus exposée sur le portail) ; lien « Mot de passe oublié ? » explicatif sur le portail. (Pas d'infra e-mail : choix assumé pour le contexte.)
+- [x] **Anti-force-brute sur le login** — limiteur en mémoire (`src/server/login-rate-limit.ts`) : 5 échecs par (IP, e-mail) sur 15 min → blocage 15 min (HTTP 429 + `Retry-After`), reset au succès. `trust proxy` activé (IP réelle derrière Render).
+- [x] **Remise à zéro des chiffres** — `npm run db:reset-figures` (`src/db/reset-figures.ts`) : conserve produits/clients/fournisseurs/tarifs, remet stock + soldes clients à 0 et purge les transactions ; sécurisée par `--confirm`, atomique.
 - [x] **Quantités décimales (poids/volume)** — `products.quantity`/`min_stock`/`max_stock` + `stock_movements.quantity` en `double precision` ; retrait des `Math.floor` sur les quantités (POS + avoirs serveur) et `step="any"` sur les champs quantité (Caisse, Achats, Réappro, Calendrier, fiche article, avoirs). Migration auto au boot (`ensure-schema.ts`).
-- [ ] Sécurité prod restante : HTTPS (fourni par Render), verrouillage anti-bruteforce, changement mot de passe forcé au 1er login
+- [ ] Sécurité prod restante : HTTPS (fourni par Render), changement mot de passe forcé au 1er login
 - [ ] Tests automatisés, sauvegardes, mode hors-ligne (PWA)
 - [x] **Versionnage git + déploiement Render — FAIT & EN LIGNE.** Repo GitHub `samueldolly321/gestion-stock` ; **déployé sur Render** via Blueprint `render.yaml` (auto-redeploy à chaque `git push` sur `main`). Single web service : l'API Express sert aussi le front buildé (`dist/`) sur la même origine ; base via `DATABASE_URL`+SSL. Script prod `npm start` (`tsx src/server.ts`). Guides `GUIDE_INSTALLATION.md` (local) & `GUIDE_RENDER.md` (cloud).
 
