@@ -371,8 +371,8 @@ export default function Partners({
   // Submit Partner
   const handlePartnerSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name || !email) {
-      showAlert('Veuillez remplir les champs obligatoires.', { variant: 'warning' });
+    if (!name || !phone) {
+      showAlert('Le nom et le téléphone sont obligatoires.', { variant: 'warning' });
       return;
     }
 
@@ -637,7 +637,6 @@ export default function Partners({
               <tr className="bg-slate-50 dark:bg-slate-950/20 border-b border-slate-200 dark:border-slate-800/60 text-[10px] font-mono text-slate-400 uppercase tracking-wider">
                 <th className="py-3 px-4">Tiers</th>
                 {partnerType === 'suppliers' && <th className="py-3 px-4 hidden lg:table-cell">Produits fournis</th>}
-                <th className="py-3 px-4 hidden lg:table-cell">Email</th>
                 <th className="py-3 px-4 hidden lg:table-cell">Téléphone</th>
                 <th className="py-3 px-4 hidden lg:table-cell">Adresse</th>
                 {partnerType === 'clients' ? (
@@ -692,14 +691,8 @@ export default function Partners({
                     )}
                     <td className="py-3.5 px-4 hidden lg:table-cell">
                       <div className="flex items-center gap-1.5">
-                        <Mail className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                        <span>{p.email}</span>
-                      </div>
-                    </td>
-                    <td className="py-3.5 px-4 hidden lg:table-cell">
-                      <div className="flex items-center gap-1.5">
                         <Phone className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                        <span>{p.phone}</span>
+                        <span>{p.phone || '-'}</span>
                       </div>
                     </td>
                     <td className="py-3.5 px-4 max-w-xs truncate hidden lg:table-cell">
@@ -1239,25 +1232,25 @@ export default function Partners({
                   />
                 </div>
 
-                {/* Email */}
+                {/* Phone */}
                 <div>
-                  <label className="text-slate-500 dark:text-slate-400 block mb-1">Email *</label>
+                  <label className="text-slate-500 dark:text-slate-400 block mb-1">Téléphone *</label>
                   <input
-                    type="email"
+                    type="text"
                     required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
                     className="w-full bg-white dark:bg-slate-950/20 p-2.5 text-xs rounded-lg border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500"
                   />
                 </div>
 
-                {/* Phone */}
+                {/* Email (facultatif) */}
                 <div>
-                  <label className="text-slate-500 dark:text-slate-400 block mb-1">Téléphone</label>
+                  <label className="text-slate-500 dark:text-slate-400 block mb-1">Email</label>
                   <input
-                    type="text"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
                     className="w-full bg-white dark:bg-slate-950/20 p-2.5 text-xs rounded-lg border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500"
                   />
                 </div>
