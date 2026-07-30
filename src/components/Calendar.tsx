@@ -303,7 +303,7 @@ export default function Calendar({ deliveries, purchases, sales, suppliers, prod
                           <option value="">— Article —</option>
                           {(buildCatalog(qaSupplierId).length ? buildCatalog(qaSupplierId).map((c) => ({ id: c.productId, name: c.name })) : products.map((p) => ({ id: p.id, name: p.name }))).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
                         </select>
-                        <input type="number" min={1} value={l.quantity} onChange={(e) => setQaLine(i, { quantity: Number(e.target.value) })} className="col-span-2 bg-white dark:bg-slate-950/20 p-2 text-xs rounded-lg border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none" title="Quantité" />
+                        <input type="number" min={0} step="any" value={l.quantity} onChange={(e) => setQaLine(i, { quantity: Number(e.target.value) })} className="col-span-2 bg-white dark:bg-slate-950/20 p-2 text-xs rounded-lg border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none" title="Quantité" />
                         <input type="number" min={0} value={l.unitCost} onChange={(e) => setQaLine(i, { unitCost: Number(e.target.value) })} className="col-span-3 bg-white dark:bg-slate-950/20 p-2 text-xs rounded-lg border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none" title="Coût unitaire" />
                         <button type="button" onClick={() => setQaLines((p) => p.filter((_, idx) => idx !== i))} className="col-span-1 text-slate-400 hover:text-red-500 flex justify-center"><Trash2 className="w-3.5 h-3.5" /></button>
                       </div>

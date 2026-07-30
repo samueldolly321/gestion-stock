@@ -201,6 +201,7 @@ export default function Reorder({ products, suppliers, purchases, user, onRefres
                           <input
                             type="number"
                             min={0}
+                            step="any"
                             value={q}
                             onChange={(e) => setQty(p.id, Number(e.target.value))}
                             className="w-20 bg-white dark:bg-slate-950/20 p-1.5 text-xs text-center rounded-lg border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500 font-mono"

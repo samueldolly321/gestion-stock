@@ -51,6 +51,8 @@ export default function AuthPage({ onLoginSuccess }: AuthPageProps) {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [fullName, setFullName] = useState('');
+  // Aide « mot de passe oublié » (récupération sans e-mail).
+  const [showForgot, setShowForgot] = useState(false);
 
   // Pages publiques éditables (À propos / Confidentialité) + modale de lecture.
   const [pages, setPages] = useState<PublicPages | null>(null);
@@ -256,7 +258,34 @@ export default function AuthPage({ onLoginSuccess }: AuthPageProps) {
                   className="w-full bg-slate-950 border border-slate-800 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 rounded-xl py-2.5 pl-10 pr-4 text-xs text-white outline-none transition"
                 />
               </div>
+              {!isSignUp && (
+                <div className="text-right">
+                  <button
+                    type="button"
+                    onClick={() => setShowForgot((v) => !v)}
+                    className="text-[11px] text-cyan-400 hover:text-cyan-300 font-mono transition"
+                  >
+                    Mot de passe oublié ?
+                  </button>
+                </div>
+              )}
             </div>
+
+            {!isSignUp && showForgot && (
+              <div className="p-3 bg-cyan-500/5 border border-cyan-500/20 rounded-xl space-y-2">
+                <p className="text-[11px] text-cyan-200 leading-relaxed">
+                  <strong>Vous êtes un employé ?</strong> Demandez à un <strong>Administrateur</strong> de
+                  réinitialiser votre mot de passe depuis l'onglet <em>Utilisateurs</em>.
+                </p>
+                <p className="text-[11px] text-cyan-200 leading-relaxed">
+                  <strong>Vous êtes le Super Admin</strong> et personne ne peut vous débloquer ? Le
+                  responsable technique lance la commande de secours sur le serveur :
+                </p>
+                <code className="block bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-[10px] text-cyan-300 font-mono select-all">
+                  npm run reset-password -- votre@email NouveauMotDePasse
+                </code>
+              </div>
+            )}
 
             {isSignUp && (
               <>

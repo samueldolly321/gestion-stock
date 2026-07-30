@@ -106,8 +106,9 @@ export const products = pgTable('products', {
   packLabel: text('pack_label'), // ex. « Carton », « Pack »
   packPurchasePrice: doublePrecision('pack_purchase_price'), // prix d'achat au carton (optionnel)
   packSalePrice: doublePrecision('pack_sale_price'), // prix de vente au carton (optionnel)
-  minStock: integer('min_stock').default(5).notNull(),
-  maxStock: integer('max_stock').default(100).notNull(),
+  // Seuils stockés en double : autorise des seuils décimaux pour les articles au poids/volume.
+  minStock: doublePrecision('min_stock').default(5).notNull(),
+  maxStock: doublePrecision('max_stock').default(100).notNull(),
   image: text('image'),
   expirationDate: text('expiration_date'),
   lotNumber: text('lot_number'),
@@ -115,7 +116,8 @@ export const products = pgTable('products', {
   supplierId: text('supplier_id'),
   supplierName: text('supplier_name'),
   locationId: text('location_id'),
-  quantity: integer('quantity').default(0).notNull(),
+  // Quantité en double : autorise les quantités décimales (ex. 1,5 kg / 0,75 L).
+  quantity: doublePrecision('quantity').default(0).notNull(),
   status: text('status').default('in_stock').notNull(), // in_stock | low_stock | out_of_stock | expired
   createdAt,
   updatedAt,
@@ -160,7 +162,7 @@ export const stockMovements = pgTable('stock_movements', {
   warehouseName: text('warehouse_name'),
   fromWarehouseId: text('from_warehouse_id'),
   fromWarehouseName: text('from_warehouse_name'),
-  quantity: integer('quantity').notNull(),
+  quantity: doublePrecision('quantity').notNull(), // double : mouvements décimaux (poids/volume)
   reason: text('reason'),
   performedBy: text('performed_by').notNull(),
   referenceId: text('reference_id'),

@@ -213,14 +213,15 @@ export default function POS({
     const p = products.find((prod) => prod.id === productId);
     const item = cart.find((i) => i.productId === productId);
     if (!p || !item) return;
+    // Quantités décimales autorisées (poids/volume : 1,5 kg / 0,75 L). Arrondi à 3 décimales.
+    const round3 = (n: number) => Math.round(n * 1000) / 1000;
     let pieces: number;
     if (item.saleUnit === 'pack') {
       const size = item.packSize;
-      const cartons = Math.max(1, Math.floor(Number(value) || 0));
-      const maxPieces = Math.max(size, Math.floor(p.quantity / size) * size);
-      pieces = Math.min(cartons * size, maxPieces);
+      const cartons = Math.max(0, Number(value) || 0);
+      pieces = round3(Math.min(cartons * size, p.quantity));
     } else {
-      pieces = Math.max(1, Math.min(Math.floor(Number(value) || 0), p.quantity));
+      pieces = round3(Math.max(0, Math.min(Number(value) || 0, p.quantity)));
     }
     setCart(cart.map((it) => it.productId === productId
       ? { ...it, quantity: pieces, total: pieces * it.unitPrice * (1 - it.discount / 100) }
@@ -555,12 +556,13 @@ export default function POS({
                     </button>
                     <input
                       type="number"
-                      min={1}
-                      value={item.saleUnit === 'pack' ? Math.round(item.quantity / item.packSize) : item.quantity}
+                      min={0}
+                      step="any"
+                      value={item.saleUnit === 'pack' ? Math.round((item.quantity / item.packSize) * 1000) / 1000 : item.quantity}
                       onFocus={(e) => e.target.select()}
                       onChange={(e) => setQuantity(item.productId, e.target.value)}
-                      title={item.saleUnit === 'pack' ? 'Nombre de cartons' : 'Nombre de pièces'}
-                      className="font-mono text-xs font-bold text-slate-900 dark:text-white w-10 text-center bg-transparent border border-slate-200 dark:border-slate-700 rounded p-0.5 focus:outline-none focus:border-cyan-500"
+                      title={item.saleUnit === 'pack' ? 'Nombre de cartons' : 'Quantité (pièces / kg / L)'}
+                      className="font-mono text-xs font-bold text-slate-900 dark:text-white w-14 text-center bg-transparent border border-slate-200 dark:border-slate-700 rounded p-0.5 focus:outline-none focus:border-cyan-500"
                     />
                     <button
                       onClick={() => updateQuantity(item.productId, 1)}

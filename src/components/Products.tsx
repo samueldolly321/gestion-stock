@@ -419,7 +419,7 @@ export default function Products({
       );
       return;
     }
-    const qty = Math.max(1, Math.floor(Number(adjustQty) || 0));
+    const qty = Math.max(0, Math.round((Number(adjustQty) || 0) * 1000) / 1000);
     const ok = await showConfirm(
       `Créer un achat de ${qty} ${p.unit} « ${p.name} » chez ${p.supplierName || 'ce fournisseur'} au prix d'achat de ${format(p.purchasePrice)} l'unité, puis le réceptionner en stock ?\n\nLe stock augmentera et la dépense (dette fournisseur) sera enregistrée.`,
       { title: 'Créer un achat', variant: 'info', confirmText: 'Créer et réceptionner' },
@@ -1114,9 +1114,10 @@ export default function Products({
                   <label className="text-slate-500 dark:text-slate-400 block mb-1">Quantité :</label>
                   <input
                     type="number"
-                    min={1}
+                    min={0}
+                    step="any"
                     value={adjustQty}
-                    onChange={(e) => setAdjustQty(Math.max(1, Number(e.target.value)))}
+                    onChange={(e) => setAdjustQty(Math.max(0, Number(e.target.value)))}
                     className="w-full bg-white dark:bg-slate-950/20 p-2 text-xs rounded-lg border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500"
                   />
                 </div>
@@ -1365,6 +1366,7 @@ export default function Products({
                     <input
                       type="number"
                       min={0}
+                      step="any"
                       value={initialQuantity}
                       onChange={(e) => setInitialQuantity(Number(e.target.value))}
                       className="w-full bg-white dark:bg-slate-950/20 p-2.5 text-xs rounded-lg border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500"
@@ -1458,6 +1460,8 @@ export default function Products({
                   <label className="text-xs text-slate-400 block mb-1">Seuil Alerte Min</label>
                   <input
                     type="number"
+                    min={0}
+                    step="any"
                     value={minStock}
                     onChange={(e) => setMinStock(Number(e.target.value))}
                     className="w-full bg-white dark:bg-slate-950/20 p-2.5 text-xs rounded-lg border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500"
@@ -1469,6 +1473,8 @@ export default function Products({
                   <label className="text-xs text-slate-400 block mb-1">Seuil Alerte Max</label>
                   <input
                     type="number"
+                    min={0}
+                    step="any"
                     value={maxStock}
                     onChange={(e) => setMaxStock(Number(e.target.value))}
                     className="w-full bg-white dark:bg-slate-950/20 p-2.5 text-xs rounded-lg border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500"

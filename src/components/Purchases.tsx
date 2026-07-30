@@ -447,7 +447,7 @@ export default function Purchases({ purchases, suppliers, products, supplierProd
                     ) : (
                       <span className="col-span-2 text-[10px] font-mono text-slate-400 text-center">Pièce</span>
                     )}
-                    <input type="number" min={1} value={l.quantity} onChange={(e) => setLine(i, { quantity: Number(e.target.value) })} className={`${inputCls} col-span-2`} title={isPack ? 'Nombre de cartons' : 'Quantité (pièces)'} />
+                    <input type="number" min={0} step="any" value={l.quantity} onChange={(e) => setLine(i, { quantity: Number(e.target.value) })} className={`${inputCls} col-span-2`} title={isPack ? 'Nombre de cartons' : 'Quantité (pièces / kg / L)'} />
                     <input type="number" min={0} value={l.unitCost} onChange={(e) => setLine(i, { unitCost: Number(e.target.value) })} className={`${inputCls} col-span-2`} title={isPack ? 'Coût par carton' : 'Coût par pièce'} />
                     <span className="col-span-1 text-[10px] font-mono text-slate-400 text-center">{applyVat ? l.tax : 0}%</span>
                     <button type="button" onClick={() => setLines((p) => p.filter((_, idx) => idx !== i))} className="col-span-1 text-slate-400 hover:text-red-500 flex justify-center"><Trash2 className="w-3.5 h-3.5" /></button>

@@ -122,6 +122,16 @@ export default function Partners({
     return m;
   }, [supplierProducts]);
 
+  // Noms des produits fournis, par fournisseur (colonne « Produits fournis » du tableau).
+  const productNamesBySupplier = useMemo(() => {
+    const m: Record<string, string[]> = {};
+    supplierProducts.forEach((sp) => {
+      const name = sp.productName || products.find((p) => p.id === sp.productId)?.name || sp.productId;
+      (m[sp.supplierId] ||= []).push(name);
+    });
+    return m;
+  }, [supplierProducts, products]);
+
   // Produits pas encore associés à ce fournisseur (proposés à l'ajout).
   const productsToAdd = useMemo(() => {
     const linked = new Set(catalogItems.map((sp) => sp.productId));
@@ -626,7 +636,7 @@ export default function Partners({
             <thead>
               <tr className="bg-slate-50 dark:bg-slate-950/20 border-b border-slate-200 dark:border-slate-800/60 text-[10px] font-mono text-slate-400 uppercase tracking-wider">
                 <th className="py-3 px-4">Tiers</th>
-                {partnerType === 'suppliers' && <th className="py-3 px-4 hidden lg:table-cell">Entreprise</th>}
+                {partnerType === 'suppliers' && <th className="py-3 px-4 hidden lg:table-cell">Produits fournis</th>}
                 <th className="py-3 px-4 hidden lg:table-cell">Email</th>
                 <th className="py-3 px-4 hidden lg:table-cell">Téléphone</th>
                 <th className="py-3 px-4 hidden lg:table-cell">Adresse</th>
@@ -660,8 +670,24 @@ export default function Partners({
                       {p.name}
                     </td>
                     {partnerType === 'suppliers' && (
-                      <td className="py-3.5 px-4 font-semibold text-slate-900 dark:text-white hidden lg:table-cell">
-                        {p.companyName}
+                      <td className="py-3.5 px-4 hidden lg:table-cell">
+                        {(() => {
+                          const names = productNamesBySupplier[p.id] || [];
+                          if (names.length === 0) return <span className="text-slate-400">—</span>;
+                          const shown = names.slice(0, 3);
+                          return (
+                            <div className="flex flex-wrap items-center gap-1 max-w-xs" title={names.join(', ')}>
+                              {shown.map((n, idx) => (
+                                <span key={idx} className="px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-600 dark:text-cyan-300 text-[10px] font-medium truncate max-w-[120px]">
+                                  {n}
+                                </span>
+                              ))}
+                              {names.length > shown.length && (
+                                <span className="text-[10px] font-mono text-slate-400">+{names.length - shown.length}</span>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </td>
                     )}
                     <td className="py-3.5 px-4 hidden lg:table-cell">

@@ -48,7 +48,8 @@ salesRouter.post('/', requireAuth, requireRole(...CASHIER_ROLES), async (req: Au
     const normalizedItems: any[] = [];
     for (const it of items) {
       const [product] = await db.select().from(products).where(eq(products.id, it.productId)).limit(1);
-      const quantity = Math.max(0, Math.floor(Number(it.quantity) || 0));
+      // Quantité décimale autorisée (poids/volume) ; arrondie à 3 décimales pour éviter le bruit flottant.
+      const quantity = Math.max(0, Math.round((Number(it.quantity) || 0) * 1000) / 1000);
       const unitPrice = Math.max(0, Number(it.unitPrice) || 0);
       // Garde-fou marge : refus si prix de vente sous le prix d'achat (sauf avoir/retour).
       if (product && saleType !== 'return' && unitPrice < product.purchasePrice) {
@@ -302,7 +303,7 @@ salesRouter.post('/:id/credit-note', requireAuth, requireRole(...CASHIER_ROLES),
       const creditItems: any[] = [];
       let creditGoodsHT = 0;
       for (const line of requested) {
-        const qty = Math.floor(Number(line.quantity) || 0);
+        const qty = Math.max(0, Math.round((Number(line.quantity) || 0) * 1000) / 1000);
         if (qty <= 0) continue;
         const src = invoiceItems.find((it) => it.productId === line.productId);
         if (!src) throw new Error(`Article ${line.productId} absent de la facture.`);

@@ -352,10 +352,10 @@ export default function Receivables({ sales, clients, user, onRefresh }: Receiva
                         <span className="text-[10px] text-slate-400">Facturé {it.quantity} · {format(it.unitPrice)}{already ? ` · déjà avoiré ${already}` : ''} · retournable {max}</span>
                       </div>
                       <input
-                        type="number" min={0} max={max} disabled={max === 0}
+                        type="number" min={0} max={max} step="any" disabled={max === 0}
                         value={cnQty[it.productId] ?? 0}
                         onChange={(e) => {
-                          const v = Math.max(0, Math.min(max, Math.floor(Number(e.target.value) || 0)));
+                          const v = Math.max(0, Math.min(max, Math.round((Number(e.target.value) || 0) * 1000) / 1000));
                           setCnQty((q) => ({ ...q, [it.productId]: v }));
                         }}
                         className="w-20 shrink-0 text-right bg-white dark:bg-slate-950/20 p-2 text-xs rounded-lg border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500 disabled:opacity-50"

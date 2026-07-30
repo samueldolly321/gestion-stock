@@ -68,4 +68,31 @@ export async function ensureSchema(): Promise<void> {
       END IF;
     END $$;
   `);
+
+  // Quantités décimales (poids/volume : kg, litre…) : passe les colonnes de
+  // quantité et de seuils d'entier à double precision. On ne convertit QUE si la
+  // colonne est encore de type entier (évite un rewrite de table à chaque boot).
+  await db.execute(sql`
+    DO $$
+    DECLARE
+      col record;
+    BEGIN
+      FOR col IN
+        SELECT table_name, column_name FROM (VALUES
+          ('products', 'quantity'),
+          ('products', 'min_stock'),
+          ('products', 'max_stock'),
+          ('stock_movements', 'quantity')
+        ) AS t(table_name, column_name)
+      LOOP
+        IF EXISTS (
+          SELECT 1 FROM information_schema.columns c
+          WHERE c.table_name = col.table_name AND c.column_name = col.column_name AND c.data_type = 'integer'
+        ) THEN
+          EXECUTE format('ALTER TABLE %I ALTER COLUMN %I TYPE double precision USING %I::double precision',
+                         col.table_name, col.column_name, col.column_name);
+        END IF;
+      END LOOP;
+    END $$;
+  `);
 }
