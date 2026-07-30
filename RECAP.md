@@ -1,7 +1,7 @@
 # 📦 Vokatra-ko — Récapitulatif du projet
 
 > ERP de **gestion de stock, ventes, achats et comptabilité** — contexte **Madagascar** (devise Ariary).
-> Dernière mise à jour : **2026-07-28**.
+> Dernière mise à jour : **2026-07-30**.
 
 ---
 
@@ -36,10 +36,12 @@ npm run dev      # Front (Vite)  -> http://localhost:3000
 - `npm run db:check` — teste la connexion + liste les tables
 - `npm run db:push` — (re)crée/mets à jour les tables depuis `src/db/schema.ts`
 - `npm run db:seed` — **données de démo** (rejouable ; vide les tables métier, garde les comptes users)
+- `npm run reset-password -- <email> <nouveau_mdp>` — **récupération de mot de passe** de secours (débloque un Super Admin qui a oublié son mot de passe ; hache en bcrypt, réactive le compte). En prod : à lancer depuis le Shell Render.
 
 ### Compte de test
 - `digital@salathis.com` / `secret123` — **Super Admin**
 - Le 1er compte créé sur une base vide devient automatiquement Super Admin.
+- **Mot de passe oublié** : un employé demande la réinitialisation à un Admin (onglet Utilisateurs) ; le Super Admin utilise la commande `npm run reset-password`. Le lien « Mot de passe oublié ? » du portail de connexion rappelle ces deux voies.
 
 ---
 
@@ -48,11 +50,11 @@ npm run dev      # Front (Vite)  -> http://localhost:3000
 | Module | Onglet | Contenu |
 |---|---|---|
 | **Tableau de bord** | Dashboard | KPI, graphiques, alertes cliquables (rupture/périmés), **Performance commerciale** (7/30/90 j) : meilleures ventes, meilleurs clients, **Recettes / Dépenses / Solde**, **carte « Résumé d'activité (IA) »** : résumé en langage naturel jour/mois généré par Claude (`POST /api/ai/summary`, clé `ANTHROPIC_API_KEY`) |
-| **Articles & Stocks** | products | Catalogue produits (CRUD, import image **avec limite 2 Mo**, catégories/sous-cat, marques, entrepôts), **champ Fournisseur** (à côté de Marque), **unité de base en liste déroulante** (+ « Autre »), **conditionnement « vente en gros » (1 carton = N pièces, prix carton achat/vente)**, **code-barres EAN-13** (génération + rendu SVG scannable + **étiquette imprimable**), fiche article **avec historique des mouvements**, ajustement rapide **+ bouton « Créer un achat » (transforme une entrée en commande fournisseur réceptionnée)** |
-| **Caisse POS** | pos | Encaissement, **image produit en grand sur les cartes**, panier (quantité éditable au clavier + boutons +/−), **vente à la pièce OU au carton par ligne**, **prix de vente éditable par ligne + tarif client auto-appliqué (blocage vente à perte < prix d'achat)**, remise, moyens de paiement (+ référence), **livraison**, **paiement partiel / avance**, **TVA optionnelle (case « Appliquer la TVA », désactivée par défaut → vente sans TVA)**, reçu (ticket 80mm / A4) |
+| **Articles & Stocks** | products | Catalogue produits (CRUD, import image **avec limite 2 Mo**, catégories/sous-cat, marques, entrepôts), **champ Fournisseur** (à côté de Marque), **unité de base en liste déroulante** (+ « Autre »), **quantités décimales** (poids/volume : 1,5 kg, 0,75 L…), **conditionnement « vente en gros » (1 carton = N pièces, prix carton achat/vente)**, **code-barres EAN-13** (génération + rendu SVG scannable + **étiquette imprimable**), fiche article **avec historique des mouvements**, ajustement rapide **+ bouton « Créer un achat » (transforme une entrée en commande fournisseur réceptionnée)** |
+| **Caisse POS** | pos | Encaissement, **image produit en grand sur les cartes**, panier (**quantité décimale éditable au clavier** + boutons +/−), **vente à la pièce OU au carton par ligne**, **prix de vente éditable par ligne + tarif client auto-appliqué (blocage vente à perte < prix d'achat)**, remise, moyens de paiement (+ référence), **livraison**, **paiement partiel / avance**, **TVA optionnelle (case « Appliquer la TVA », désactivée par défaut → vente sans TVA)**, reçu (ticket 80mm / A4) |
 | **Créances Clients** | receivables | Avances/reste par vente, encaissements, **historique détaillé** des règlements, états payé/partiel/non payé, **établissement d'avoirs** (notes de crédit) |
-| **Clients & Fournisseurs** | partners | CRUD clients & fournisseurs, coffre-fort documents, fiche en ligne mobile, **catalogue « Produits fournis » par fournisseur (prix d'achat négocié, multi-fournisseurs) — panneau Package**, **« Tarifs » de vente par client (prix négocié par produit, panneau Tag) appliqués en caisse** |
-| **Achats** | purchases | Commandes fournisseurs, **colonne « Produits » (nom + quantité)**, **saisie à la pièce ou au carton par ligne**, **pré-remplissage auto des produits du fournisseur sélectionné (avec son prix négocié)**, **réception valorisée** (→ stock), **suivi des règlements** (dette fournisseurs), détails |
+| **Clients & Fournisseurs** | partners | CRUD clients & fournisseurs (**nom + téléphone obligatoires, email facultatif** ; tableau sans colonne Email — email dans la fiche détaillée), **colonne « Produits fournis » dans le tableau fournisseurs** (à la place de l'ex-colonne Entreprise), coffre-fort documents, fiche en ligne mobile, **catalogue « Produits fournis » par fournisseur (prix d'achat négocié, multi-fournisseurs) — panneau Package**, **« Tarifs » de vente par client (prix négocié par produit, panneau Tag) appliqués en caisse** |
+| **Achats** | purchases | Commandes fournisseurs, **colonne « Produits » (nom + quantité)**, **saisie à la pièce ou au carton par ligne (quantités décimales)**, **pré-remplissage auto des produits du fournisseur sélectionné (avec son prix négocié)**, **réception valorisée** (→ stock), **suivi des règlements** (dette fournisseurs), détails |
 | **Ventes** | sales | **Journal des ventes** : filtre Jour/Mois/Année + navigation, cartes de synthèse (nb ventes, CA TTC, encaissé, reste dû), recherche, **détail d'une vente + réimpression du reçu** (ticket 80mm / A4), export PDF/Excel |
 | **Réapprovisionnement** | reorder | Articles sous seuil mini, quantités suggérées, **création de commande d'achat** groupée par fournisseur, **indicateur « commande en cours »** (anti-doublon) |
 | **Dépenses** | expenses | Frais divers (transport, douane, taxes…), liés aux achats, statut payé/non payé |
@@ -114,8 +116,8 @@ Système à **deux dimensions**, **configurable** depuis Configuration ERP et **
 `users`, `categories`, `brands`, `suppliers`, `clients`, `warehouses`, `products`,
 **`supplier_products`** (catalogue appro : `supplier_id` + `product_id` + `purchase_price` négocié + `supplier_ref`, unicité `(supplier_id, product_id)` — un produit peut avoir plusieurs fournisseurs),
 **`client_prices`** (tarifs de vente par client : `client_id` + `product_id` + `sale_price`, unicité `(client_id, product_id)` — prix de vente différent par client, appliqué en caisse),
-`products` (+ **conditionnement gros** : `pack_size`, `pack_label`, `pack_purchase_price`, `pack_sale_price` — 1 carton = `pack_size` pièces ; le stock reste compté en pièces),
-`stock_movements`, `inventory_audits`, `purchases` (+ `paid_amount`, `received_at`, **`expected_date`** = réception prévue ; items enrichis de `unit_label`/`pack_qty` pour l'affichage carton),
+`products` (+ **conditionnement gros** : `pack_size`, `pack_label`, `pack_purchase_price`, `pack_sale_price` — 1 carton = `pack_size` pièces ; le stock reste compté en pièces ; **`quantity`, `min_stock`, `max_stock` en `double precision`** → quantités décimales poids/volume),
+`stock_movements` (**`quantity` en `double precision`**), `inventory_audits`, `purchases` (+ `paid_amount`, `received_at`, **`expected_date`** = réception prévue ; items enrichis de `unit_label`/`pack_qty` pour l'affichage carton),
 `sales` (+ `paid_amount`, **`invoice_number`** unique, **`related_sale_id`** = facture d'origine d'un avoir, **`due_date`** = échéance de créance), `payments` (kind `sale`/`purchase`/**`credit_note`**), `expenses`, `deliveries`, `audit_logs`,
 `document_counters` (compteurs de séquences légales — clés `invoice` **et `credit_note`**),
 `settings` (+ `role_permissions`, `write_permissions`, `logo_initials`, **`invoice_prefix`**, **`credit_note_prefix`**, **`invoice_padding`**, **`about_text`**, **`privacy_text`** = pages éditables du portail).
@@ -150,7 +152,8 @@ et côté client :
 - `helpers.ts` — `generateId(prefix)`, `computeProductStatus()`, `writeAuditLog()` (publie aussi en SSE), `pickFields`/`pickProductFields` (anti-injection)
 - `events.ts` — bus SSE en mémoire (`publish`)
 - `routes/` : `auth`, `users`, `categories`, `products`, `movements`, `clients`, `suppliers`, `supplierProducts`, `clientPrices`, `sales`, `payments`, `purchases`, `expenses`, `deliveries`, `audits`, `auditLogs`, `brands`, `warehouses`, `settings`, `events`
-- `ensure-schema.ts` — migrations idempotentes appliquées au **démarrage** du serveur (Render ne crée pas les tables ; port 5432 souvent bloqué en local) : crée `supplier_products`, `client_prices`, colonne `settings.brand_name`.
+- `ensure-schema.ts` — migrations idempotentes appliquées au **démarrage** du serveur (Render ne crée pas les tables ; port 5432 souvent bloqué en local) : crée `supplier_products`, `client_prices`, colonne `settings.brand_name`, **conversion des colonnes de quantité `integer` → `double precision`** (guardée : ne convertit que si encore en `integer`, pas de rewrite à chaque boot).
+- `reset-password.ts` — script de récupération de mot de passe (`npm run reset-password -- <email> <mdp>`), hors application (accès serveur requis).
 
 ### Base — `src/db/`
 - `schema.ts` — tables Drizzle (aligné sur `src/types.ts`, **source de vérité des types métier**)
@@ -200,6 +203,8 @@ et côté client :
 - [x] **RBAC en lecture** — middleware `requireAnyTab(...)` (`auth-middleware.ts`) sur les GET sensibles (`sales`, `payments`, `purchases`, `client-prices`, `supplier-products`, `expenses`) : lit `rolePermissions`, refuse (403) si le rôle n'a aucun onglet consommant la donnée.
 - [x] **JWT durci + simulateur verrouillé** — le serveur **refuse de démarrer** si `JWT_SECRET` est absent/faible en prod ; le **simulateur de rôle n'est visible que pour le Super Admin réel** (`realRole` immuable issu du JWT) et n'est plus qu'une prévisualisation UI (les droits serveur restent ceux du compte). Bouton « Charger Données Démo » (stub) retiré.
 - [x] **Comptabilité corrigée** — CA HT **exclut les frais de livraison** (`totalAmount − TVA − livraison`) ; **COGS au coût historique** (`stock_movements.costTotal` des `exit_sale`, net des `entry_return`) au lieu du prix d'achat courant.
+- [x] **Récupération de mot de passe (sans e-mail)** — reset par un Admin depuis l'onglet Utilisateurs (employés) + **commande de secours `npm run reset-password`** pour débloquer un Super Admin ; lien « Mot de passe oublié ? » explicatif sur le portail de connexion. (Pas d'infra e-mail : choix assumé pour le contexte.)
+- [x] **Quantités décimales (poids/volume)** — `products.quantity`/`min_stock`/`max_stock` + `stock_movements.quantity` en `double precision` ; retrait des `Math.floor` sur les quantités (POS + avoirs serveur) et `step="any"` sur les champs quantité (Caisse, Achats, Réappro, Calendrier, fiche article, avoirs). Migration auto au boot (`ensure-schema.ts`).
 - [ ] Sécurité prod restante : HTTPS (fourni par Render), verrouillage anti-bruteforce, changement mot de passe forcé au 1er login
 - [ ] Tests automatisés, sauvegardes, mode hors-ligne (PWA)
 - [x] **Versionnage git + déploiement Render — FAIT & EN LIGNE.** Repo GitHub `samueldolly321/gestion-stock` ; **déployé sur Render** via Blueprint `render.yaml` (auto-redeploy à chaque `git push` sur `main`). Single web service : l'API Express sert aussi le front buildé (`dist/`) sur la même origine ; base via `DATABASE_URL`+SSL. Script prod `npm start` (`tsx src/server.ts`). Guides `GUIDE_INSTALLATION.md` (local) & `GUIDE_RENDER.md` (cloud).
