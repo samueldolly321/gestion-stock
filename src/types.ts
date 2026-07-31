@@ -4,6 +4,7 @@ export type UserRole =
   | 'Manager'
   | 'Magasinier'
   | 'Commercial'
+  | 'Caissier'
   | 'Acheteur'
   | 'Comptable'
   | 'Auditeur';

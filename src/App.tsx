@@ -433,7 +433,7 @@ export default function App() {
     { id: 'deliveries', label: 'Livraisons', icon: Truck },
     { id: 'audits', label: 'Audits & Ajustements', icon: ClipboardList },
     { id: 'movements', label: 'Historique des Flux', icon: History },
-    { id: 'warehouses', label: 'Entrepôts & Localisations', icon: WarehouseIcon },
+    { id: 'warehouses', label: 'Entrepôts', icon: WarehouseIcon },
     { id: 'calendar', label: 'Calendrier', icon: CalendarDays },
     { id: 'accounting', label: 'Comptabilité', icon: Landmark },
     { id: 'users', label: 'Utilisateurs', icon: UserCog },
@@ -468,6 +468,7 @@ export default function App() {
               <option value="Admin">🛠️ Admin</option>
               <option value="Manager">💼 Gérant / Manager</option>
               <option value="Commercial">📈 Commercial</option>
+              <option value="Caissier">💵 Caissier</option>
               <option value="Acheteur">📦 Acheteur</option>
               <option value="Comptable">🧮 Comptable</option>
               <option value="Auditeur">🔍 Auditeur</option>

@@ -8,7 +8,7 @@ import { adjustWarehouseStock, resolveWarehouseId } from '../stock.ts';
 
 export const salesRouter = Router();
 
-const CASHIER_ROLES = ['Super Admin', 'Admin', 'Manager', 'Commercial', 'Magasinier'];
+const CASHIER_ROLES = ['Super Admin', 'Admin', 'Manager', 'Commercial', 'Caissier', 'Magasinier'];
 
 /** GET /api/sales — historique des ventes (plus récentes d'abord). */
 salesRouter.get('/', requireAuth, requireAnyTab('dashboard', 'pos', 'receivables', 'accounting', 'calendar', 'sales'), async (_req, res) => {
@@ -203,7 +203,7 @@ salesRouter.post('/', requireAuth, requireRole(...CASHIER_ROLES), async (req: Au
   }
 });
 
-const PAY_ROLES = ['Super Admin', 'Admin', 'Manager', 'Commercial', 'Comptable'];
+const PAY_ROLES = ['Super Admin', 'Admin', 'Manager', 'Commercial', 'Caissier', 'Comptable'];
 
 /** POST /api/sales/:id/pay — enregistre un règlement client (réduit le reste dû). */
 salesRouter.post('/:id/pay', requireAuth, requireRole(...PAY_ROLES), async (req: AuthedRequest, res) => {
