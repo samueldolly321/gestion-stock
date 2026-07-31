@@ -1,9 +1,10 @@
 import { Router } from 'express';
 import { desc, eq } from 'drizzle-orm';
 import { db } from '../../db/index.ts';
-import { products } from '../../db/schema.ts';
+import { products, productStock } from '../../db/schema.ts';
 import { requireAuth, requireWrite, type AuthedRequest } from '../auth-middleware.ts';
 import { generateId, computeProductStatus, writeAuditLog } from '../helpers.ts';
+import { setWarehouseStock, resolveWarehouseId, recomputeProductTotal } from '../stock.ts';
 
 export const productsRouter = Router();
 
@@ -72,7 +73,13 @@ productsRouter.post('/', requireAuth, requireWrite('products'), async (req: Auth
 
     const id = generateId('PRD');
     const status = computeProductStatus(f.quantity, f.minStock, f.expirationDate);
-    const [created] = await db.insert(products).values({ id, ...f, status }).returning();
+    const created = await db.transaction(async (tx) => {
+      const [row] = await tx.insert(products).values({ id, ...f, status }).returning();
+      // Alimente le stock par entrepôt : la quantité initiale entre dans la localisation choisie.
+      const whId = await resolveWarehouseId(tx, f.locationId, id);
+      if (whId) await setWarehouseStock(tx, id, whId, f.quantity);
+      return row;
+    });
 
     await writeAuditLog({
       userId: req.user?.sub,
@@ -96,12 +103,31 @@ productsRouter.put('/:id', requireAuth, requireWrite('products'), async (req: Au
     if (!f.name || !f.sku) {
       return res.status(400).json({ error: 'Le nom et le SKU sont requis.' });
     }
-    const status = computeProductStatus(f.quantity, f.minStock, f.expirationDate);
-    const [updated] = await db
-      .update(products)
-      .set({ ...f, status, updatedAt: new Date().toISOString() })
-      .where(eq(products.id, req.params.id))
-      .returning();
+    // Le stock est dérivé des entrepôts : on ne l'écrase pas directement ici.
+    const { quantity: submittedQty, ...rest } = f;
+    const updated = await db.transaction(async (tx) => {
+      const [row] = await tx
+        .update(products)
+        .set({ ...rest, updatedAt: new Date().toISOString() })
+        .where(eq(products.id, req.params.id))
+        .returning();
+      if (!row) return null;
+
+      // Ajustement de stock à l'édition : autorisé seulement si le produit tient dans UN
+      // seul entrepôt (sinon la répartition est ambiguë → passer par ajustement/transfert).
+      const stockRows = await tx.select().from(productStock).where(eq(productStock.productId, row.id));
+      const currentTotal = stockRows.reduce((s: number, r: any) => s + (Number(r.quantity) || 0), 0);
+      if (Math.abs(submittedQty - currentTotal) > 0.0001 && stockRows.length <= 1) {
+        const whId = stockRows[0]?.warehouseId ?? await resolveWarehouseId(tx, rest.locationId, row.id);
+        if (whId) await setWarehouseStock(tx, row.id, whId, submittedQty);
+        else await recomputeProductTotal(tx, row.id);
+      } else {
+        // Recale le total + le statut (minStock/péremption ont pu changer).
+        await recomputeProductTotal(tx, row.id);
+      }
+      const [fresh] = await tx.select().from(products).where(eq(products.id, row.id)).limit(1);
+      return fresh;
+    });
     if (!updated) return res.status(404).json({ error: 'Produit introuvable.' });
 
     await writeAuditLog({

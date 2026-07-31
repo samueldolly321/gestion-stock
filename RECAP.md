@@ -1,7 +1,7 @@
 # 📦 Vokatra-ko — Récapitulatif du projet
 
 > ERP de **gestion de stock, ventes, achats et comptabilité** — contexte **Madagascar** (devise Ariary).
-> Dernière mise à jour : **2026-07-30**.
+> Dernière mise à jour : **2026-07-31**.
 
 ---
 
@@ -52,7 +52,8 @@ npm run dev      # Front (Vite)  -> http://localhost:3000
 |---|---|---|
 | **Tableau de bord** | Dashboard | KPI, graphiques, alertes cliquables (rupture/périmés), **Performance commerciale** (7/30/90 j) : meilleures ventes, meilleurs clients, **Recettes / Dépenses / Solde**, **carte « Résumé d'activité (IA) »** : résumé en langage naturel jour/mois généré par Claude (`POST /api/ai/summary`, clé `ANTHROPIC_API_KEY`) |
 | **Articles & Stocks** | products | Catalogue produits (CRUD, import image **avec limite 2 Mo**, catégories/sous-cat, marques, entrepôts), **champ Fournisseur** (à côté de Marque), **unité de base en liste déroulante** (+ « Autre »), **quantités décimales** (poids/volume : 1,5 kg, 0,75 L…), **conditionnement « vente en gros » (1 carton = N pièces, prix carton achat/vente)**, **code-barres EAN-13** (génération + rendu SVG scannable + **étiquette imprimable**), fiche article **avec historique des mouvements**, ajustement rapide **+ bouton « Créer un achat » (transforme une entrée en commande fournisseur réceptionnée)** |
-| **Caisse POS** | pos | Encaissement, **image produit en grand sur les cartes**, panier (**quantité décimale éditable au clavier** + boutons +/−), **vente à la pièce OU au carton par ligne**, **prix de vente éditable par ligne + tarif client auto-appliqué (blocage vente à perte < prix d'achat)**, remise, moyens de paiement (+ référence), **livraison**, **paiement partiel / avance**, **TVA optionnelle (case « Appliquer la TVA », désactivée par défaut → vente sans TVA)**, reçu (ticket 80mm / A4) |
+| **Caisse POS** | pos | Encaissement, **image produit en grand sur les cartes**, panier (**quantité décimale éditable au clavier** + boutons +/−), **vente à la pièce OU au carton par ligne**, **prix de vente éditable par ligne + tarif client auto-appliqué (blocage vente à perte < prix d'achat)**, remise, moyens de paiement (+ référence), **livraison**, **paiement partiel / avance**, **TVA optionnelle (case « Appliquer la TVA », désactivée par défaut → vente sans TVA)**, reçu (ticket 80mm / A4), **sélecteur « entrepôt actif » (la vente déduit le stock de cet entrepôt ; disponibilité affichée par entrepôt)**, **scan code-barres : douchette USB (code + Entrée → ajout auto au panier, bip + toast) ou caméra (bouton « Scanner », API `BarcodeDetector`)** |
+| **Entrepôts & Localisations** | warehouses | **CRUD entrepôts** (nom, code, localisation, capacité, statut actif/inactif ; suppression bloquée si stock présent), **répartition du stock par entrepôt** (tableau produit × entrepôt), **transfert de stock A→B** (sort de la source, entre en destination, total inchangé, refus si stock source insuffisant) |
 | **Créances Clients** | receivables | Avances/reste par vente, encaissements, **historique détaillé** des règlements, états payé/partiel/non payé, **établissement d'avoirs** (notes de crédit) |
 | **Clients & Fournisseurs** | partners | CRUD clients & fournisseurs (**nom + téléphone obligatoires, email facultatif** ; tableau sans colonne Email — email dans la fiche détaillée), **colonne « Produits fournis » dans le tableau fournisseurs** (à la place de l'ex-colonne Entreprise), coffre-fort documents, fiche en ligne mobile, **catalogue « Produits fournis » par fournisseur (prix d'achat négocié, multi-fournisseurs) — panneau Package**, **« Tarifs » de vente par client (prix négocié par produit, panneau Tag) appliqués en caisse** |
 | **Achats** | purchases | Commandes fournisseurs, **colonne « Produits » (nom + quantité)**, **saisie à la pièce ou au carton par ligne (quantités décimales)**, **pré-remplissage auto des produits du fournisseur sélectionné (avec son prix négocié)**, **réception valorisée** (→ stock), **suivi des règlements** (dette fournisseurs), détails |
@@ -106,7 +107,8 @@ Système à **deux dimensions**, **configurable** depuis Configuration ERP et **
 | Livraisons | `GET/POST/PUT/DELETE /deliveries` |
 | Inventaires | `GET/POST /audits`, `POST /audits/:id/validate`, `POST /audits/:id/cancel` |
 | Journal | `GET /audit-logs` |
-| Marques / Entrepôts | `GET/POST/PUT/DELETE /brands` · `/warehouses` |
+| Marques / Entrepôts | `GET/POST/PUT/DELETE /brands` · `/warehouses` (PUT = édition entrepôt) |
+| Stock par entrepôt | **`GET /warehouses/stock`** (répartition produit × entrepôt) · **transfert = `POST /movements` type `transfer`** (corps `fromWarehouseId` + `warehouseId` destination ; refus si stock source insuffisant) |
 | Réglages | `GET /settings`, `PUT /settings`, **`GET /settings/public`** (sans auth : marque + pages À propos/Confidentialité pour le portail) |
 | Administration | **`POST /admin/reset-figures`** (Super Admin uniquement : remise à zéro des chiffres ; corps `{confirm:'REINITIALISER'}` revérifié serveur) |
 | Temps réel | `GET /events?token=JWT` (SSE) |
@@ -118,8 +120,9 @@ Système à **deux dimensions**, **configurable** depuis Configuration ERP et **
 `users`, `categories`, `brands`, `suppliers`, `clients`, `warehouses`, `products`,
 **`supplier_products`** (catalogue appro : `supplier_id` + `product_id` + `purchase_price` négocié + `supplier_ref`, unicité `(supplier_id, product_id)` — un produit peut avoir plusieurs fournisseurs),
 **`client_prices`** (tarifs de vente par client : `client_id` + `product_id` + `sale_price`, unicité `(client_id, product_id)` — prix de vente différent par client, appliqué en caisse),
+**`product_stock`** (**stock réel par entrepôt** : `product_id` + `warehouse_id` + `quantity`, unicité `(product_id, warehouse_id)` — `products.quantity` reste le TOTAL dénormalisé = somme des lignes ; tous les flux passent par `src/server/stock.ts`),
 `products` (+ **conditionnement gros** : `pack_size`, `pack_label`, `pack_purchase_price`, `pack_sale_price` — 1 carton = `pack_size` pièces ; le stock reste compté en pièces ; **`quantity`, `min_stock`, `max_stock` en `double precision`** → quantités décimales poids/volume),
-`stock_movements` (**`quantity` en `double precision`**), `inventory_audits`, `purchases` (+ `paid_amount`, `received_at`, **`expected_date`** = réception prévue ; items enrichis de `unit_label`/`pack_qty` pour l'affichage carton),
+`stock_movements` (**`quantity` en `double precision`**), `inventory_audits`, `purchases` (+ `paid_amount`, `received_at`, **`expected_date`** = réception prévue, **`warehouse_id`/`warehouse_name`** = entrepôt de destination à la réception ; items enrichis de `unit_label`/`pack_qty` pour l'affichage carton),
 `sales` (+ `paid_amount`, **`invoice_number`** unique, **`related_sale_id`** = facture d'origine d'un avoir, **`due_date`** = échéance de créance), `payments` (kind `sale`/`purchase`/**`credit_note`**), `expenses`, `deliveries`, `audit_logs`,
 `document_counters` (compteurs de séquences légales — clés `invoice` **et `credit_note`**),
 `settings` (+ `role_permissions`, `write_permissions`, `logo_initials`, **`invoice_prefix`**, **`credit_note_prefix`**, **`invoice_padding`**, **`about_text`**, **`privacy_text`** = pages éditables du portail).
@@ -138,7 +141,8 @@ et côté client :
 ### Front — `src/services/` (clients d'API, `fetch` + JWT)
 - `api.ts` — wrapper fetch, JWT stocké dans `localStorage` (clé `stockflow_token`)
 - `authService.ts` — register / login / me / logout
-- Services métier : `categoriesService`, `productsService`, `movementsService`, `partnersService` (clients+fournisseurs), `supplierProductsService` (catalogue appro), `salesService`, `auditsService`, `auditLogsService`, `catalogService` (marques+entrepôts), `settingsService`, `adminService` (remise à zéro des chiffres) (+ services achats/dépenses/livraisons/règlements/utilisateurs)
+- Services métier : `categoriesService`, `productsService`, `movementsService` (dont **transfert** = mouvement type `transfer`), `partnersService` (clients+fournisseurs), `supplierProductsService` (catalogue appro), `salesService`, `auditsService`, `auditLogsService`, `catalogService` (marques + entrepôts + **`listProductStock`/`updateWarehouse`**), `settingsService`, `adminService` (remise à zéro des chiffres) (+ services achats/dépenses/livraisons/règlements/utilisateurs)
+- Composants clés : `Warehouses.tsx` (**onglet Entrepôts & Localisations** : CRUD + répartition + transfert), `BarcodeScannerModal.tsx` (**scan caméra** via `BarcodeDetector`) ; la **Caisse POS** gère l'entrepôt actif + l'auto-ajout au scan douchette (Entrée + bip)
 - `permissions.ts` — **source de vérité RBAC** (partagée front + serveur)
 - `currency.ts` + `CurrencyContext.tsx` — devise base Ariary, affichage Ar ou € converti (`useMoney()`), taux + préférence en `localStorage`
 - `realtime.ts` — connexion **SSE** (`EventSource`) pour le temps réel
@@ -153,10 +157,11 @@ et côté client :
 - `auth-middleware.ts` — `signToken`, `verifyToken`, `requireAuth`, `requireRole`, `requireWrite(scope)` (lit la matrice de permissions en base)
 - `helpers.ts` — `generateId(prefix)`, `computeProductStatus()`, `writeAuditLog()` (publie aussi en SSE), `pickFields`/`pickProductFields` (anti-injection)
 - `events.ts` — bus SSE en mémoire (`publish`)
+- `stock.ts` — **point d'entrée UNIQUE du stock par entrepôt** : `adjustWarehouseStock`/`setWarehouseStock`/`getWarehouseStock`/`resolveWarehouseId` (met à jour la ligne `product_stock` ET recalcule `products.quantity` total + statut). Utilisé par vente, réception, mouvement/transfert, inventaire, création/édition produit.
 - `login-rate-limit.ts` — limiteur anti-force-brute du login (en mémoire, sans dépendance ; clé IP+e-mail)
 - `reset-figures.ts` — cœur de la remise à zéro des chiffres (transaction), partagé par la route admin
 - `routes/` : `auth`, `users`, `categories`, `products`, `movements`, `clients`, `suppliers`, `supplierProducts`, `clientPrices`, `sales`, `payments`, `purchases`, `expenses`, `deliveries`, `audits`, `auditLogs`, `brands`, `warehouses`, `settings`, `events`, `admin` (remise à zéro — Super Admin)
-- `ensure-schema.ts` — migrations idempotentes appliquées au **démarrage** du serveur (Render ne crée pas les tables ; port 5432 souvent bloqué en local) : crée `supplier_products`, `client_prices`, colonne `settings.brand_name`, **conversion des colonnes de quantité `integer` → `double precision`** (guardée : ne convertit que si encore en `integer`, pas de rewrite à chaque boot).
+- `ensure-schema.ts` — migrations idempotentes appliquées au **démarrage** du serveur (Render ne crée pas les tables ; port 5432 souvent bloqué en local) : crée `supplier_products`, `client_prices`, colonne `settings.brand_name`, **conversion des colonnes de quantité `integer` → `double precision`** (guardée : ne convertit que si encore en `integer`, pas de rewrite à chaque boot), **colonnes `purchases.warehouse_id`/`warehouse_name`**, **table `product_stock` + backfill du stock existant** dans l'entrepôt de chaque produit (crée « Entrepôt Central » si aucun ; ne remplit que les produits sans ligne → rejouable).
 - `reset-password.ts` — script de récupération de mot de passe (`npm run reset-password -- <email> <mdp>`), hors application (accès serveur requis).
 
 ### Base — `src/db/`
@@ -220,6 +225,9 @@ Alternative **hors ligne, multi-postes** au déploiement Render (données locale
 - [x] **Récupération de mot de passe (sans e-mail)** — reset par un Admin depuis l'onglet Utilisateurs (employés) + **commande de secours `npm run reset-password`** pour débloquer un Super Admin (documentée dans `GUIDE_RENDER.md`, plus exposée sur le portail) ; lien « Mot de passe oublié ? » explicatif sur le portail. (Pas d'infra e-mail : choix assumé pour le contexte.)
 - [x] **Anti-force-brute sur le login** — limiteur en mémoire (`src/server/login-rate-limit.ts`) : 5 échecs par (IP, e-mail) sur 15 min → blocage 15 min (HTTP 429 + `Retry-After`), reset au succès. `trust proxy` activé (IP réelle derrière Render).
 - [x] **Remise à zéro des chiffres** — conserve produits/clients/fournisseurs/tarifs, remet stock + soldes clients à 0 et purge les transactions ; atomique. **Deux voies** : bouton in-app « Zone de danger » de Configuration ERP (Super Admin, saisie `REINITIALISER`) via `POST /admin/reset-figures` (`src/server/reset-figures.ts` + `routes/admin.ts`) — **ne nécessite pas le Shell Render** (payant) ; ou CLI `npm run db:reset-figures -- --confirm` (`src/db/reset-figures.ts`) si accès serveur.
+- [x] **Stock réel par entrepôt + transfert A→B** — table `product_stock` (une ligne par couple produit × entrepôt ; `products.quantity` = total dénormalisé). **Onglet dédié « Entrepôts & Localisations »** : CRUD entrepôts (créer/éditer/supprimer/statut/capacité), répartition du stock par entrepôt, **transfert A→B** (sort de la source, entre en destination, total inchangé, refus si source insuffisante). Tous les flux (vente POS avec **entrepôt actif**, réception achat, ajustement, inventaire, avoir, création/édition produit) branchés sur le point d'entrée unique `src/server/stock.ts`. Migration + backfill idempotents au boot (`ensure-schema.ts`).
+- [x] **Scan de code-barres à la caisse** — **douchette USB** : code tapé + Entrée → ajout auto au panier (recherche par code-barres exact/SKU) + **bip + toast** de confirmation ; **caméra/webcam** : bouton « Scanner » → `BarcodeScannerModal` (API native `BarcodeDetector`, anti-doublon, repli si non supporté). Permission caméra autorisée dans le client bureau (`desktop/main.js`) — **reconstruire l'installeur** (`npm run dist`) pour l'activer dans le `.exe`.
+- [ ] Stock par entrepôt — extensions possibles : réception partielle par entrepôt, seuils mini par entrepôt, valorisation par entrepôt.
 - [x] **Quantités décimales (poids/volume)** — `products.quantity`/`min_stock`/`max_stock` + `stock_movements.quantity` en `double precision` ; retrait des `Math.floor` sur les quantités (POS + avoirs serveur) et `step="any"` sur les champs quantité (Caisse, Achats, Réappro, Calendrier, fiche article, avoirs). Migration auto au boot (`ensure-schema.ts`).
 - [ ] Sécurité prod restante : HTTPS (fourni par Render), changement mot de passe forcé au 1er login
 - [x] **Version bureau & fonctionnement hors ligne (réseau local)** — client **Electron** (`desktop/`) + **serveur local** (1 PC hôte : Postgres + Express) : plusieurs postes partagent les mêmes données **sans Internet** sur le réseau local. Installeur Windows (`npm run dist`) ou portable (`npm run dist:portable`). Guides `GUIDE_RESEAU_LOCAL.md` & `GUIDE_DEMARRAGE_MAGASIN.md`. *(Séparé de la version en ligne Render, sans synchro — choix assumé.)*
@@ -230,7 +238,7 @@ Alternative **hors ligne, multi-postes** au déploiement Render (données locale
 
 ## 11. Comptes & données de démo (`npm run db:seed`)
 
-3 catégories + 7 sous-catégories · 6 marques · 2 entrepôts · 3 fournisseurs · 4 clients ·
+3 catégories + 7 sous-catégories · 6 marques · **2 entrepôts (stock réparti par entrepôt via `product_stock`)** · 3 fournisseurs · 4 clients ·
 12 produits (dont 2 sous seuil pour le réappro) · 12 mouvements (dont 1 retour d'avoir) ·
 **11 ventes** (dont 2 à crédit → créances) + **1 avoir `AV-000001`** (retour sur `FAC-000008`) · 1 avance client · **4 livraisons** ·
 **3 achats** (statuts variés) · **4 dépenses** · initiales logo `SM`.

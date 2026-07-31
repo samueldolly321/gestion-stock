@@ -151,6 +151,21 @@ export const clientPrices = pgTable('client_prices', {
   uniqClientProduct: unique('uniq_client_product').on(t.clientId, t.productId),
 }));
 
+// 7d. Product ↔ Warehouse — stock réel par entrepôt.
+// Chaque ligne = quantité d'un produit dans UN entrepôt. `products.quantity` reste
+// le TOTAL (somme de toutes les lignes) — cache dénormalisé pour l'affichage/alertes.
+// Unicité (productId, warehouseId) : une seule ligne par couple.
+export const productStock = pgTable('product_stock', {
+  id: text('id').primaryKey(),
+  productId: text('product_id').notNull(),
+  warehouseId: text('warehouse_id').notNull(),
+  quantity: doublePrecision('quantity').default(0).notNull(), // double : quantités décimales (poids/volume)
+  createdAt,
+  updatedAt,
+}, (t) => ({
+  uniqProductWarehouse: unique('uniq_product_warehouse').on(t.productId, t.warehouseId),
+}));
+
 // 8. Stock Movements
 export const stockMovements = pgTable('stock_movements', {
   id: text('id').primaryKey(),
@@ -201,6 +216,8 @@ export const purchases = pgTable('purchases', {
   paidAmount: doublePrecision('paid_amount').default(0).notNull(),
   receivedAt: text('received_at'), // date de réception en stock (null = pas encore reçu)
   expectedDate: text('expected_date'), // date de réception prévue (pour le calendrier)
+  warehouseId: text('warehouse_id'), // entrepôt de destination à la réception
+  warehouseName: text('warehouse_name'),
   notes: text('notes'),
   createdBy: text('created_by').notNull(),
   createdAt,

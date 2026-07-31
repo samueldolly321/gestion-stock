@@ -16,6 +16,7 @@ export const ALL_TABS = [
   'calendar',
   'audits',
   'movements',
+  'warehouses',
   'accounting',
   'users',
   'settings',
@@ -35,6 +36,7 @@ export const TAB_LABELS: Record<string, string> = {
   calendar: 'Calendrier',
   audits: 'Audits & Ajustements',
   movements: 'Historique des Flux',
+  warehouses: 'Entrepôts & Localisations',
   accounting: 'Comptabilité',
   users: 'Utilisateurs',
   settings: 'Configuration ERP',
@@ -58,9 +60,9 @@ export const DEFAULT_ROLE_TABS: Record<string, string[]> = {
   Manager: ALL_TABS.filter((t) => t !== 'users'),
   Commercial: ['dashboard', 'products', 'pos', 'receivables', 'partners', 'sales', 'deliveries', 'calendar', 'movements'],
   Acheteur: ['products', 'calendar'],
-  Auditeur: ['dashboard', 'products', 'movements', 'audits'],
+  Auditeur: ['dashboard', 'products', 'movements', 'warehouses', 'audits'],
   Comptable: ['dashboard', 'products', 'pos', 'receivables', 'partners', 'purchases', 'sales', 'expenses', 'deliveries', 'calendar', 'movements', 'accounting', 'settings'],
-  Magasinier: ['dashboard', 'products', 'purchases', 'reorder', 'deliveries', 'calendar', 'movements', 'audits'],
+  Magasinier: ['dashboard', 'products', 'purchases', 'reorder', 'deliveries', 'calendar', 'movements', 'warehouses', 'audits'],
 };
 
 // Note : 'users' (gestion des comptes) reste réservé à Super Admin / Admin.

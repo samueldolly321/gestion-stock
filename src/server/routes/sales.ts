@@ -4,6 +4,7 @@ import { db } from '../../db/index.ts';
 import { sales, products, clients, stockMovements, payments } from '../../db/schema.ts';
 import { requireAuth, requireRole, requireAnyTab, type AuthedRequest } from '../auth-middleware.ts';
 import { generateId, computeProductStatus, writeAuditLog, nextDocNumber } from '../helpers.ts';
+import { adjustWarehouseStock, resolveWarehouseId } from '../stock.ts';
 
 export const salesRouter = Router();
 
@@ -119,14 +120,13 @@ salesRouter.post('/', requireAuth, requireRole(...CASHIER_ROLES), async (req: Au
         })
         .returning();
 
-      // 2. Mouvement de sortie + déduction de stock pour chaque article
+      // 2. Mouvement de sortie + déduction de stock (par entrepôt) pour chaque article.
+      //    L'entrepôt vendeur est l'entrepôt actif de la caisse (b.warehouseId), avec repli.
       for (const item of normalizedItems) {
         const [product] = await tx.select().from(products).where(eq(products.id, item.productId)).limit(1);
         if (!product) continue; // article introuvable : on ignore
-
-        let newQty = product.quantity - (Number(item.quantity) || 0);
-        if (newQty < 0) newQty = 0;
-        const status = computeProductStatus(newQty, product.minStock, product.expirationDate);
+        const qty = Number(item.quantity) || 0;
+        const whId = await resolveWarehouseId(tx, b.warehouseId, product.id);
 
         await tx.insert(stockMovements).values({
           id: generateId('MVT'),
@@ -134,19 +134,24 @@ salesRouter.post('/', requireAuth, requireRole(...CASHIER_ROLES), async (req: Au
           productId: product.id,
           productName: product.name,
           sku: product.sku,
-          warehouseId: product.locationId ?? null,
-          quantity: Number(item.quantity) || 0,
+          warehouseId: whId,
+          quantity: qty,
           reason: `Vente POS Réf: ${saleId}`,
           performedBy: req.user?.name ?? 'POS',
           referenceId: saleId,
           costPrice: product.purchasePrice,
-          costTotal: product.purchasePrice * (Number(item.quantity) || 0),
+          costTotal: product.purchasePrice * qty,
         });
 
-        await tx
-          .update(products)
-          .set({ quantity: newQty, status, updatedAt: new Date().toISOString() })
-          .where(eq(products.id, product.id));
+        if (whId) {
+          await adjustWarehouseStock(tx, product.id, whId, -qty);
+        } else {
+          // Aucun entrepôt (cas dégénéré) : repli sur le total global.
+          const newQty = Math.max(0, product.quantity - qty);
+          await tx.update(products)
+            .set({ quantity: newQty, status: computeProductStatus(newQty, product.minStock, product.expirationDate), updatedAt: new Date().toISOString() })
+            .where(eq(products.id, product.id));
+        }
       }
 
       // 3. Créance : le reste dû augmente le solde (balance) du client.
@@ -354,21 +359,20 @@ salesRouter.post('/:id/credit-note', requireAuth, requireRole(...CASHIER_ROLES),
         warehouseName: invoice.warehouseName ?? null,
       }).returning();
 
-      // 2. Réintégration du stock (sauf marchandise détruite).
+      // 2. Réintégration du stock (sauf marchandise détruite) dans l'entrepôt de la facture.
       if (restock) {
         for (const it of creditItems) {
           const returnedQty = Math.abs(Number(it.quantity) || 0);
           const [product] = await tx.select().from(products).where(eq(products.id, it.productId)).limit(1);
           if (!product) continue;
-          const newQty = product.quantity + returnedQty;
-          const status = computeProductStatus(newQty, product.minStock, product.expirationDate);
+          const whId = await resolveWarehouseId(tx, invoice.warehouseId, product.id);
           await tx.insert(stockMovements).values({
             id: generateId('MVT'),
             type: 'entry_return',
             productId: product.id,
             productName: product.name,
             sku: product.sku,
-            warehouseId: product.locationId ?? null,
+            warehouseId: whId,
             quantity: returnedQty,
             reason: `Avoir ${creditNumber} (facture ${invoice.invoiceNumber || invoice.id})`,
             performedBy: req.user?.name ?? 'Avoir',
@@ -376,9 +380,14 @@ salesRouter.post('/:id/credit-note', requireAuth, requireRole(...CASHIER_ROLES),
             costPrice: product.purchasePrice,
             costTotal: product.purchasePrice * returnedQty,
           });
-          await tx.update(products)
-            .set({ quantity: newQty, status, updatedAt: new Date().toISOString() })
-            .where(eq(products.id, product.id));
+          if (whId) {
+            await adjustWarehouseStock(tx, product.id, whId, returnedQty);
+          } else {
+            const newQty = product.quantity + returnedQty;
+            await tx.update(products)
+              .set({ quantity: newQty, status: computeProductStatus(newQty, product.minStock, product.expirationDate), updatedAt: new Date().toISOString() })
+              .where(eq(products.id, product.id));
+          }
         }
       }
 

@@ -115,6 +115,17 @@ export interface Warehouse {
   createdAt: string;
 }
 
+// Stock réel d'un produit dans un entrepôt donné (la somme sur tous les
+// entrepôts = Product.quantity, conservé comme total dénormalisé).
+export interface ProductStock {
+  id: string;
+  productId: string;
+  warehouseId: string;
+  quantity: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export type MovementType =
   | 'entry_reception'
   | 'entry_return'
