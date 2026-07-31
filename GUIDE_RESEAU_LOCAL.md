@@ -128,7 +128,7 @@ npm run dist:portable
 npm install
 npm run dist
 ```
-→ produit `Vokatra-ko Setup 1.0.0.exe`.
+→ produit `Vokatra-ko Setup 1.1.0.exe` (cette version autorise la **caméra** pour le scan de code-barres).
 ⚠️ Nécessite d'activer le **Mode développeur** de Windows (*Paramètres → Confidentialité
 et sécurité → Pour les développeurs*) **ou** un terminal **administrateur** — sinon la
 génération échoue (erreur de « lien symbolique »). La version portable (A) évite ça.

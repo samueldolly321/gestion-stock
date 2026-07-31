@@ -117,15 +117,21 @@ Ouvrir `http://localhost:3001` sur le PC serveur.
       Le tout 1er compte devient automatiquement **Super Admin** (accès total).
 
 ### 4.2 Les comptes caissiers
-Dans l'onglet **Utilisateurs** → **Nouvel utilisateur**, créer un compte par caissier :
-- [ ] Caissier 1 — rôle **Commercial**
-- [ ] Caissier 2 — rôle **Commercial**
-- [ ] Caissier 3 — rôle **Commercial**
-- [ ] Caissier 4 — rôle **Commercial**
+Dans l'onglet **Utilisateurs** → **Nouvel utilisateur**, créer un compte par caissier
+avec le rôle **Caissier** :
+- [ ] Caissier 1 — rôle **Caissier** — *lieu de travail* : son entrepôt/dépôt
+- [ ] Caissier 2 — rôle **Caissier** — *lieu de travail* : son entrepôt/dépôt
+- [ ] Caissier 3 — rôle **Caissier** — *lieu de travail* : son entrepôt/dépôt
+- [ ] Caissier 4 — rôle **Caissier** — *lieu de travail* : son entrepôt/dépôt
 
-> Le rôle **Commercial** donne accès à la **Caisse** et aux ventes, sans exposer
-> les achats, les marges ni la configuration. Chaque vente est enregistrée au nom
-> du caissier connecté.
+> Le rôle **Caissier** donne accès à la **Caisse**, aux **ventes**, aux **clients** et
+> aux **créances**, sans exposer les achats, les marges ni la configuration. Chaque
+> vente est enregistrée au nom du caissier connecté.
+>
+> 🏬 **Lieu de travail** : à la création (ou plus tard, en cliquant sur la colonne
+> « Lieu de travail »), affectez chaque caissier à **son entrepôt**. En caisse,
+> l'**entrepôt actif** se cale alors automatiquement dessus (le caissier vend le
+> stock de son dépôt). Laisser « **Entrepôt général** » si vous n'avez qu'un lieu.
 
 ### 4.3 Régler les accès (facultatif, si besoin d'ajuster)
 - [ ] **Configuration ERP → Matrice de permissions** : cocher/décocher les onglets
@@ -137,7 +143,10 @@ Dans l'onglet **Utilisateurs** → **Nouvel utilisateur**, créer un compte par 
 
 Dans l'ordre conseillé :
 - [ ] **Configuration ERP** : raison sociale, logo (initiales), devise (Ariary), TVA.
-- [ ] **Entrepôt(s)** et **catégories** de produits.
+- [ ] **Entrepôts** (onglet **Entrepôts & Localisations**) : créez vos dépôts/magasins.
+      Vous y voyez aussi la **répartition du stock par entrepôt** et pouvez **transférer**
+      des produits d'un dépôt à un autre (A→B).
+- [ ] **Catégories** de produits.
 - [ ] **Fournisseurs** (nom + téléphone).
 - [ ] **Articles** : produits avec prix d'achat/vente, unité (pièce, **kg**, **carton**…),
       stock de départ. *(Le code-barres EAN-13 peut être généré par l'app.)*
@@ -151,7 +160,7 @@ Dans l'ordre conseillé :
 ## 6. Installer les postes CAISSIERS
 
 ### 6.1 Récupérer l'application
-- [ ] Sur une clé USB, copier l'installeur **`Vokatra-ko Setup 1.0.0.exe`**
+- [ ] Sur une clé USB, copier l'installeur **`Vokatra-ko Setup 1.1.0.exe`**
       (dossier `desktop\dist-installer\`).
       *(ou la version portable `win-unpacked\` à copier telle quelle.)*
 
@@ -164,6 +173,14 @@ Dans l'ordre conseillé :
 
 ✅ Le caissier voit la **Caisse** et peut encaisser. Ses ventes mettent à jour le
 stock **en temps réel** sur tous les postes.
+
+### 6.3 Scanner les code-barres (facultatif)
+- **Douchette USB** (recommandé) : branchez-la sur le PC caissier — elle fonctionne
+  comme un clavier, **aucune installation**. En Caisse, le curseur est déjà dans la
+  barre de recherche : scannez un article → il **s'ajoute au panier** (bip + message).
+- **Caméra / webcam** : bouton **« Scanner »** à côté de la recherche → autorisez la
+  caméra une fois → visez le code-barres. *(Nécessite la version `.exe` 1.1.0.)*
+- Les étiquettes code-barres s'impriment depuis **Articles & Stocks** (fiche article).
 
 ---
 
@@ -209,7 +226,7 @@ pg_dump -U user -d stock -f sauvegarde_vokatra_%DATE%.sql
 
 - [ ] PC serveur : logiciels installés, base créée, `.env` configuré.
 - [ ] `serveur-local.cmd` démarre le serveur, IP notée, pare-feu ouvert, démarrage auto.
-- [ ] Compte chef (Super Admin) + comptes caissiers (Commercial) créés.
+- [ ] Compte chef (Super Admin) + comptes caissiers (rôle **Caissier**, lieu de travail affecté) créés.
 - [ ] Données de base saisies (articles, clients, fournisseurs).
 - [ ] Application installée sur chaque poste caissier et connectée au serveur.
 - [ ] Sauvegarde testée + onduleur en place.
@@ -221,7 +238,7 @@ pg_dump -U user -d stock -f sauvegarde_vokatra_%DATE%.sql
 | | PC serveur | Poste chef | Postes caissiers |
 |---|---|---|---|
 | **Rôle** | héberge tout | supervise | encaissent |
-| **Compte** | — | Super Admin / Admin | Commercial |
+| **Compte** | — | Super Admin / Admin | Caissier |
 | **Lance** | `serveur-local.cmd` | `Vokatra-ko` (.exe) | `Vokatra-ko` (.exe) |
 | **Accès** | (moteur) | tout | Caisse & ventes |
 
