@@ -1,6 +1,6 @@
 {
   "name": "vokatra-ko-desktop",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Client bureau (Electron) de Vokatra-ko — se connecte au serveur local du réseau.",
   "author": "Vokatra-ko",
   "private": true,
