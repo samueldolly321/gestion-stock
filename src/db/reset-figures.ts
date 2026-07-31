@@ -76,8 +76,9 @@ async function main() {
     await pool.query('BEGIN');
     // 1) Purge des transactions & historique.
     await pool.query(`TRUNCATE ${TABLES_TO_CLEAR.join(', ')} RESTART IDENTITY`);
-    // 2) Stock produits à 0 + statut rupture.
+    // 2) Stock produits à 0 (total + par entrepôt) + statut rupture.
     await pool.query(`UPDATE products SET quantity = 0, status = 'out_of_stock', updated_at = now()`);
+    await pool.query(`UPDATE product_stock SET quantity = 0, updated_at = now()`);
     // 3) Soldes & fidélité clients à 0.
     await pool.query(`UPDATE clients SET balance = 0, loyalty_points = 0`);
     await pool.query('COMMIT');

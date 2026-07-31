@@ -64,6 +64,11 @@ function createWindow() {
     },
   });
 
+  // Autorise l'accès à la caméra (scan de code-barres à la caisse) et au micro.
+  win.webContents.session.setPermissionRequestHandler((_wc, permission, callback) => {
+    callback(permission === 'media');
+  });
+
   buildMenu();
   loadServerOrConfig();
 

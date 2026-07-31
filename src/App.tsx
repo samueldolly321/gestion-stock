@@ -14,7 +14,7 @@ import { listPurchases } from './services/purchasesService';
 import { listExpenses } from './services/expensesService';
 import { listAudits } from './services/auditsService';
 import { listAuditLogs } from './services/auditLogsService';
-import { listBrands, listWarehouses } from './services/catalogService';
+import { listBrands, listWarehouses, listProductStock } from './services/catalogService';
 import { getSettings } from './services/settingsService';
 import { connectRealtime } from './services/realtime';
 import {
@@ -40,6 +40,7 @@ import {
   Shield,
   Loader2,
   Menu,
+  Warehouse as WarehouseIcon,
   X
 } from 'lucide-react';
 import {
@@ -59,7 +60,8 @@ import {
   Purchase,
   Expense,
   SupplierProduct,
-  ClientPrice
+  ClientPrice,
+  ProductStock
 } from './types';
 import AuthPage from './components/AuthPage';
 import Dashboard from './components/Dashboard';
@@ -75,6 +77,7 @@ import Deliveries from './components/Deliveries';
 import UsersAdmin from './components/Users';
 import Audits from './components/Audits';
 import Movements from './components/Movements';
+import Warehouses from './components/Warehouses';
 import Calendar from './components/Calendar';
 import Accounting from './components/Accounting';
 import Settings from './components/Settings';
@@ -97,6 +100,7 @@ export default function App() {
   // Données chargées depuis l'API PostgreSQL
   const [products, setProducts] = useState<Product[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+  const [productStock, setProductStock] = useState<ProductStock[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [supplierProducts, setSupplierProducts] = useState<SupplierProduct[]>([]);
   const [clientPrices, setClientPrices] = useState<ClientPrice[]>([]);
@@ -209,11 +213,18 @@ export default function App() {
   }, []);
 
   // Après une réception d'achat : stock, mouvements et achats changent.
+  const reloadProductStock = React.useCallback(() => {
+    listProductStock()
+      .then(setProductStock)
+      .catch((err) => console.error('Chargement du stock par entrepôt échoué :', err));
+  }, []);
+
   const reloadAfterPurchase = React.useCallback(() => {
     reloadProducts();
     reloadMovements();
     reloadPurchases();
-  }, [reloadProducts, reloadMovements, reloadPurchases]);
+    reloadProductStock();
+  }, [reloadProducts, reloadMovements, reloadPurchases, reloadProductStock]);
 
   // Réservé aux gestionnaires de comptes (évite un 403 pour les autres rôles).
   const reloadUsers = React.useCallback(() => {
@@ -236,7 +247,8 @@ export default function App() {
     listWarehouses()
       .then(setWarehouses)
       .catch((err) => console.error('Chargement des entrepôts échoué :', err));
-  }, []);
+    reloadProductStock();
+  }, [reloadProductStock]);
 
   const reloadSettings = React.useCallback(() => {
     getSettings()
@@ -266,7 +278,8 @@ export default function App() {
     reloadPartners();
     reloadDeliveries();
     reloadAuditLogs();
-  }, [reloadProducts, reloadMovements, reloadSales, reloadPartners, reloadDeliveries, reloadAuditLogs]);
+    reloadProductStock();
+  }, [reloadProducts, reloadMovements, reloadSales, reloadPartners, reloadDeliveries, reloadAuditLogs, reloadProductStock]);
 
   // Après un inventaire : stock, mouvements, inventaires et journal changent.
   const reloadAfterAudit = React.useCallback(() => {
@@ -274,7 +287,8 @@ export default function App() {
     reloadProducts();
     reloadMovements();
     reloadAuditLogs();
-  }, [reloadAudits, reloadProducts, reloadMovements, reloadAuditLogs]);
+    reloadProductStock();
+  }, [reloadAudits, reloadProducts, reloadMovements, reloadAuditLogs, reloadProductStock]);
 
   useEffect(() => {
     if (!currentUser) return;
@@ -419,6 +433,7 @@ export default function App() {
     { id: 'deliveries', label: 'Livraisons', icon: Truck },
     { id: 'audits', label: 'Audits & Ajustements', icon: ClipboardList },
     { id: 'movements', label: 'Historique des Flux', icon: History },
+    { id: 'warehouses', label: 'Entrepôts', icon: WarehouseIcon },
     { id: 'calendar', label: 'Calendrier', icon: CalendarDays },
     { id: 'accounting', label: 'Comptabilité', icon: Landmark },
     { id: 'users', label: 'Utilisateurs', icon: UserCog },
@@ -453,6 +468,7 @@ export default function App() {
               <option value="Admin">🛠️ Admin</option>
               <option value="Manager">💼 Gérant / Manager</option>
               <option value="Commercial">📈 Commercial</option>
+              <option value="Caissier">💵 Caissier</option>
               <option value="Acheteur">📦 Acheteur</option>
               <option value="Comptable">🧮 Comptable</option>
               <option value="Auditeur">🔍 Auditeur</option>
@@ -596,6 +612,8 @@ export default function App() {
               products={products}
               clients={clients}
               clientPrices={clientPrices}
+              warehouses={warehouses}
+              productStock={productStock}
               user={currentUser}
               onRefresh={reloadAfterSale}
               currencySymbol={currencySymbol}
@@ -712,6 +730,17 @@ export default function App() {
               warehouses={warehouses}
               onRefresh={() => {}}
               currencySymbol={currencySymbol}
+            />
+          )}
+
+          {activeTab === 'warehouses' && (
+            <Warehouses
+              warehouses={warehouses}
+              products={products}
+              productStock={productStock}
+              user={currentUser}
+              onRefresh={reloadCatalog}
+              writePerms={settings?.writePermissions}
             />
           )}
 

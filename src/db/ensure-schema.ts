@@ -95,4 +95,73 @@ export async function ensureSchema(): Promise<void> {
       END LOOP;
     END $$;
   `);
+
+  // Entrepôt de destination sur les commandes d'achat (réception ciblée).
+  await db.execute(sql`ALTER TABLE purchases ADD COLUMN IF NOT EXISTS warehouse_id text;`);
+  await db.execute(sql`ALTER TABLE purchases ADD COLUMN IF NOT EXISTS warehouse_name text;`);
+
+  // Stock réel par entrepôt : table product_stock (une ligne par couple produit×entrepôt).
+  // products.quantity reste le TOTAL (somme des lignes). Migration additive et réversible.
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS product_stock (
+      id text PRIMARY KEY NOT NULL,
+      product_id text NOT NULL,
+      warehouse_id text NOT NULL,
+      quantity double precision DEFAULT 0 NOT NULL,
+      created_at timestamp DEFAULT now() NOT NULL,
+      updated_at timestamp DEFAULT now() NOT NULL
+    );
+  `);
+  await db.execute(sql`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'uniq_product_warehouse') THEN
+        ALTER TABLE product_stock
+          ADD CONSTRAINT uniq_product_warehouse UNIQUE (product_id, warehouse_id);
+      END IF;
+    END $$;
+  `);
+
+  // Backfill : répartit le stock existant de chaque produit dans SON entrepôt
+  // (location_id s'il pointe vers un entrepôt valide, sinon un entrepôt par défaut).
+  // Ne touche QUE les produits n'ayant encore aucune ligne de stock → rejouable.
+  await db.execute(sql`
+    DO $$
+    DECLARE
+      default_wh text;
+    BEGIN
+      -- Rien à faire s'il n'existe aucun produit à répartir.
+      IF NOT EXISTS (
+        SELECT 1 FROM products p
+        WHERE NOT EXISTS (SELECT 1 FROM product_stock ps WHERE ps.product_id = p.id)
+      ) THEN
+        RETURN;
+      END IF;
+
+      -- Entrepôt par défaut : le plus ancien existant, sinon on crée « Entrepôt Central ».
+      SELECT id INTO default_wh FROM warehouses ORDER BY created_at ASC LIMIT 1;
+      IF default_wh IS NULL THEN
+        default_wh := 'WH-CENTRAL';
+        INSERT INTO warehouses (id, name, location, code, status, capacity)
+        VALUES (default_wh, 'Entrepôt Central', NULL, 'CENTRAL', 'active', 0)
+        ON CONFLICT (id) DO NOTHING;
+      END IF;
+
+      INSERT INTO product_stock (id, product_id, warehouse_id, quantity, created_at, updated_at)
+      SELECT
+        'PS-' || p.id,
+        p.id,
+        CASE
+          WHEN p.location_id IS NOT NULL AND p.location_id <> ''
+               AND EXISTS (SELECT 1 FROM warehouses w WHERE w.id = p.location_id)
+          THEN p.location_id
+          ELSE default_wh
+        END,
+        COALESCE(p.quantity, 0),
+        now(), now()
+      FROM products p
+      WHERE NOT EXISTS (SELECT 1 FROM product_stock ps WHERE ps.product_id = p.id)
+      ON CONFLICT (product_id, warehouse_id) DO NOTHING;
+    END $$;
+  `);
 }

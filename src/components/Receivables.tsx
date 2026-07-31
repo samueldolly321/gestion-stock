@@ -26,8 +26,8 @@ const PAY_META: Record<string, { label: string; cls: string }> = {
 
 export default function Receivables({ sales, clients, user, onRefresh }: ReceivablesProps) {
   const { format } = useMoney();
-  const canPay = ['Super Admin', 'Admin', 'Manager', 'Commercial', 'Comptable'].includes(user.role);
-  const canCreditNote = ['Super Admin', 'Admin', 'Manager', 'Commercial', 'Magasinier'].includes(user.role);
+  const canPay = ['Super Admin', 'Admin', 'Manager', 'Commercial', 'Caissier', 'Comptable'].includes(user.role);
+  const canCreditNote = ['Super Admin', 'Admin', 'Manager', 'Commercial', 'Caissier', 'Magasinier'].includes(user.role);
 
   const [search, setSearch] = useState('');
   const [onlyDue, setOnlyDue] = useState(true);

@@ -38,6 +38,8 @@ export async function resetFigures(): Promise<Record<string, number>> {
     }
     await tx.execute(sql.raw(`TRUNCATE ${TABLES_TO_CLEAR.join(', ')} RESTART IDENTITY`));
     await tx.execute(sql`UPDATE products SET quantity = 0, status = 'out_of_stock', updated_at = now()`);
+    // Stock par entrepôt remis à zéro (couples produit×entrepôt conservés, quantités = 0).
+    await tx.execute(sql`UPDATE product_stock SET quantity = 0, updated_at = now()`);
     await tx.execute(sql`UPDATE clients SET balance = 0, loyalty_points = 0`);
   });
   return cleared;

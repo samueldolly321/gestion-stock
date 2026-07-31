@@ -25,7 +25,7 @@ async function main() {
   console.log('→ Nettoyage des données métier (comptes conservés)...');
   await pool.query(
     `TRUNCATE stock_movements, sales, payments, deliveries, purchases, expenses, inventory_audits, audit_logs,
-              products, supplier_products, categories, brands, warehouses, suppliers, clients, settings, document_counters
+              product_stock, products, supplier_products, categories, brands, warehouses, suppliers, clients, settings, document_counters
      RESTART IDENTITY CASCADE`,
   );
 
@@ -122,6 +122,16 @@ async function main() {
     }
   });
   await db.insert(schema.products).values(products);
+
+  // --- Stock par entrepôt : une ligne par produit dans sa localisation (= son stock total) ---
+  await db.insert(schema.productStock).values(
+    products.map((p: any) => ({
+      id: `PS-${p.id}`,
+      productId: p.id,
+      warehouseId: p.locationId,
+      quantity: p.quantity,
+    })),
+  );
 
   // --- Catalogue d'approvisionnement (fournisseur ↔ produit, prix négocié) ---
   // Chaque produit est fourni par son fournisseur principal (prix = prix d'achat de la fiche).

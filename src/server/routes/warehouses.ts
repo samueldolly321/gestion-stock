@@ -1,13 +1,23 @@
 import { Router } from 'express';
 import { desc, eq } from 'drizzle-orm';
 import { db } from '../../db/index.ts';
-import { warehouses } from '../../db/schema.ts';
+import { warehouses, productStock } from '../../db/schema.ts';
 import { requireAuth, requireWrite, type AuthedRequest } from '../auth-middleware.ts';
 import { generateId, writeAuditLog } from '../helpers.ts';
 
 export const warehousesRouter = Router();
 
 const MANAGE_ROLES = ['Super Admin', 'Admin', 'Manager'];
+
+/** GET /api/warehouses/stock — répartition du stock par entrepôt (toutes les lignes). */
+warehousesRouter.get('/stock', requireAuth, async (_req, res) => {
+  try {
+    res.json(await db.select().from(productStock));
+  } catch (err) {
+    console.error('list product-stock error:', err);
+    res.status(500).json({ error: 'Erreur lors du chargement du stock par entrepôt.' });
+  }
+});
 
 function pickFields(b: any) {
   return {

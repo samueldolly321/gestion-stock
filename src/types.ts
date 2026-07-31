@@ -4,6 +4,7 @@ export type UserRole =
   | 'Manager'
   | 'Magasinier'
   | 'Commercial'
+  | 'Caissier'
   | 'Acheteur'
   | 'Comptable'
   | 'Auditeur';
@@ -113,6 +114,17 @@ export interface Warehouse {
   capacity: number;
   managerId?: string;
   createdAt: string;
+}
+
+// Stock réel d'un produit dans un entrepôt donné (la somme sur tous les
+// entrepôts = Product.quantity, conservé comme total dénormalisé).
+export interface ProductStock {
+  id: string;
+  productId: string;
+  warehouseId: string;
+  quantity: number;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export type MovementType =

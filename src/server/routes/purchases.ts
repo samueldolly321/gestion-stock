@@ -3,7 +3,8 @@ import { desc, eq } from 'drizzle-orm';
 import { db } from '../../db/index.ts';
 import { purchases, products, stockMovements, payments } from '../../db/schema.ts';
 import { requireAuth, requireWrite, requireAnyTab, type AuthedRequest } from '../auth-middleware.ts';
-import { generateId, computeProductStatus, writeAuditLog } from '../helpers.ts';
+import { generateId, writeAuditLog } from '../helpers.ts';
+import { adjustWarehouseStock, resolveWarehouseId } from '../stock.ts';
 
 export const purchasesRouter = Router();
 
@@ -68,6 +69,8 @@ purchasesRouter.post('/', requireAuth, requireWrite('purchases'), async (req: Au
         paymentStatus: 'unpaid',
         paidAmount: 0,
         expectedDate: b.expectedDate || null,
+        warehouseId: b.warehouseId ?? null,
+        warehouseName: b.warehouseName ?? null,
         notes: b.notes ?? null,
         createdBy: req.user?.name ?? 'Système',
       })
@@ -108,13 +111,13 @@ purchasesRouter.post('/:id/receive', requireAuth, requireWrite('purchases'), asy
 
         const qty = Number(item.quantity) || 0;
         const unitCost = Number(item.unitCost) || 0;
-        const newQty = product.quantity + qty;
-        const status = computeProductStatus(newQty, product.minStock, product.expirationDate);
+        const whId = await resolveWarehouseId(tx, purchase.warehouseId, product.id);
 
-        // Coût moyen pondéré (PMP/CUMP) : le prix d'achat de la fiche est réactualisé au
-        // coût réel réceptionné → fiabilise le COGS et le garde-fou vente à perte.
-        const newPurchasePrice = newQty > 0
-          ? (product.quantity * product.purchasePrice + qty * unitCost) / newQty
+        // Coût moyen pondéré (PMP/CUMP) sur le stock TOTAL : le prix d'achat de la fiche est
+        // réactualisé au coût réel réceptionné → fiabilise le COGS et le garde-fou vente à perte.
+        const newTotal = product.quantity + qty;
+        const newPurchasePrice = newTotal > 0
+          ? (product.quantity * product.purchasePrice + qty * unitCost) / newTotal
           : (unitCost || product.purchasePrice);
 
         await tx.insert(stockMovements).values({
@@ -123,7 +126,7 @@ purchasesRouter.post('/:id/receive', requireAuth, requireWrite('purchases'), asy
           productId: product.id,
           productName: product.name,
           sku: product.sku,
-          warehouseId: product.locationId ?? null,
+          warehouseId: whId,
           quantity: qty,
           reason: `Réception achat Réf: ${purchase.id}`,
           performedBy: req.user?.name ?? 'Achats',
@@ -132,10 +135,18 @@ purchasesRouter.post('/:id/receive', requireAuth, requireWrite('purchases'), asy
           costTotal: unitCost * qty,
         });
 
-        await tx
-          .update(products)
-          .set({ quantity: newQty, purchasePrice: newPurchasePrice, status, updatedAt: new Date().toISOString() })
-          .where(eq(products.id, product.id));
+        // Entre en stock dans l'entrepôt de destination (recalcule total + statut),
+        // puis met à jour le PMP séparément (adjustWarehouseStock ne touche pas au prix).
+        if (whId) {
+          await adjustWarehouseStock(tx, product.id, whId, qty);
+          await tx.update(products)
+            .set({ purchasePrice: newPurchasePrice, updatedAt: new Date().toISOString() })
+            .where(eq(products.id, product.id));
+        } else {
+          await tx.update(products)
+            .set({ quantity: newTotal, purchasePrice: newPurchasePrice, updatedAt: new Date().toISOString() })
+            .where(eq(products.id, product.id));
+        }
       }
 
       const [row] = await tx

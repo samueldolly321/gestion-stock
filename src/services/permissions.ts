@@ -16,6 +16,7 @@ export const ALL_TABS = [
   'calendar',
   'audits',
   'movements',
+  'warehouses',
   'accounting',
   'users',
   'settings',
@@ -35,6 +36,7 @@ export const TAB_LABELS: Record<string, string> = {
   calendar: 'Calendrier',
   audits: 'Audits & Ajustements',
   movements: 'Historique des Flux',
+  warehouses: 'Entrepôts & Localisations',
   accounting: 'Comptabilité',
   users: 'Utilisateurs',
   settings: 'Configuration ERP',
@@ -45,6 +47,7 @@ export const ROLES = [
   'Admin',
   'Manager',
   'Commercial',
+  'Caissier',
   'Acheteur',
   'Auditeur',
   'Comptable',
@@ -57,10 +60,13 @@ export const DEFAULT_ROLE_TABS: Record<string, string[]> = {
   // Le Manager gère tout sauf les comptes utilisateurs.
   Manager: ALL_TABS.filter((t) => t !== 'users'),
   Commercial: ['dashboard', 'products', 'pos', 'receivables', 'partners', 'sales', 'deliveries', 'calendar', 'movements'],
+  // Caissier : centré sur la caisse (arrive sur POS). Pas de dashboard/compta par défaut
+  // (ajustable via la matrice de Configuration ERP).
+  Caissier: ['pos', 'products', 'partners', 'receivables', 'sales'],
   Acheteur: ['products', 'calendar'],
-  Auditeur: ['dashboard', 'products', 'movements', 'audits'],
+  Auditeur: ['dashboard', 'products', 'movements', 'warehouses', 'audits'],
   Comptable: ['dashboard', 'products', 'pos', 'receivables', 'partners', 'purchases', 'sales', 'expenses', 'deliveries', 'calendar', 'movements', 'accounting', 'settings'],
-  Magasinier: ['dashboard', 'products', 'purchases', 'reorder', 'deliveries', 'calendar', 'movements', 'audits'],
+  Magasinier: ['dashboard', 'products', 'purchases', 'reorder', 'deliveries', 'calendar', 'movements', 'warehouses', 'audits'],
 };
 
 // Note : 'users' (gestion des comptes) reste réservé à Super Admin / Admin.
@@ -95,6 +101,7 @@ export const DEFAULT_WRITE_PERMS: Record<string, string[]> = {
   Admin: [...WRITE_SCOPES],
   Manager: [...WRITE_SCOPES],
   Commercial: ['partners', 'deliveries'],
+  Caissier: ['partners'], // peut enregistrer un client au comptoir (la vente passe par requireRole)
   Acheteur: [], // lecture seule par défaut (droits Achats/Fournisseurs à accorder via la matrice)
   Auditeur: ['audits'],
   Comptable: ['purchases', 'expenses'], // règlements fournisseurs + dépenses

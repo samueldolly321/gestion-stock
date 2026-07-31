@@ -4,6 +4,7 @@ import { db } from '../../db/index.ts';
 import { inventoryAudits, products, stockMovements } from '../../db/schema.ts';
 import { requireAuth, requireWrite, type AuthedRequest } from '../auth-middleware.ts';
 import { generateId, computeProductStatus, writeAuditLog } from '../helpers.ts';
+import { setWarehouseStock, resolveWarehouseId } from '../stock.ts';
 
 export const auditsRouter = Router();
 
@@ -66,7 +67,7 @@ auditsRouter.post('/:id/validate', requireAuth, requireWrite('audits'), async (r
         if (!product) continue;
 
         const counted = Number(item.actualQuantity) || 0;
-        const status = computeProductStatus(counted, product.minStock, product.expirationDate);
+        const whId = await resolveWarehouseId(tx, current.warehouseId, product.id);
 
         await tx.insert(stockMovements).values({
           id: generateId('MVT'),
@@ -74,7 +75,7 @@ auditsRouter.post('/:id/validate', requireAuth, requireWrite('audits'), async (r
           productId: product.id,
           productName: product.name,
           sku: product.sku,
-          warehouseId: current.warehouseId ?? product.locationId ?? null,
+          warehouseId: whId ?? product.locationId ?? null,
           quantity: diff, // signé : positif = surplus, négatif = manquant
           reason: `Ajustement inventaire réf: ${current.id}. ${item.notes ? 'Notes: ' + item.notes : ''}`.trim(),
           performedBy: req.user?.name ?? 'Auditeur',
@@ -83,10 +84,14 @@ auditsRouter.post('/:id/validate', requireAuth, requireWrite('audits'), async (r
           costTotal: 0,
         });
 
-        await tx
-          .update(products)
-          .set({ quantity: counted, status, updatedAt: new Date().toISOString() })
-          .where(eq(products.id, product.id));
+        // Fixe la quantité comptée DANS l'entrepôt inventorié (recalcule total + statut).
+        if (whId) {
+          await setWarehouseStock(tx, product.id, whId, counted);
+        } else {
+          await tx.update(products)
+            .set({ quantity: counted, status: computeProductStatus(counted, product.minStock, product.expirationDate), updatedAt: new Date().toISOString() })
+            .where(eq(products.id, product.id));
+        }
       }
 
       const [updated] = await tx

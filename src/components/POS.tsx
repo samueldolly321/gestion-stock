@@ -14,21 +14,47 @@ import {
   CheckCircle,
   TrendingUp,
   Coins,
-  Truck
+  Truck,
+  ScanLine
 } from 'lucide-react';
-import { Product, Client, ClientPrice, Sale, User, TransactionItem, DeliveryType } from '../types';
+import { Product, Client, ClientPrice, Sale, User, TransactionItem, DeliveryType, Warehouse, ProductStock } from '../types';
 import { packSizeOf, hasPack } from '../services/pack';
 import { createSale } from '../services/salesService';
 import { createDelivery, DELIVERY_TYPES, defaultFeeFor, deliveryTypeLabel } from '../services/deliveriesService';
 import ReceiptModal from './ReceiptModal';
+import BarcodeScannerModal from './BarcodeScannerModal';
 import { showAlert } from '../services/dialog';
+import { showToast } from '../services/toast';
 import { useMoney } from '../services/CurrencyContext';
 import confetti from 'canvas-confetti';
+
+const round3 = (n: number) => Math.round(n * 1000) / 1000;
+
+// Bip sonore court de confirmation de scan (aigu = OK, grave = échec). WebAudio, sans asset.
+let _audioCtx: any = null;
+function beep(ok = true) {
+  try {
+    const AC = (window as any).AudioContext || (window as any).webkitAudioContext;
+    if (!AC) return;
+    _audioCtx = _audioCtx || new AC();
+    const o = _audioCtx.createOscillator();
+    const g = _audioCtx.createGain();
+    o.connect(g);
+    g.connect(_audioCtx.destination);
+    o.type = 'square';
+    o.frequency.value = ok ? 880 : 220;
+    g.gain.value = 0.04;
+    o.start();
+    o.stop(_audioCtx.currentTime + (ok ? 0.08 : 0.2));
+  } catch { /* audio indisponible : silencieux */ }
+}
 
 interface POSProps {
   products: Product[];
   clients: Client[];
   clientPrices: ClientPrice[];
+  warehouses: Warehouse[];
+  productStock: ProductStock[];
   user: User;
   onRefresh: () => void;
   currencySymbol: string;
@@ -47,12 +73,34 @@ export default function POS({
   products,
   clients,
   clientPrices,
+  warehouses,
+  productStock,
   user,
   onRefresh,
   currencySymbol,
   company
 }: POSProps) {
+  // Entrepôt actif de la caisse : la vente déduit le stock de CET entrepôt.
+  const sellableWarehouses = useMemo(() => warehouses.filter((w) => w.status !== 'inactive'), [warehouses]);
+  const [activeWarehouseId, setActiveWarehouseId] = useState<string>('');
+  React.useEffect(() => {
+    if (!activeWarehouseId && sellableWarehouses.length) setActiveWarehouseId(sellableWarehouses[0].id);
+  }, [sellableWarehouses, activeWarehouseId]);
+  const activeWarehouse = warehouses.find((w) => w.id === activeWarehouseId) || null;
+
+  // Stock disponible d'un produit DANS l'entrepôt actif (repli : stock total si aucun entrepôt).
+  const stockMap = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const s of productStock) m.set(`${s.productId}::${s.warehouseId}`, Number(s.quantity) || 0);
+    return m;
+  }, [productStock]);
+  const availOf = React.useCallback((product: Product): number => {
+    if (!activeWarehouseId) return product.quantity;
+    return stockMap.get(`${product.id}::${activeWarehouseId}`) || 0;
+  }, [stockMap, activeWarehouseId]);
+
   const [searchTerm, setSearchTerm] = useState('');
+  const [scannerOpen, setScannerOpen] = useState(false);
   const [cart, setCart] = useState<CartLine[]>([]);
   const [selectedClientId, setSelectedClientId] = useState<string>(clients[0]?.id || '');
   const [paymentMethod, setPaymentMethod] = useState<Sale['paymentMethod']>('cash');
@@ -115,14 +163,14 @@ export default function POS({
   // Filter products by search term (name, sku, barcode)
   const availableProducts = useMemo(() => {
     return products.filter((p) => {
-      if (p.quantity <= 0) return false; // Hide out of stock items
+      if (availOf(p) <= 0) return false; // Masque les articles sans stock dans l'entrepôt actif
       return (
         p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         p.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        p.barcode.includes(searchTerm)
+        (p.barcode || '').includes(searchTerm)
       );
     });
-  }, [products, searchTerm]);
+  }, [products, searchTerm, availOf]);
 
   // Pas de progression (+/-) d'une ligne : 1 carton si la ligne est en mode carton, sinon 1 pièce.
   const stepFor = (item: CartLine) => (item.saleUnit === 'pack' ? item.packSize : 1);
@@ -132,8 +180,8 @@ export default function POS({
     const cartItem = cart.find((item) => item.productId === product.id);
     if (cartItem) {
       const step = stepFor(cartItem);
-      if (cartItem.quantity + step > product.quantity) {
-        showAlert(`Stock insuffisant. Seulement ${product.quantity} disponibles.`, { variant: 'warning' });
+      if (cartItem.quantity + step > availOf(product)) {
+        showAlert(`Stock insuffisant. Seulement ${availOf(product)} disponible(s) dans ${activeWarehouse?.name || 'l\'entrepôt'}.`, { variant: 'warning' });
         return;
       }
       setCart(
@@ -162,6 +210,34 @@ export default function POS({
     }
   };
 
+  // Ajout par code scanné (douchette USB dans la barre de recherche, ou caméra) :
+  // recherche par code-barres exact, sinon SKU exact, sinon unique résultat filtré.
+  // Confirme par un bip + toast ; refuse (bip grave) si introuvable ou en rupture.
+  const addByCode = (raw: string): boolean => {
+    const code = raw.trim();
+    if (!code) return false;
+    const match =
+      products.find((p) => (p.barcode || '') === code) ||
+      products.find((p) => p.sku.toLowerCase() === code.toLowerCase()) ||
+      (availableProducts.length === 1 ? availableProducts[0] : null);
+    if (!match) {
+      beep(false);
+      showAlert(`Aucun produit ne correspond au code « ${code} ».`, { variant: 'warning' });
+      return false;
+    }
+    const inCart = cart.find((i) => i.productId === match.id)?.quantity || 0;
+    if (availOf(match) - inCart <= 0) {
+      beep(false);
+      showAlert(`« ${match.name} » est en rupture dans ${activeWarehouse?.name || 'cet entrepôt'}.`, { variant: 'warning' });
+      return false;
+    }
+    addToCart(match);
+    beep(true);
+    showToast(`${match.name} ajouté au panier`, { title: 'Scan ✓', type: 'success', duration: 1200 });
+    setSearchTerm('');
+    return true;
+  };
+
   // Bascule pièce ↔ carton pour une ligne. Recalcule le prix/pièce et arrondit la quantité
   // à un multiple de la taille de colis (au moins 1 colis).
   const setSaleUnit = (productId: string, saleUnit: 'piece' | 'pack') => {
@@ -174,7 +250,8 @@ export default function POS({
       let qty = item.quantity;
       if (saleUnit === 'pack') {
         qty = Math.max(size, Math.round(item.quantity / size) * size); // multiple de la taille de colis
-        if (qty > prod.quantity) qty = Math.max(size, Math.floor(prod.quantity / size) * size);
+        const avail = availOf(prod);
+        if (qty > avail) qty = Math.max(size, Math.floor(avail / size) * size);
       }
       return { ...item, saleUnit, unitPrice: newPrice, quantity: qty, total: qty * newPrice * (1 - item.discount / 100) };
     }));
@@ -191,8 +268,8 @@ export default function POS({
           if (item.productId === productId) {
             const newQty = item.quantity + delta * stepFor(item); // 1 pièce ou 1 carton
             if (newQty <= 0) return null;
-            if (newQty > p.quantity) {
-              showAlert(`Quantité limitée au stock disponible (${p.quantity}).`, { variant: 'warning' });
+            if (newQty > availOf(p)) {
+              showAlert(`Quantité limitée au stock disponible (${availOf(p)}).`, { variant: 'warning' });
               return item;
             }
             return {
@@ -216,12 +293,13 @@ export default function POS({
     // Quantités décimales autorisées (poids/volume : 1,5 kg / 0,75 L). Arrondi à 3 décimales.
     const round3 = (n: number) => Math.round(n * 1000) / 1000;
     let pieces: number;
+    const avail = availOf(p);
     if (item.saleUnit === 'pack') {
       const size = item.packSize;
       const cartons = Math.max(0, Number(value) || 0);
-      pieces = round3(Math.min(cartons * size, p.quantity));
+      pieces = round3(Math.min(cartons * size, avail));
     } else {
-      pieces = round3(Math.max(0, Math.min(Number(value) || 0, p.quantity)));
+      pieces = round3(Math.max(0, Math.min(Number(value) || 0, avail)));
     }
     setCart(cart.map((it) => it.productId === productId
       ? { ...it, quantity: pieces, total: pieces * it.unitPrice * (1 - it.discount / 100) }
@@ -334,7 +412,8 @@ export default function POS({
         paidAmount: advanceMode ? Math.max(0, Math.min(amountReceived, totals.totalAmount)) : totals.totalAmount,
         dueDate: advanceMode ? dueDate : undefined, // échéance si vente à crédit
         notes: notesFinal,
-        warehouseId: products[0]?.locationId || '',
+        warehouseId: activeWarehouseId || undefined,
+        warehouseName: activeWarehouse?.name ?? undefined,
       });
 
       // Crée la livraison liée à la facture si l'option est activée.
@@ -387,9 +466,25 @@ export default function POS({
           <h2 className="text-xl font-bold text-slate-900 dark:text-white">Terminal Point de Vente (POS)</h2>
           <p className="text-xs text-slate-400">Facturation rapide, déduction automatique de stock et gestion de fidélité.</p>
         </div>
-        <span className="text-xs px-2.5 py-1 bg-cyan-500/10 text-cyan-400 font-mono rounded-lg border border-cyan-500/20">
-          Caisse : {user.name}
-        </span>
+        <div className="flex items-center gap-2 flex-wrap">
+          {sellableWarehouses.length > 0 && (
+            <label className="flex items-center gap-1.5 text-xs px-2.5 py-1 bg-white dark:bg-slate-900/40 rounded-lg border border-slate-200 dark:border-slate-800">
+              <span className="text-slate-400">Entrepôt :</span>
+              <select
+                value={activeWarehouseId}
+                onChange={(e) => setActiveWarehouseId(e.target.value)}
+                className="bg-transparent text-slate-900 dark:text-white font-semibold focus:outline-none cursor-pointer"
+              >
+                {sellableWarehouses.map((w) => (
+                  <option key={w.id} value={w.id}>{w.name}</option>
+                ))}
+              </select>
+            </label>
+          )}
+          <span className="text-xs px-2.5 py-1 bg-cyan-500/10 text-cyan-400 font-mono rounded-lg border border-cyan-500/20">
+            Caisse : {user.name}
+          </span>
+        </div>
       </div>
 
       {/* POS Screen Division */}
@@ -398,16 +493,33 @@ export default function POS({
         {/* Left Side: Product Picker */}
         <div className="lg:col-span-3 space-y-4">
           
-          {/* Search bar */}
-          <div className="relative">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
-            <input
-              type="text"
-              placeholder="Rechercher par nom, SKU ou scanner code-barres..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-white dark:bg-slate-900/40 text-xs py-3.5 pl-10 pr-4 rounded-xl border border-slate-200 dark:border-slate-800/80 text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500"
-            />
+          {/* Search bar + scan caméra */}
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
+              <input
+                type="text"
+                autoFocus
+                placeholder="Rechercher, ou scanner un code-barres (douchette) puis Entrée…"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    addByCode(searchTerm); // douchette USB : code tapé + Entrée → ajout direct
+                  }
+                }}
+                className="w-full bg-white dark:bg-slate-900/40 text-xs py-3.5 pl-10 pr-4 rounded-xl border border-slate-200 dark:border-slate-800/80 text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => setScannerOpen(true)}
+              title="Scanner avec la caméra"
+              className="shrink-0 px-3.5 rounded-xl border border-slate-200 dark:border-slate-800/80 bg-white dark:bg-slate-900/40 text-slate-600 dark:text-slate-300 hover:text-cyan-400 hover:border-cyan-500 flex items-center gap-1.5 text-xs font-semibold transition cursor-pointer"
+            >
+              <ScanLine className="w-4 h-4" /> <span className="hidden sm:inline">Scanner</span>
+            </button>
           </div>
 
           {/* Product grid list */}
@@ -419,7 +531,7 @@ export default function POS({
             ) : (
               availableProducts.map((p) => {
                 const quantityInCart = cart.find((i) => i.productId === p.id)?.quantity || 0;
-                const isMax = quantityInCart >= p.quantity;
+                const isMax = quantityInCart >= availOf(p);
                 return (
                   <button
                     key={p.id}
@@ -445,7 +557,7 @@ export default function POS({
                     <div className="mt-3 w-full">
                       <div className="flex justify-between text-[10px] text-slate-400">
                         <span>Disponible :</span>
-                        <span className="font-mono font-semibold text-slate-900 dark:text-slate-300">{p.quantity - quantityInCart}</span>
+                        <span className="font-mono font-semibold text-slate-900 dark:text-slate-300">{round3(availOf(p) - quantityInCart)}</span>
                       </div>
                       <div className="flex justify-between items-end mt-1.5 pt-1.5 border-t border-slate-200 dark:border-slate-800/50">
                         <span className="text-xs font-bold font-mono text-cyan-400">
@@ -819,6 +931,9 @@ export default function POS({
       {showReceipt && (
         <ReceiptModal sale={showReceipt} company={company} onClose={() => setShowReceipt(null)} />
       )}
+
+      {/* Scan de code-barres par la caméra */}
+      <BarcodeScannerModal open={scannerOpen} onClose={() => setScannerOpen(false)} onDetect={addByCode} />
 
     </div>
   );
