@@ -595,6 +595,7 @@ export default function App() {
             <Products
               products={products}
               warehouses={warehouses}
+              productStock={productStock}
               suppliers={suppliers}
               categories={categories}
               brands={brands}
@@ -658,6 +659,7 @@ export default function App() {
               suppliers={suppliers}
               products={products}
               supplierProducts={supplierProducts}
+              warehouses={warehouses}
               user={currentUser}
               onRefresh={reloadAfterPurchase}
               writePerms={settings?.writePermissions}
@@ -775,6 +777,7 @@ export default function App() {
             <UsersAdmin
               users={usersList}
               currentUser={currentUser}
+              warehouses={warehouses}
               onRefresh={reloadUsers}
             />
           )}

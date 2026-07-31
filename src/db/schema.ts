@@ -13,6 +13,7 @@ export const users = pgTable('users', {
   passwordHash: text('password_hash'), // null pour les comptes démo/externes
   role: text('role').notNull(), // 'Super Admin' | 'Admin' | 'Manager' | ...
   avatar: text('avatar'),
+  warehouseId: text('warehouse_id'), // lieu de travail (entrepôt) ; null = Entrepôt général
   active: boolean('active').default(true).notNull(),
   createdAt,
   updatedAt,

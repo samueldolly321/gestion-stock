@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import {
   ShoppingBag, Plus, Trash2, PackageCheck, Wallet, Eye, X, Download, Truck,
 } from 'lucide-react';
-import { Purchase, Supplier, Product, User, PurchaseItem, PurchaseStatus, SupplierProduct } from '../types';
+import { Purchase, Supplier, Product, User, PurchaseItem, PurchaseStatus, SupplierProduct, Warehouse } from '../types';
 import { useMoney } from '../services/CurrencyContext';
 import { createPurchase, receivePurchase, payPurchase, deletePurchase } from '../services/purchasesService';
 import { canWrite as hasWritePerm } from '../services/permissions';
@@ -18,6 +18,7 @@ interface PurchasesProps {
   suppliers: Supplier[];
   products: Product[];
   supplierProducts: SupplierProduct[];
+  warehouses: Warehouse[];
   user: User;
   onRefresh: () => void;
   writePerms?: Record<string, string[]> | null;
@@ -37,7 +38,7 @@ const PAY_META: Record<string, { label: string; cls: string }> = {
 // unit = unité de SAISIE de la ligne ('piece' ou 'pack'). Convertie en pièces à la création.
 interface Line { productId: string; quantity: number; unitCost: number; tax: number; unit: 'piece' | 'pack' }
 
-export default function Purchases({ purchases, suppliers, products, supplierProducts, user, onRefresh, writePerms }: PurchasesProps) {
+export default function Purchases({ purchases, suppliers, products, supplierProducts, warehouses, user, onRefresh, writePerms }: PurchasesProps) {
   const { format } = useMoney();
   const canWrite = useMemo(() => hasWritePerm(user.role, 'purchases', writePerms), [user.role, writePerms]);
 
@@ -72,6 +73,7 @@ export default function Purchases({ purchases, suppliers, products, supplierProd
   const [lines, setLines] = useState<Line[]>([{ productId: '', quantity: 1, unitCost: 0, tax: 20, unit: 'piece' }]);
   const [notes, setNotes] = useState('');
   const [expectedDate, setExpectedDate] = useState(''); // date de réception prévue (calendrier)
+  const [warehouseId, setWarehouseId] = useState(user.warehouseId || ''); // entrepôt de réception (défaut : lieu de travail)
   const [applyVat, setApplyVat] = useState(false); // TVA optionnelle (désactivée par défaut)
   const [busy, setBusy] = useState(false);
 
@@ -207,7 +209,8 @@ export default function Purchases({ purchases, suppliers, products, supplierProd
     setBusy(true);
     try {
       const sup = suppliers.find((s) => s.id === supplierId);
-      await createPurchase({ supplierId, supplierName: sup?.name, items, notes, expectedDate: expectedDate || undefined });
+      const wh = warehouses.find((w) => w.id === warehouseId);
+      await createPurchase({ supplierId, supplierName: sup?.name, items, notes, expectedDate: expectedDate || undefined, warehouseId: warehouseId || undefined, warehouseName: wh?.name });
       setIsCreateOpen(false);
       showToast('Commande d\'achat créée.', { title: 'Achats' });
       onRefresh();
@@ -344,6 +347,7 @@ export default function Purchases({ purchases, suppliers, products, supplierProd
               <tr className="bg-slate-50 dark:bg-slate-950/20 border-b border-slate-200 dark:border-slate-800/60 text-[10px] font-mono text-slate-400 uppercase tracking-wider">
                 <th className="py-3 px-4">Fournisseur</th>
                 <th className="py-3 px-4">Produits</th>
+                <th className="py-3 px-4 hidden lg:table-cell">Entrepôt</th>
                 <th className="py-3 px-4">Date</th>
                 <th className="py-3 px-4 text-right">Total TTC</th>
                 <th className="py-3 px-4 text-right hidden md:table-cell">Reste dû</th>
@@ -354,7 +358,7 @@ export default function Purchases({ purchases, suppliers, products, supplierProd
             </thead>
             <tbody className="divide-y divide-slate-200 dark:divide-slate-800/60 text-xs text-slate-600 dark:text-gray-300">
               {filtered.length === 0 ? (
-                <tr><td colSpan={8} className="py-12 text-center text-slate-500">Aucune commande d'achat.</td></tr>
+                <tr><td colSpan={9} className="py-12 text-center text-slate-500">Aucune commande d'achat.</td></tr>
               ) : (
                 page.paged.map((p) => {
                   const reste = p.totalAmount - (p.paidAmount || 0);
@@ -364,6 +368,7 @@ export default function Purchases({ purchases, suppliers, products, supplierProd
                       <td className="py-3 px-4 max-w-[220px]">
                         <span className="block truncate text-slate-700 dark:text-slate-200" title={itemsSummary(p)}>{itemsSummary(p)}</span>
                       </td>
+                      <td className="py-3 px-4 hidden lg:table-cell text-slate-500 dark:text-slate-300">{p.warehouseName || warehouses.find((w) => w.id === p.warehouseId)?.name || '—'}</td>
                       <td className="py-3 px-4 font-mono text-[11px] text-slate-400 whitespace-nowrap">{new Date(p.createdAt).toLocaleDateString()}</td>
                       <td className="py-3 px-4 text-right font-mono font-bold text-slate-900 dark:text-white">{format(p.totalAmount)}</td>
                       <td className="py-3 px-4 text-right hidden md:table-cell font-mono">{reste > 0 ? <span className="text-red-500 font-bold">{format(reste)}</span> : <span className="text-emerald-500">0</span>}</td>
@@ -457,6 +462,14 @@ export default function Purchases({ purchases, suppliers, products, supplierProd
                   </div>
                   );
                 })}
+              </div>
+
+              <div>
+                <label className="text-slate-500 dark:text-slate-400 block mb-1">Entrepôt de réception</label>
+                <select value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)} className={inputCls} title="Entrepôt où la marchandise entrera à la réception">
+                  <option value="">Entrepôt général</option>
+                  {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+                </select>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

@@ -24,7 +24,7 @@ import {
   Printer,
   ShoppingBag
 } from 'lucide-react';
-import { Product, Category, Brand, Supplier, User, Warehouse as WarehouseType, StockMovement } from '../types';
+import { Product, Category, Brand, Supplier, User, Warehouse as WarehouseType, StockMovement, ProductStock } from '../types';
 import { generateId } from '../services/ids';
 import { useMoney } from '../services/CurrencyContext';
 import { createCategory, deleteCategory } from '../services/categoriesService';
@@ -54,6 +54,7 @@ interface ProductsProps {
   brands: Brand[];
   suppliers: Supplier[];
   warehouses: WarehouseType[];
+  productStock: ProductStock[];
   user: User;
   onRefresh: () => void;
   onRefreshPurchases?: () => void; // recharge aussi les achats (après « Créer un achat »)
@@ -89,6 +90,7 @@ export default function Products({
   brands,
   suppliers,
   warehouses,
+  productStock,
   user,
   onRefresh,
   onRefreshPurchases,
@@ -98,6 +100,20 @@ export default function Products({
 }: ProductsProps) {
   // Formatage monétaire (Ariary base / Euro converti)
   const { format } = useMoney();
+
+  // Répartition du stock par entrepôt (pour la colonne « Entrepôt(s) » du tableau).
+  const stockByProduct = useMemo(() => {
+    const m = new Map<string, { name: string; qty: number }[]>();
+    for (const s of productStock) {
+      const qty = Number(s.quantity) || 0;
+      if (qty <= 0) continue;
+      const name = warehouses.find((w) => w.id === s.warehouseId)?.name || 'Entrepôt';
+      const arr = m.get(s.productId) || [];
+      arr.push({ name, qty });
+      m.set(s.productId, arr);
+    }
+    return m;
+  }, [productStock, warehouses]);
 
   // Search & Filters state
   const [searchTerm, setSearchTerm] = useState('');
@@ -783,6 +799,7 @@ export default function Products({
                   <th className="py-3 px-4 text-right">Prix Achat</th>
                   <th className="py-3 px-4 text-right">Prix Vente</th>
                   <th className="py-3 px-4 text-center">Quantité</th>
+                  <th className="py-3 px-4">Entrepôt(s)</th>
                   <th className="py-3 px-4 text-center">Statut</th>
                   <th className="py-3 px-4 text-right">Actions</th>
                 </tr>
@@ -790,7 +807,7 @@ export default function Products({
               <tbody className="divide-y divide-slate-200 dark:divide-slate-800/60 text-xs">
                 {filteredProducts.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="py-12 text-center text-slate-500">
+                    <td colSpan={10} className="py-12 text-center text-slate-500">
                       Aucun produit ne correspond aux filtres appliqués.
                     </td>
                   </tr>
@@ -844,6 +861,22 @@ export default function Products({
                         {hasPack(p.packSize) && (
                           <span className="block text-[9px] text-slate-400 font-mono mt-0.5">{packBreakdown(p.quantity, p.packSize, p.packLabel)}</span>
                         )}
+                      </td>
+                      <td className="py-3.5 px-4 text-[11px] text-slate-500 dark:text-slate-300 min-w-[120px]">
+                        {(() => {
+                          const dist = stockByProduct.get(p.id);
+                          if (!dist || dist.length === 0) return <span className="text-slate-400">—</span>;
+                          return (
+                            <div className="space-y-0.5">
+                              {dist.map((d) => (
+                                <div key={d.name} className="flex justify-between gap-2">
+                                  <span className="truncate">{d.name}</span>
+                                  <span className="font-mono text-slate-400">{d.qty}</span>
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        })()}
                       </td>
                       <td className="py-3.5 px-4 text-center">
                         <span
@@ -908,7 +941,7 @@ export default function Products({
                     {/* Fiche article en ligne (mobile/tablette uniquement, sous le produit cliqué) */}
                     {viewProduct?.id === p.id && (
                       <tr className="xl:hidden">
-                        <td colSpan={9} className="p-3 bg-slate-50 dark:bg-slate-950/20 border-b border-slate-200 dark:border-slate-800/60">
+                        <td colSpan={10} className="p-3 bg-slate-50 dark:bg-slate-950/20 border-b border-slate-200 dark:border-slate-800/60">
                           {renderFiche(p)}
                         </td>
                       </tr>

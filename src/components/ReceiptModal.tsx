@@ -37,6 +37,7 @@ export default function ReceiptModal({ sale, company, onClose }: ReceiptModalPro
           <div className="flex justify-between"><span>Facture N° :</span><span className="font-bold">{sale.invoiceNumber || sale.id}</span></div>
           <div className="flex justify-between"><span>Date :</span><span>{new Date(sale.createdAt).toLocaleString()}</span></div>
           <div className="flex justify-between"><span>Caissier :</span><span>{sale.cashierName}</span></div>
+          {sale.warehouseName && <div className="flex justify-between"><span>Entrepôt :</span><span>{sale.warehouseName}</span></div>}
           <div className="flex justify-between"><span>Client :</span><span className="font-bold">{sale.clientName}</span></div>
           <div className="border-b border-dashed border-slate-300 py-1"></div>
         </div>

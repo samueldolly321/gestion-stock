@@ -84,8 +84,12 @@ export default function POS({
   const sellableWarehouses = useMemo(() => warehouses.filter((w) => w.status !== 'inactive'), [warehouses]);
   const [activeWarehouseId, setActiveWarehouseId] = useState<string>('');
   React.useEffect(() => {
-    if (!activeWarehouseId && sellableWarehouses.length) setActiveWarehouseId(sellableWarehouses[0].id);
-  }, [sellableWarehouses, activeWarehouseId]);
+    if (!activeWarehouseId && sellableWarehouses.length) {
+      // Défaut : le lieu de travail du caissier s'il est actif, sinon le 1er entrepôt.
+      const preferred = sellableWarehouses.find((w) => w.id === user.warehouseId);
+      setActiveWarehouseId((preferred || sellableWarehouses[0]).id);
+    }
+  }, [sellableWarehouses, activeWarehouseId, user.warehouseId]);
   const activeWarehouse = warehouses.find((w) => w.id === activeWarehouseId) || null;
 
   // Stock disponible d'un produit DANS l'entrepôt actif (repli : stock total si aucun entrepôt).

@@ -15,6 +15,8 @@ export function createPurchase(data: {
   discountAmount?: number;
   notes?: string;
   expectedDate?: string;
+  warehouseId?: string;
+  warehouseName?: string;
 }): Promise<Purchase> {
   return apiFetch<Purchase>('/purchases', { method: 'POST', body: JSON.stringify(data) });
 }

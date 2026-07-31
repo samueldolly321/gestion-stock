@@ -14,13 +14,14 @@ export function createUser(data: {
   password: string;
   role: string;
   active?: boolean;
+  warehouseId?: string | null;
 }): Promise<User> {
   return apiFetch<User>('/users', { method: 'POST', body: JSON.stringify(data) });
 }
 
 export function updateUser(
   id: string,
-  data: { name?: string; role?: string; active?: boolean },
+  data: { name?: string; role?: string; active?: boolean; warehouseId?: string | null },
 ): Promise<User> {
   return apiFetch<User>(`/users/${id}`, { method: 'PUT', body: JSON.stringify(data) });
 }

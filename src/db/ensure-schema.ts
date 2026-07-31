@@ -100,6 +100,9 @@ export async function ensureSchema(): Promise<void> {
   await db.execute(sql`ALTER TABLE purchases ADD COLUMN IF NOT EXISTS warehouse_id text;`);
   await db.execute(sql`ALTER TABLE purchases ADD COLUMN IF NOT EXISTS warehouse_name text;`);
 
+  // Lieu de travail (entrepôt) d'un utilisateur — null = Entrepôt général.
+  await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS warehouse_id text;`);
+
   // Stock réel par entrepôt : table product_stock (une ligne par couple produit×entrepôt).
   // products.quantity reste le TOTAL (somme des lignes). Migration additive et réversible.
   await db.execute(sql`

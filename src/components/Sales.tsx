@@ -174,6 +174,7 @@ export default function Sales({ sales, user, currencySymbol, company }: SalesPro
                 <th className="py-3 px-4">N° Facture</th>
                 <th className="py-3 px-4">Date</th>
                 <th className="py-3 px-4">Client</th>
+                <th className="py-3 px-4 hidden md:table-cell">Entrepôt</th>
                 <th className="py-3 px-4 text-right">Total TTC</th>
                 <th className="py-3 px-4 text-right hidden md:table-cell">Reste dû</th>
                 <th className="py-3 px-4 text-center">Paiement</th>
@@ -182,7 +183,7 @@ export default function Sales({ sales, user, currencySymbol, company }: SalesPro
             </thead>
             <tbody className="divide-y divide-slate-200 dark:divide-slate-800/60 text-xs text-slate-600 dark:text-gray-300">
               {periodSales.length === 0 ? (
-                <tr><td colSpan={7} className="py-12 text-center text-slate-500">Aucune vente sur cette période.</td></tr>
+                <tr><td colSpan={8} className="py-12 text-center text-slate-500">Aucune vente sur cette période.</td></tr>
               ) : (
                 page.paged.map((s) => {
                   const reste = s.totalAmount - (s.paidAmount || 0);
@@ -191,6 +192,7 @@ export default function Sales({ sales, user, currencySymbol, company }: SalesPro
                       <td className="py-3 px-4 font-mono font-bold text-[11px] text-cyan-500">{s.invoiceNumber || s.id}</td>
                       <td className="py-3 px-4 font-mono text-[11px] text-slate-400 whitespace-nowrap">{new Date(s.createdAt).toLocaleString()}</td>
                       <td className="py-3 px-4 font-semibold text-slate-900 dark:text-white">{s.clientName || '—'}</td>
+                      <td className="py-3 px-4 hidden md:table-cell text-slate-500 dark:text-slate-300">{s.warehouseName || '—'}</td>
                       <td className="py-3 px-4 text-right font-mono font-bold text-slate-900 dark:text-white">{format(s.totalAmount)}</td>
                       <td className="py-3 px-4 text-right hidden md:table-cell font-mono">{reste > 0 ? <span className="text-red-500 font-bold">{format(reste)}</span> : <span className="text-emerald-500">0</span>}</td>
                       <td className="py-3 px-4 text-center"><span className={`px-1.5 py-0.5 rounded text-[9px] font-mono ${PAY_META[s.paymentStatus]?.cls}`}>{PAY_META[s.paymentStatus]?.label || s.paymentStatus}</span></td>

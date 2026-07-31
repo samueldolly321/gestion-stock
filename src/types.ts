@@ -15,6 +15,7 @@ export interface User {
   email: string;
   role: UserRole;
   avatar?: string;
+  warehouseId?: string | null; // lieu de travail (entrepôt) ; null/absent = Entrepôt général
   active: boolean;
   createdAt?: string;
   updatedAt?: string;
@@ -283,6 +284,8 @@ export interface Purchase {
   paidAmount: number;
   receivedAt?: string | null;
   expectedDate?: string | null; // date de réception prévue (calendrier)
+  warehouseId?: string | null; // entrepôt de destination à la réception
+  warehouseName?: string | null;
   notes?: string;
   createdBy: string;
   createdAt: string;

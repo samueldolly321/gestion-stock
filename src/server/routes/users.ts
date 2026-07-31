@@ -33,7 +33,7 @@ usersRouter.get('/', requireAuth, requireRole(...MANAGE_ROLES), async (_req, res
 /** POST /api/users — crée un compte. */
 usersRouter.post('/', requireAuth, requireRole(...MANAGE_ROLES), async (req: AuthedRequest, res) => {
   try {
-    const { name, email, password, role, active } = req.body ?? {};
+    const { name, email, password, role, active, warehouseId } = req.body ?? {};
     if (!name || !email || !password) {
       return res.status(400).json({ error: 'Nom, e-mail et mot de passe sont requis.' });
     }
@@ -56,6 +56,7 @@ usersRouter.post('/', requireAuth, requireRole(...MANAGE_ROLES), async (req: Aut
         passwordHash,
         role: finalRole,
         avatar: `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(name)}`,
+        warehouseId: warehouseId || null,
         active: active !== false,
       })
       .returning();
@@ -80,7 +81,7 @@ usersRouter.post('/', requireAuth, requireRole(...MANAGE_ROLES), async (req: Aut
 /** PUT /api/users/:id — met à jour nom / rôle / statut actif. */
 usersRouter.put('/:id', requireAuth, requireRole(...MANAGE_ROLES), async (req: AuthedRequest, res) => {
   try {
-    const { name, role, active } = req.body ?? {};
+    const { name, role, active, warehouseId } = req.body ?? {};
     const targetId = req.params.id;
     const [target] = await db.select().from(users).where(eq(users.id, targetId)).limit(1);
     if (!target) return res.status(404).json({ error: 'Utilisateur introuvable.' });
@@ -105,6 +106,7 @@ usersRouter.put('/:id', requireAuth, requireRole(...MANAGE_ROLES), async (req: A
         name: name?.trim() || target.name,
         role: finalRole,
         active: nextActive,
+        warehouseId: warehouseId === undefined ? target.warehouseId : (warehouseId || null),
         updatedAt: new Date().toISOString(),
       })
       .where(eq(users.id, targetId))

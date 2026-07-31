@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { UserCog, Plus, Trash2, KeyRound, X, ShieldCheck, ShieldOff } from 'lucide-react';
-import { User } from '../types';
+import { User, Warehouse } from '../types';
 import { ROLES } from '../services/permissions';
 import { createUser, updateUser, resetUserPassword, deleteUser } from '../services/usersService';
 import { showAlert, showConfirm } from '../services/dialog';
@@ -10,11 +10,15 @@ import Pagination, { usePagination } from './Pagination';
 interface UsersProps {
   users: User[];
   currentUser: User;
+  warehouses: Warehouse[];
   onRefresh: () => void;
 }
 
-export default function Users({ users, currentUser, onRefresh }: UsersProps) {
+export default function Users({ users, currentUser, warehouses, onRefresh }: UsersProps) {
   const isSuperAdmin = currentUser.role === 'Super Admin';
+
+  // Libellé du lieu de travail : nom de l'entrepôt, ou « Entrepôt général » si non assigné.
+  const workplaceLabel = (id?: string | null) => warehouses.find((w) => w.id === id)?.name || 'Entrepôt général';
 
   // Rôles attribuables : un non-Super-Admin ne peut pas créer/attribuer Admin/Super Admin.
   const assignableRoles = useMemo(
@@ -37,6 +41,7 @@ export default function Users({ users, currentUser, onRefresh }: UsersProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState('Magasinier');
+  const [workplaceId, setWorkplaceId] = useState(''); // '' = Entrepôt général
   const [busy, setBusy] = useState(false);
 
   // Modal réinitialisation de mot de passe
@@ -54,6 +59,7 @@ export default function Users({ users, currentUser, onRefresh }: UsersProps) {
     setEmail('');
     setPassword('');
     setRole('Magasinier');
+    setWorkplaceId('');
     setIsCreateOpen(true);
   };
 
@@ -65,7 +71,7 @@ export default function Users({ users, currentUser, onRefresh }: UsersProps) {
     }
     setBusy(true);
     try {
-      await createUser({ name: name.trim(), email: email.trim(), password, role, active: true });
+      await createUser({ name: name.trim(), email: email.trim(), password, role, active: true, warehouseId: workplaceId || null });
       setIsCreateOpen(false);
       showToast(`Compte « ${name.trim()} » créé (${role}).`, { title: 'Utilisateurs' });
       onRefresh();
@@ -83,6 +89,16 @@ export default function Users({ users, currentUser, onRefresh }: UsersProps) {
       onRefresh();
     } catch (err: any) {
       showAlert(err?.message || 'Erreur lors du changement de rôle.', { variant: 'error' });
+    }
+  };
+
+  const changeWorkplace = async (u: User, warehouseId: string) => {
+    try {
+      await updateUser(u.uid, { warehouseId: warehouseId || null });
+      showToast(`Lieu de travail de ${u.name} → ${workplaceLabel(warehouseId)}.`, { title: 'Utilisateurs' });
+      onRefresh();
+    } catch (err: any) {
+      showAlert(err?.message || 'Erreur lors du changement de lieu de travail.', { variant: 'error' });
     }
   };
 
@@ -166,6 +182,7 @@ export default function Users({ users, currentUser, onRefresh }: UsersProps) {
                 <th className="py-3 px-4">Utilisateur</th>
                 <th className="py-3 px-4 hidden md:table-cell">E-mail</th>
                 <th className="py-3 px-4">Rôle</th>
+                <th className="py-3 px-4 hidden md:table-cell">Lieu de travail</th>
                 <th className="py-3 px-4 text-center">Statut</th>
                 <th className="py-3 px-4 hidden lg:table-cell">Créé le</th>
                 <th className="py-3 px-4 text-right">Actions</th>
@@ -174,7 +191,7 @@ export default function Users({ users, currentUser, onRefresh }: UsersProps) {
             <tbody className="divide-y divide-slate-200 dark:divide-slate-800/60 text-xs text-slate-600 dark:text-gray-300">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-slate-500">Aucun utilisateur.</td>
+                  <td colSpan={7} className="py-12 text-center text-slate-500">Aucun utilisateur.</td>
                 </tr>
               ) : (
                 page.paged.map((u) => {
@@ -204,6 +221,19 @@ export default function Users({ users, currentUser, onRefresh }: UsersProps) {
                           {/* Toujours afficher le rôle courant même s'il n'est pas attribuable */}
                           {(assignableRoles.includes(u.role) ? assignableRoles : [u.role, ...assignableRoles]).map((r) => (
                             <option key={r} value={r}>{r}</option>
+                          ))}
+                        </select>
+                      </td>
+                      <td className="py-3 px-4 hidden md:table-cell">
+                        <select
+                          value={u.warehouseId || ''}
+                          disabled={!editable}
+                          onChange={(e) => changeWorkplace(u, e.target.value)}
+                          className="text-[11px] font-semibold rounded-md px-2 py-1 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/30 text-slate-700 dark:text-slate-200 focus:outline-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed max-w-[160px]"
+                        >
+                          <option value="">Entrepôt général</option>
+                          {warehouses.map((w) => (
+                            <option key={w.id} value={w.id}>{w.name}</option>
                           ))}
                         </select>
                       </td>
@@ -284,6 +314,15 @@ export default function Users({ users, currentUser, onRefresh }: UsersProps) {
                 <select value={role} onChange={(e) => setRole(e.target.value)} className={inputCls}>
                   {assignableRoles.map((r) => (
                     <option key={r} value={r}>{r}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-slate-500 dark:text-slate-400 block mb-1">Lieu de travail</label>
+                <select value={workplaceId} onChange={(e) => setWorkplaceId(e.target.value)} className={inputCls}>
+                  <option value="">Entrepôt général</option>
+                  {warehouses.map((w) => (
+                    <option key={w.id} value={w.id}>{w.name}</option>
                   ))}
                 </select>
               </div>
