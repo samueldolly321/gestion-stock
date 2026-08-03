@@ -85,11 +85,25 @@ export default function POS({
   const [activeWarehouseId, setActiveWarehouseId] = useState<string>('');
   React.useEffect(() => {
     if (!activeWarehouseId && sellableWarehouses.length) {
-      // Défaut : le lieu de travail du caissier s'il est actif, sinon le 1er entrepôt.
+      // Défaut : le lieu de travail du caissier s'il est actif, sinon l'entrepôt le mieux approvisionné.
       const preferred = sellableWarehouses.find((w) => w.id === user.warehouseId);
-      setActiveWarehouseId((preferred || sellableWarehouses[0]).id);
+      let fallback = sellableWarehouses[0];
+      if (!preferred) {
+        // Nombre de produits en stock (quantité > 0) par entrepôt → on prend celui qui en a le plus.
+        const counts = new Map<string, number>();
+        for (const s of productStock) {
+          if ((Number(s.quantity) || 0) > 0) {
+            counts.set(s.warehouseId, (counts.get(s.warehouseId) || 0) + 1);
+          }
+        }
+        fallback = sellableWarehouses.reduce(
+          (best, w) => ((counts.get(w.id) || 0) > (counts.get(best.id) || 0) ? w : best),
+          sellableWarehouses[0],
+        );
+      }
+      setActiveWarehouseId((preferred || fallback).id);
     }
-  }, [sellableWarehouses, activeWarehouseId, user.warehouseId]);
+  }, [sellableWarehouses, activeWarehouseId, user.warehouseId, productStock]);
   const activeWarehouse = warehouses.find((w) => w.id === activeWarehouseId) || null;
 
   // Stock disponible d'un produit DANS l'entrepôt actif (repli : stock total si aucun entrepôt).

@@ -274,7 +274,7 @@ export default function Products({
   // Create or Update submit
   const handleProductSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name || !sku || purchasePrice <= 0 || salePrice <= 0) {
+    if (!name || !sku || purchasePrice <= 0) {
       showAlert('Veuillez remplir tous les champs requis correctement.', { variant: 'warning' });
       return;
     }
@@ -1380,12 +1380,11 @@ export default function Products({
 
                 {/* Sale Price */}
                 <div>
-                  <label className="text-xs text-slate-400 block mb-1">Prix de Vente HT (Ar) *</label>
+                  <label className="text-xs text-slate-400 block mb-1">Prix de Vente HT (Ar) <span className="text-slate-400 font-normal">(facultatif)</span></label>
                   <input
                     type="number"
                     step="any"
-                    required
-                    min={0.01}
+                    min={0}
                     value={salePrice}
                     onChange={(e) => setSalePrice(Number(e.target.value))}
                     className="w-full bg-white dark:bg-slate-950/20 p-2.5 text-xs rounded-lg border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500"
