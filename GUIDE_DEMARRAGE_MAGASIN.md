@@ -182,6 +182,23 @@ stock **en temps réel** sur tous les postes.
   caméra une fois → visez le code-barres. *(Nécessite la version `.exe` 1.1.0.)*
 - Les étiquettes code-barres s'impriment depuis **Articles & Stocks** (fiche article).
 
+### 6.4 Mettre à jour l'application plus tard (sans repasser sur chaque poste)
+L'appli **Vokatra-ko** installée sur les postes caissiers est une simple **fenêtre** :
+elle n'embarque rien, elle affiche l'application **depuis le PC serveur**. Du coup :
+
+> 💡 **Pour installer une nouvelle version, on met à jour UNIQUEMENT le PC serveur.**
+> Les postes caissiers, eux, n'ont **rien à réinstaller** : ils voient la nouvelle
+> version au prochain lancement.
+
+- [ ] Sur le **PC serveur** : récupérer la nouvelle version (`git pull`), puis dans
+      le dossier du projet lancer `npm run build` (reconstruit l'écran de l'appli).
+- [ ] **Relancer `serveur-local.cmd`.**
+- [ ] Sur les postes caissiers : rien à faire — au besoin **Fichier → Recharger**.
+
+⚠️ On ne refait un nouvel **`.exe`** (§6.1) que si l'on change le **logiciel poste
+caissier lui-même** (icône, autorisation caméra, écran de connexion au serveur…) —
+pas pour une évolution des écrans de l'appli (articles, caisse, ventes…).
+
 ---
 
 ## 7. Routine quotidienne
