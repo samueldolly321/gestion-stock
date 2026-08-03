@@ -143,6 +143,28 @@ génération échoue (erreur de « lien symbolique »). La version portable (A) 
 
 Tous les postes voient désormais **les mêmes données**, mises à jour en temps réel.
 
+### 3. Mettre à jour l'application (sans réinstaller le `.exe`)
+Le `.exe` (portable ou installeur) est une **simple coquille** : il ne contient
+pas l'application, il l'affiche depuis le **serveur**. Chaque poste montre donc
+toujours la dernière version servie par le PC serveur.
+
+> **Pour déployer une nouvelle version de l'app : on met à jour le SERVEUR, pas les postes.**
+
+Sur le **PC serveur**, une fois le code à jour (`git pull`) :
+```powershell
+npm install       # seulement si les dépendances ont changé
+npm run build     # reconstruit le front (dossier dist/)
+```
+puis relance `serveur-local.cmd`. Au lancement suivant, chaque poste client
+affiche automatiquement la nouvelle version (ou via le menu **Fichier → Recharger**).
+
+**Quand faut-il vraiment régénérer le `.exe` et le réinstaller ?**
+Uniquement si le **client Electron lui-même** change (`desktop/main.js`,
+`preload.js`, page de config, icône, permission caméra…). Une évolution des
+écrans/fonctions de l'app (articles, caisse, ventes…) **ne nécessite AUCUN
+nouveau `.exe`** — elle arrive par le serveur. La version courante de l'installeur
+est **`Vokatra-ko Setup 1.1.0.exe`**.
+
 ---
 
 ## Sauvegardes (important)
