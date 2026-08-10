@@ -179,7 +179,9 @@ et côté client :
   - ⚠️ **Piège EPERM** (Defender/« Accès contrôlé aux dossiers » sur `D:\perso`) : builder hors du dossier projet → `npx electron-builder --win -c.directories.output="$env:LOCALAPPDATA\vokatra-release"`. **Installateur ~152 Mo** → `%LOCALAPPDATA%\vokatra-release\Vokatra-ko Setup 0.0.0.exe` (copié sur le Bureau).
   - ⚠️ **Orphelins** : si l'app est tuée de force, `postgres.exe` peut rester (port 54339 occupé) → redémarrer le PC avant de relancer.
   - Après un changement de `src/db/schema.ts` : **`npm run db:generate`** avant de rebâtir le `.exe`.
-- **Remplacement** : l'ancien **client réseau `desktop/`** (Electron léger connecté à un PC serveur LAN) a été **supprimé** au profit de cette version autonome. Les guides `GUIDE_RESEAU_LOCAL.md` / `GUIDE_DEMARRAGE_MAGASIN.md` décrivent encore l'ancien modèle réseau (à mettre à jour si besoin).
+- **Remplacement** : l'ancien **client réseau `desktop/`** (Electron léger connecté à un PC serveur LAN) a été **supprimé** au profit de cette version autonome.
+- **Multi-postes** : le `.exe` du **PC principal** écoute aussi sur le réseau (Express bind toutes interfaces, port 34519) → les autres postes ouvrent un **navigateur** vers `http://<ip>:34519` (ne PAS installer le `.exe` ailleurs, sinon base séparée). Nécessite d'ouvrir le pare-feu (`netsh advfirewall ... localport=34519`).
+- **Guides réécrits pour l'autonome** : `GUIDE_DEMARRAGE_MAGASIN.md` (mise en route magasin, mono ou multi-postes) et `GUIDE_RESEAU_LOCAL.md` (partage réseau via navigateur). `GUIDE_INSTALLATION.md` reste le guide **développeur** (sources) avec un renvoi vers le `.exe`. Sauvegarde = copier `%APPDATA%\Vokatra-ko\pgdata` **app fermée**.
 
 ---
 

@@ -1,116 +1,93 @@
 # 🏪 Vokatra-ko — Fiche de mise en route « Magasin »
 
-Guide pas-à-pas pour installer et démarrer Vokatra-ko dans un magasin de gros,
-avec **1 PC serveur**, **1 chef de magasin** et **3-4 caissiers** (chacun son PC),
-en **réseau local** (fonctionne **sans Internet**).
+Guide pas-à-pas pour installer et démarrer **Vokatra-ko** dans un magasin, avec la
+**version autonome** : **un seul fichier `.exe`**, **PostgreSQL est déjà intégré**
+(rien à installer), **100 % hors ligne**. On **double-clique et ça marche.**
 
-> 📌 Pour les détails techniques, voir aussi `GUIDE_RESEAU_LOCAL.md`.
-> Cette fiche est le « fil conducteur » à suivre dans l'ordre.
+> 📌 Pour partager les données entre **plusieurs postes** (chef + caissiers), voir
+> aussi `GUIDE_RESEAU_LOCAL.md`. Cette fiche est le « fil conducteur » à suivre dans l'ordre.
 
 ---
 
-## 1. Comprendre l'organisation (2 minutes)
+## 1. Comprendre l'organisation (1 minute)
 
+**Cas simple — 1 poste (recommandé pour démarrer) :**
+```
+   ┌─────────────────────────────────────────┐
+   │   PC CAISSE                              │
+   │   Vokatra-ko.exe                         │
+   │   (application + base de données         │
+   │    embarquée : TOUT est ici)             │
+   └─────────────────────────────────────────┘
+```
+Le `.exe` embarque **l'application ET la base**. Aucune installation de PostgreSQL,
+aucun serveur à configurer, aucun réseau. Les données restent sur ce PC.
+
+**Cas magasin — plusieurs caissiers qui partagent les mêmes données :**
 ```
         ┌──────────────────────────────┐
-        │   PC SERVEUR (reste allumé)  │   ← contient TOUTES les données
-        │   serveur-local.cmd          │
+        │  PC PRINCIPAL (reste allumé) │  ← lance Vokatra-ko.exe
+        │  Vokatra-ko.exe (app + base) │  ← LES DONNÉES VIVENT ICI
         └───────────────┬──────────────┘
                         │  réseau local (câble / Wi-Fi)
-      ┌─────────┬───────┼────────┬─────────┐
-   ┌──┴──┐  ┌───┴──┐ ┌──┴───┐ ┌──┴───┐ ┌───┴──┐
-   │Chef │  │Caisse│ │Caisse│ │Caisse│ │Caisse│
-   │ .exe│  │1 .exe│ │2 .exe│ │3 .exe│ │4 .exe│
-   └─────┘  └──────┘ └──────┘ └──────┘ └──────┘
+        ┌───────────────┼───────────────┐
+   ┌────┴─────┐   ┌─────┴────┐   ┌──────┴───┐
+   │ Caisse 2 │   │ Caisse 3 │   │ Caisse 4 │  ← un simple NAVIGATEUR
+   │(navigat.)│   │(navigat.)│   │(navigat.)│    vers l'adresse du PC principal
+   └──────────┘   └──────────┘   └──────────┘
 ```
-
-- **1 seul PC** fait office de **serveur** : il héberge l'application et la base.
-  Ce peut être le PC du chef, ou un PC dédié qui reste allumé.
-- Les **autres postes** ouvrent simplement l'application **Vokatra-ko** (le `.exe`)
-  qui se connecte au serveur. Ils ne stockent aucune donnée.
+> ⚠️ Sur les autres postes on **n'installe PAS** le `.exe` (sinon chacun aurait sa
+> propre base). On ouvre juste un **navigateur** vers le PC principal. Détails au §6
+> et dans `GUIDE_RESEAU_LOCAL.md`.
 
 ---
 
 ## 2. Matériel & prérequis (liste de courses)
 
-- [ ] **1 PC serveur** correct qui reste allumé aux heures d'ouverture.
-- [ ] **3-4 PC caissiers** (Windows).
-- [ ] **1 box / routeur / switch** reliant tous les postes (même réseau).
-      **Pas besoin d'Internet** : un routeur **sans connexion Internet**, simplement
-      allumé, suffit (il ne sert qu'à relier les postes en local).
-      **Wi-Fi ou câble** au choix, tant que tout le monde est sur le **même réseau**.
-      *⚠️ Éviter le Wi-Fi « Invité/Guest » (il isole les appareils). Idéal : câbles
-      Ethernet pour les caisses, plus stable que le Wi-Fi.*
-- [ ] **1 onduleur (UPS)** sur le PC serveur — **fortement recommandé** (coupures
-      de courant → protège la base de données).
+- [ ] **1 PC** (Windows 10/11) pour la caisse principale.
+- [ ] *(Magasin multi-postes)* **1-3 PC supplémentaires** + **1 box / routeur / switch**
+      reliant tous les postes au **même réseau** (Wi-Fi ou câble ; **pas besoin d'Internet**).
+      *⚠️ Éviter le Wi-Fi « Invité/Guest » (il isole les appareils).*
+- [ ] **1 onduleur (UPS)** sur le PC principal — **fortement recommandé** (une coupure
+      de courant brutale peut abîmer la base).
 - [ ] **1 clé USB / disque externe** pour les sauvegardes.
 - [ ] *(Facultatif)* imprimante tickets 80 mm ou A4 pour les reçus.
+- [ ] *(Facultatif)* douchette code-barres USB.
+
+> ✅ **Rien d'autre à installer** : ni Node.js, ni PostgreSQL, ni pgAdmin. Tout est
+> dans le `.exe`.
 
 ---
 
-## 3. Installer le PC SERVEUR (à faire une seule fois)
+## 3. Installer le PC de CAISSE (à faire une seule fois)
 
-> ⏱️ ~30 min. À faire par une personne à l'aise avec l'informatique.
+> ⏱️ ~3 min.
 
-### 3.1 Installer les logiciels de base
-- [ ] **Node.js LTS** → https://nodejs.org (bouton « LTS »).
-- [ ] **PostgreSQL 16** → https://www.postgresql.org/download/windows/
-      → **note bien le mot de passe** choisi pendant l'installation.
+### 3.1 Copier l'installeur
+- [ ] Récupérer le fichier **`Vokatra-ko Setup 0.0.0.exe`** (clé USB) et le copier sur le PC.
 
-### 3.2 Créer la base de données
-Ouvrir **pgAdmin** (installé avec PostgreSQL) et exécuter :
-```sql
-CREATE USER "user" WITH PASSWORD 'user';
-CREATE DATABASE stock OWNER "user";
-```
+### 3.2 Installer
+- [ ] Double-cliquer **`Vokatra-ko Setup 0.0.0.exe`**.
+      *(Windows peut afficher « Windows a protégé votre ordinateur / Éditeur inconnu »
+      → **Informations complémentaires** → **Exécuter quand même**.)*
+- [ ] Choisir le dossier d'installation (ou laisser par défaut), laisser cocher
+      **« créer un raccourci sur le Bureau »**, terminer.
 
-### 3.3 Copier l'application
-- [ ] Copier le dossier du projet sur le PC serveur, ex. `C:\Vokatra-ko`.
+### 3.3 Premier lancement
+- [ ] Double-cliquer le raccourci **Vokatra-ko**.
+      **⏳ Le tout premier lancement prend un peu plus de temps** (il prépare la base
+      de données intégrée) — c'est normal, patiente jusqu'à l'écran de connexion.
+- [ ] Les lancements suivants sont rapides.
 
-### 3.4 Configurer la connexion
-- [ ] Créer un fichier **`.env`** à la racine du projet :
-```env
-SQL_HOST=localhost
-SQL_PORT=5432
-SQL_USER=user
-SQL_PASSWORD=user
-SQL_DB_NAME=stock
-JWT_SECRET=colle-ici-une-longue-chaine-aleatoire-de-32-caracteres-minimum
-```
-
-### 3.5 Première installation
-Dans PowerShell, ouvert dans le dossier du projet :
-```powershell
-npm install
-npm run db:push     # crée les tables (une seule fois)
-```
-
-### 3.6 Démarrer le serveur
-- [ ] Double-cliquer **`serveur-local.cmd`** (racine du projet).
-      La 1ʳᵉ fois, il construit l'interface (patiente), puis démarre le serveur.
-      **Laisser la fenêtre ouverte** (le serveur tourne dedans).
-
-### 3.7 Noter l'adresse du serveur
-- [ ] Dans PowerShell : `ipconfig` → relever l'**Adresse IPv4** (ex. `192.168.1.10`).
-- [ ] L'adresse à donner aux caissiers sera : **`http://192.168.1.10:3001`**
-- [ ] *(Recommandé)* fixer cette IP (IP fixe Windows **ou** réservation dans la box)
-      pour qu'elle ne change pas.
-
-### 3.8 Ouvrir le pare-feu
-Dans un PowerShell **administrateur**, une seule fois :
-```powershell
-netsh advfirewall firewall add rule name="Vokatra-ko 3001" dir=in action=allow protocol=TCP localport=3001
-```
-
-### 3.9 Démarrage automatique (recommandé)
-- [ ] `Win + R` → `shell:startup` → créer un **raccourci** vers `serveur-local.cmd`.
-- [ ] Régler l'alimentation du PC serveur sur **« ne jamais se mettre en veille »**.
+> 💾 Les données sont stockées sur ce PC dans `%APPDATA%\Vokatra-ko\pgdata`
+> (dossier personnel Windows). Elles **persistent** entre les redémarrages et
+> **survivent à une réinstallation** de la nouvelle version.
 
 ---
 
-## 4. Créer les comptes (sur le PC serveur, dans le navigateur)
+## 4. Créer les comptes
 
-Ouvrir `http://localhost:3001` sur le PC serveur.
+Au premier écran de l'application :
 
 ### 4.1 Le compte propriétaire (1er compte = Super Admin)
 - [ ] Cliquer **« Créer un compte »** → c'est le **compte du patron / chef de magasin**.
@@ -139,7 +116,7 @@ avec le rôle **Caissier** :
 
 ---
 
-## 5. Saisir les données de départ (sur le PC serveur ou le poste du chef)
+## 5. Saisir les données de départ
 
 Dans l'ordre conseillé :
 - [ ] **Configuration ERP** : raison sociale, logo (initiales), devise (Ariary), TVA.
@@ -157,106 +134,125 @@ Dans l'ordre conseillé :
 
 ---
 
-## 6. Installer les postes CAISSIERS
+## 6. Ajouter d'autres postes caissiers (magasin multi-postes)
 
-### 6.1 Récupérer l'application
-- [ ] Sur une clé USB, copier l'installeur **`Vokatra-ko Setup 1.1.0.exe`**
-      (dossier `desktop\dist-installer\`).
-      *(ou la version portable `win-unpacked\` à copier telle quelle.)*
+> Si tu n'as **qu'un seul PC**, saute cette étape : tout se passe sur le PC de caisse.
+
+Sur les autres postes, **on n'installe pas le `.exe`** — on ouvre l'application
+**depuis le PC principal**, via un simple **navigateur**.
+
+### 6.1 Sur le PC principal (une fois)
+- [ ] Le laisser **allumé** aux heures d'ouverture (et ne pas le mettre en veille).
+- [ ] **Autoriser le port dans le pare-feu.** Dans un PowerShell **administrateur** :
+      ```powershell
+      netsh advfirewall firewall add rule name="Vokatra-ko 34519" dir=in action=allow protocol=TCP localport=34519
+      ```
+- [ ] **Noter son adresse IP** : PowerShell → `ipconfig` → ligne **Adresse IPv4**
+      (ex. `192.168.1.10`). *(Recommandé : fixer cette IP — réservation DHCP dans la box.)*
 
 ### 6.2 Sur chaque poste caissier
-- [ ] Installer / lancer **Vokatra-ko**. *(Windows peut afficher « Éditeur inconnu »
-      → Informations complémentaires → Exécuter quand même.)*
-- [ ] Au 1er lancement, saisir l'adresse du serveur : **`http://192.168.1.10:3001`**
-      (l'IP notée au §3.7).
+- [ ] Ouvrir un navigateur (Chrome / Edge) sur : **`http://192.168.1.10:34519`**
+      (l'IP notée ci-dessus). Créer un **raccourci / favori** vers cette adresse.
 - [ ] Se connecter avec le **compte caissier** correspondant.
 
 ✅ Le caissier voit la **Caisse** et peut encaisser. Ses ventes mettent à jour le
-stock **en temps réel** sur tous les postes.
+stock **en temps réel** sur tous les postes (tout est enregistré sur le PC principal).
+
+> 📖 Détails complets (pare-feu, IP fixe, dépannage réseau) : `GUIDE_RESEAU_LOCAL.md`.
 
 ### 6.3 Scanner les code-barres (facultatif)
-- **Douchette USB** (recommandé) : branchez-la sur le PC caissier — elle fonctionne
-  comme un clavier, **aucune installation**. En Caisse, le curseur est déjà dans la
-  barre de recherche : scannez un article → il **s'ajoute au panier** (bip + message).
-- **Caméra / webcam** : bouton **« Scanner »** à côté de la recherche → autorisez la
-  caméra une fois → visez le code-barres. *(Nécessite la version `.exe` 1.1.0.)*
+- **Douchette USB** (recommandé) : branchez-la sur le poste — elle fonctionne comme
+  un clavier, **aucune installation**. En Caisse, le curseur est déjà dans la barre de
+  recherche : scannez un article → il **s'ajoute au panier** (bip + message).
+- **Caméra / webcam** : bouton **« Scanner »** à côté de la recherche → visez le
+  code-barres. *(Dans l'app `.exe`, la caméra est déjà autorisée. Dans un navigateur,
+  acceptez la demande d'autorisation caméra.)*
 - Les étiquettes code-barres s'impriment depuis **Articles & Stocks** (fiche article).
 
-### 6.4 Mettre à jour l'application plus tard (sans repasser sur chaque poste)
-L'appli **Vokatra-ko** installée sur les postes caissiers est une simple **fenêtre** :
-elle n'embarque rien, elle affiche l'application **depuis le PC serveur**. Du coup :
-
-> 💡 **Pour installer une nouvelle version, on met à jour UNIQUEMENT le PC serveur.**
-> Les postes caissiers, eux, n'ont **rien à réinstaller** : ils voient la nouvelle
-> version au prochain lancement.
-
-- [ ] Sur le **PC serveur** : récupérer la nouvelle version (`git pull`), puis dans
-      le dossier du projet lancer `npm run build` (reconstruit l'écran de l'appli).
-- [ ] **Relancer `serveur-local.cmd`.**
-- [ ] Sur les postes caissiers : rien à faire — au besoin **Fichier → Recharger**.
-
-⚠️ On ne refait un nouvel **`.exe`** (§6.1) que si l'on change le **logiciel poste
-caissier lui-même** (icône, autorisation caméra, écran de connexion au serveur…) —
-pas pour une évolution des écrans de l'appli (articles, caisse, ventes…).
+### 6.4 Imprimer un reçu / une facture
+- En caisse, après encaissement, cliquez **Imprimer** : la fenêtre d'impression de
+  Windows s'ouvre (format **ticket 80 mm** ou **A4**). Choisissez l'imprimante et
+  validez. *(L'impression fonctionne directement dans l'app autonome.)*
 
 ---
 
-## 7. Routine quotidienne
+## 7. Mettre à jour l'application plus tard
+
+Quand une nouvelle version sort, on installe simplement le **nouveau `.exe`**
+**sur le PC principal** (et sur tout PC qui utilise le `.exe`) :
+
+- [ ] Récupérer le nouveau **`Vokatra-ko Setup X.Y.Z.exe`**.
+- [ ] Le lancer et installer **par-dessus** l'ancienne version.
+      **✅ Les données sont conservées** (elles vivent dans `%APPDATA%\Vokatra-ko`,
+      pas dans le dossier d'installation).
+- [ ] Les postes caissiers **en navigateur** n'ont **rien** à faire : ils voient la
+      nouvelle version automatiquement (au besoin, actualiser la page avec `Ctrl+F5`).
+
+---
+
+## 8. Routine quotidienne
 
 **Le matin :**
-- [ ] Vérifier que le **PC serveur est allumé** et que `serveur-local.cmd` tourne
-      (fenêtre ouverte). *(Automatique si tu as fait le §3.9.)*
-- [ ] Les caissiers ouvrent **Vokatra-ko** et se connectent.
+- [ ] Allumer / vérifier le **PC principal** et **lancer Vokatra-ko** (le laisser ouvert).
+- [ ] Les caissiers ouvrent leur **favori navigateur** (multi-postes) ou l'app.
 
 **Le soir (chef de magasin) :**
 - [ ] Vérifier les ventes du jour (onglet **Ventes** / **Tableau de bord**).
-- [ ] **Sauvegarder la base** (voir §8).
+- [ ] **Sauvegarder les données** (voir §9).
 
 ---
 
-## 8. Sauvegardes (à ne pas négliger)
+## 9. Sauvegardes (à ne pas négliger)
 
-Toutes les données sont sur le **PC serveur uniquement**. Sauvegarder régulièrement :
-```powershell
-pg_dump -U user -d stock -f sauvegarde_vokatra_%DATE%.sql
-```
-- [ ] Copier ces fichiers sur une **clé USB / disque externe**.
-- [ ] En cas de panne du PC serveur, c'est ce qui permet de tout restaurer.
+Toutes les données sont sur le **PC principal**, dans `%APPDATA%\Vokatra-ko\pgdata`.
 
-> Fréquence conseillée : **tous les jours** en fin de journée.
+**Méthode simple (recommandée) — copie du dossier de données :**
+1. [ ] **Fermer complètement Vokatra-ko** (clic sur la croix ; l'app arrête sa base proprement).
+2. [ ] Ouvrir l'Explorateur, coller dans la barre d'adresse : `%APPDATA%\Vokatra-ko`
+3. [ ] Copier le dossier **`pgdata`** entier sur une **clé USB / disque externe**
+       (renommez avec la date, ex. `pgdata-2026-08-10`).
+
+> 🔁 **Restauration** : fermer l'app → remplacer le dossier `pgdata` par la copie
+> sauvegardée → relancer l'app.
+>
+> ⚠️ La copie doit se faire **application fermée** (sinon la base est en cours
+> d'utilisation et la copie serait incohérente).
+
+Fréquence conseillée : **tous les jours** en fin de journée.
 
 ---
 
-## 9. Dépannage rapide
+## 10. Dépannage rapide
 
 | Problème | Solution |
 |---|---|
-| Un caissier voit « Serveur injoignable » | PC serveur allumé ? Fenêtre `serveur-local.cmd` ouverte ? Même réseau ? Bonne adresse (§3.7) ? |
-| Ça marchait, puis plus rien | L'IP du serveur a peut-être changé → refaire §3.7, mettre à jour l'adresse dans l'appli caissier (**Fichier → Changer de serveur**), ou fixer l'IP. |
-| « Connexion refusée » | Règle de pare-feu manquante → refaire §3.8 (en administrateur). |
-| Le serveur s'arrête seul | Le PC serveur se met en veille → désactiver la veille (§3.9). |
+| Le 1er lancement est long | Normal : la base intégrée s'initialise une seule fois. Patienter. |
+| Au démarrage : « démarrage impossible » | Une ancienne instance tourne encore, ou un `postgres.exe` est resté bloqué → **fermer l'app partout, puis redémarrer le PC** et relancer. |
+| L'impression n'ouvre pas la bonne imprimante | Dans la fenêtre d'impression Windows, sélectionner la bonne imprimante (80 mm ou A4). |
+| Un poste **navigateur** voit « impossible d'accéder au site » | PC principal allumé et Vokatra-ko ouvert ? Même réseau ? Bonne adresse `http://IP:34519` ? Pare-feu ouvert (§6.1) ? |
+| Ça marchait, puis plus rien (multi-postes) | L'IP du PC principal a changé → refaire §6.1 (relever l'IP) et mettre à jour le favori, ou fixer l'IP. |
 | Un caissier a oublié son mot de passe | Le chef le réinitialise dans **Utilisateurs**. |
 
 ---
 
-## 10. Check-list finale (tout est prêt si tout est coché)
+## 11. Check-list finale (tout est prêt si tout est coché)
 
-- [ ] PC serveur : logiciels installés, base créée, `.env` configuré.
-- [ ] `serveur-local.cmd` démarre le serveur, IP notée, pare-feu ouvert, démarrage auto.
+- [ ] PC de caisse : `Vokatra-ko Setup 0.0.0.exe` installé, 1er lancement OK.
 - [ ] Compte chef (Super Admin) + comptes caissiers (rôle **Caissier**, lieu de travail affecté) créés.
 - [ ] Données de base saisies (articles, clients, fournisseurs).
-- [ ] Application installée sur chaque poste caissier et connectée au serveur.
+- [ ] *(Multi-postes)* pare-feu ouvert (34519), IP notée/fixée, postes caissiers connectés en navigateur.
+- [ ] Impression testée (reçu).
 - [ ] Sauvegarde testée + onduleur en place.
 
 ---
 
 ## Aide-mémoire « qui fait quoi »
 
-| | PC serveur | Poste chef | Postes caissiers |
-|---|---|---|---|
-| **Rôle** | héberge tout | supervise | encaissent |
-| **Compte** | — | Super Admin / Admin | Caissier |
-| **Lance** | `serveur-local.cmd` | `Vokatra-ko` (.exe) | `Vokatra-ko` (.exe) |
-| **Accès** | (moteur) | tout | Caisse & ventes |
+| | PC principal | Postes caissiers (multi-postes) |
+|---|---|---|
+| **Lance** | `Vokatra-ko` (.exe) | un **navigateur** → `http://IP-principal:34519` |
+| **Contient** | l'app **+ la base** (toutes les données) | rien (affichage seulement) |
+| **Compte** | Super Admin / Admin | Caissier |
+| **Accès** | tout | Caisse & ventes |
 
 Bonne mise en route ! 🚀

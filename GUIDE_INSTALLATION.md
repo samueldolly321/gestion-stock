@@ -1,7 +1,13 @@
 # 🏠 Guide d'installation — Vokatra-ko (copie sur un autre PC)
 
+> 🖥️ **Vous voulez juste UTILISER l'application ?** Ce guide-ci est réservé aux
+> **développeurs** (lancer le projet depuis les sources). Pour un magasin / un poste
+> de caisse, utilisez la **version autonome** : double-cliquez **`Vokatra-ko Setup 0.0.0.exe`**
+> — PostgreSQL est déjà intégré, **rien d'autre à installer**. Voir
+> **`GUIDE_DEMARRAGE_MAGASIN.md`** (et `GUIDE_RESEAU_LOCAL.md` pour plusieurs postes).
+
 Ce guide te permet d'obtenir le **même projet fonctionnel chez toi**, à partir d'une copie USB
-(ou d'un clone Git), avec sa base de données PostgreSQL. Suis les étapes **dans l'ordre**.
+(ou d'un clone Git), avec sa base de données PostgreSQL, **pour développer**. Suis les étapes **dans l'ordre**.
 
 > Contexte : Windows 10/11. Toutes les commandes se tapent dans **PowerShell**
 > (menu Démarrer → taper « PowerShell »), depuis le dossier du projet sauf indication contraire.
