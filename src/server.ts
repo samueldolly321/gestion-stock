@@ -9,6 +9,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import express from 'express';
 import { sql } from 'drizzle-orm';
+import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { db } from './db/index.ts';
 import { ensureSchema } from './db/ensure-schema.ts';
 import { authRouter } from './server/routes/auth.ts';
@@ -131,13 +132,31 @@ if (fs.existsSync(path.join(distDir, 'index.html'))) {
 
 const PORT = Number(process.env.PORT) || 3001;
 
-// Garantit la présence des tables récentes (idempotent) AVANT d'accepter du trafic.
+// Séquence de démarrage AVANT d'accepter du trafic :
+//  1) Migrations Drizzle — UNIQUEMENT si RUN_MIGRATIONS=true (application desktop autonome :
+//     crée toutes les tables au 1er lancement, sur PostgreSQL embarqué). Sur Render, les tables
+//     sont créées par `npm run db:push` au build, donc RUN_MIGRATIONS n'y est pas défini.
+//  2) ensureSchema — patchs idempotents (colonnes/tables récentes), rejouable sans risque.
 // Un échec ne bloque pas le démarrage (le serveur reste up, on logge simplement).
-ensureSchema()
-  .then(() => console.log('✓ Schéma vérifié (ensureSchema).'))
-  .catch((err) => console.error('ensureSchema a échoué (démarrage poursuivi) :', err))
-  .finally(() => {
-    app.listen(PORT, () => {
-      console.log(`🚀 API Vokatra-ko démarrée sur le port ${PORT}`);
-    });
+async function boot(): Promise<void> {
+  if (process.env.RUN_MIGRATIONS === 'true') {
+    const migrationsFolder = process.env.MIGRATIONS_DIR || path.resolve('drizzle');
+    try {
+      await migrate(db, { migrationsFolder });
+      console.log('✓ Migrations Drizzle appliquées.');
+    } catch (err) {
+      console.error('Échec des migrations Drizzle (démarrage poursuivi) :', err);
+    }
+  }
+  try {
+    await ensureSchema();
+    console.log('✓ Schéma vérifié (ensureSchema).');
+  } catch (err) {
+    console.error('ensureSchema a échoué (démarrage poursuivi) :', err);
+  }
+  app.listen(PORT, () => {
+    console.log(`🚀 API Vokatra-ko démarrée sur le port ${PORT}`);
   });
+}
+
+boot();
