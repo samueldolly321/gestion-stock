@@ -352,12 +352,12 @@ async function main() {
   // --- Journal d'audit de démonstration (alimente l'« Historique des actions ») ---
   await db.insert(schema.auditLogs).values([
     { id: 'LOG-SEED-1', userName: 'Système', action: 'Initialisation des données de démonstration', module: 'Système', createdAt: daysAgo(6) },
-    { id: 'LOG-SEED-2', userName: 'Salathis Admin', action: 'Réception valorisée de la commande ACH-DEMO-1 (Tana Import)', module: 'Achats', entityId: 'ACH-DEMO-1', createdAt: daysAgo(15) },
-    { id: 'LOG-SEED-3', userName: 'Salathis Admin', action: 'Vente POS encaissée (FAC-000008, total 4 320 000)', module: 'Ventes', entityId: 'SALE-D02', createdAt: daysAgo(4) },
-    { id: 'LOG-SEED-4', userName: 'Salathis Admin', action: 'Avoir AV-000001 émis sur facture FAC-000008 (montant 36 000)', module: 'Avoirs', entityId: 'CN-DEMO-1', createdAt: daysAgo(3) },
-    { id: 'LOG-SEED-5', userName: 'Salathis Admin', action: 'Commande d\'achat créée pour Océan Indien Distribution', module: 'Achats', entityId: 'ACH-DEMO-3', createdAt: daysAgo(2) },
-    { id: 'LOG-SEED-6', userName: 'Salathis Admin', action: 'Règlement client enregistré (FAC-000009) — partiel', module: 'Règlements', entityId: 'SALE-D01', createdAt: daysAgo(2) },
-    { id: 'LOG-SEED-7', userName: 'Salathis Admin', action: 'Mise à jour des réglages de l\'entreprise', module: 'Paramètres', entityId: 'global', createdAt: daysAgo(1) },
+    { id: 'LOG-SEED-2', userName: 'Admin', action: 'Réception valorisée de la commande ACH-DEMO-1 (Tana Import)', module: 'Achats', entityId: 'ACH-DEMO-1', createdAt: daysAgo(15) },
+    { id: 'LOG-SEED-3', userName: 'Admin', action: 'Vente POS encaissée (FAC-000008, total 4 320 000)', module: 'Ventes', entityId: 'SALE-D02', createdAt: daysAgo(4) },
+    { id: 'LOG-SEED-4', userName: 'Admin', action: 'Avoir AV-000001 émis sur facture FAC-000008 (montant 36 000)', module: 'Avoirs', entityId: 'CN-DEMO-1', createdAt: daysAgo(3) },
+    { id: 'LOG-SEED-5', userName: 'Admin', action: 'Commande d\'achat créée pour Océan Indien Distribution', module: 'Achats', entityId: 'ACH-DEMO-3', createdAt: daysAgo(2) },
+    { id: 'LOG-SEED-6', userName: 'Admin', action: 'Règlement client enregistré (FAC-000009) — partiel', module: 'Règlements', entityId: 'SALE-D01', createdAt: daysAgo(2) },
+    { id: 'LOG-SEED-7', userName: 'Admin', action: 'Mise à jour des réglages de l\'entreprise', module: 'Paramètres', entityId: 'global', createdAt: daysAgo(1) },
   ]);
 
   console.log('✅ Données de démonstration insérées :');
