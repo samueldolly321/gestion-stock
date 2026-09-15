@@ -40,7 +40,7 @@ npm run dev      # Front (Vite)  -> http://localhost:3000
 - `npm run reset-password -- <email> <nouveau_mdp>` — **récupération de mot de passe** de secours (débloque un Super Admin qui a oublié son mot de passe ; hache en bcrypt, réactive le compte). En prod : à lancer depuis le Shell Render.
 
 ### Compte de test
-- `digital@salathis.com` / `secret123` — **Super Admin**
+
 - Le 1er compte créé sur une base vide devient automatiquement Super Admin.
 - **Mot de passe oublié** : un employé demande la réinitialisation à un Admin (onglet Utilisateurs) ; le Super Admin utilise la commande `npm run reset-password`. Le lien « Mot de passe oublié ? » du portail de connexion rappelle ces deux voies.
 
