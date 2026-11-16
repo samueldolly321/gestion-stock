@@ -571,7 +571,7 @@ export default function Products({
       const matchSearch =
         p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         p.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        p.barcode.includes(searchTerm);
+        (p.barcode || '').includes(searchTerm);
 
       const matchCat = selectedCategory === 'all' || p.categoryId === selectedCategory;
       const matchWarehouse = selectedWarehouse === 'all' || p.locationId === selectedWarehouse;
@@ -1000,7 +1000,7 @@ export default function Products({
                       <button onClick={() => setLabelProduct(viewProduct)} className="text-[10px] text-cyan-400 hover:underline flex items-center gap-1"><Printer className="w-3 h-3" />Imprimer l'étiquette</button>
                     ) : <span className="font-mono text-slate-400">—</span>}
                   </div>
-                  {viewProduct.barcode.length === 13 && (
+                  {viewProduct.barcode?.length === 13 && (
                     <div className="flex justify-center p-2 bg-white rounded-lg border border-slate-200 dark:border-slate-700">
                       <BarcodeSVG code={viewProduct.barcode} height={48} />
                     </div>
