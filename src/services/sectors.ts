@@ -7,7 +7,7 @@
  */
 import { SIZE_PRESETS } from './variants';
 
-export type SectorId = 'alimentation' | 'grossiste' | 'vetements' | 'chaussures' | 'hightech' | 'quincaillerie' | 'general';
+export type SectorId = 'alimentation' | 'poissonnerie' | 'grossiste' | 'vetements' | 'chaussures' | 'hightech' | 'quincaillerie' | 'general';
 
 export interface Features {
   /** Variantes taille × couleur (bouton « Nouveau modèle ») */
@@ -31,6 +31,8 @@ export interface Sector {
   examples: string;
   features: Partial<Features>;
   categories: CategoryTemplate[];
+  /** Valeurs proposées à la création d'un article (unité de base, nom du conditionnement) */
+  productDefaults?: { unit: string; packLabel: string };
 }
 
 export const SECTORS: Sector[] = [
@@ -44,6 +46,22 @@ export const SECTORS: Sector[] = [
       { name: 'Boissons', children: ['Eaux', 'Sodas et jus', 'Café et thé'] },
       { name: 'Produits frais', children: ['Produits laitiers', 'Viandes et poissons', 'Fruits et légumes'] },
       { name: 'Hygiène et entretien', children: ['Savons et soins', 'Lessive et ménage'] },
+    ],
+  },
+  {
+    id: 'poissonnerie',
+    label: 'Poissonnerie (gros et détail)',
+    examples: 'Poisson frais, fruits de mer, séché ou fumé — vente au kg et à la caisse',
+    // Détail = au kg (quantités décimales) ; gros = à la caisse (ex. 1 caisse = 10 kg, prix caisse)
+    // + tarifs négociés par client grossiste. Péremption pour la fraîcheur.
+    features: { packs: true, expiry: true },
+    productDefaults: { unit: 'Kg', packLabel: 'Caisse' },
+    categories: [
+      { name: 'Poissons frais', children: ['Poissons de mer', "Poissons d'eau douce"] },
+      { name: 'Fruits de mer', children: ['Crevettes', 'Crabes', 'Calamars et poulpes', 'Langoustes'] },
+      { name: 'Poissons séchés et fumés' },
+      { name: 'Surgelés' },
+      { name: 'Glace et conditionnement', children: ['Glace', 'Caisses et emballages'] },
     ],
   },
   {
@@ -161,3 +179,20 @@ export function categoriesFor(sectors: string[]): CategoryTemplate[] {
 }
 
 export const sectorLabel = (id: string) => SECTORS.find((s) => s.id === id)?.label || id;
+
+/** Unité et conditionnement proposés pour un nouvel article (1er secteur choisi qui en définit). */
+export function productDefaultsFor(sectors: string[] | null | undefined): { unit: string; packLabel: string } {
+  const s = SECTORS.find((x) => sectors?.includes(x.id) && x.productDefaults);
+  return s?.productDefaults ?? { unit: 'Pièces', packLabel: 'Carton' };
+}
+
+/** Suffixe de prix selon l'unité : « /kg », « /L », sinon « /pce ». */
+export function priceUnitSuffix(unit?: string | null): string {
+  const u = (unit || '').toLowerCase();
+  if (u === 'kg') return '/kg';
+  if (u === 'litre' || u === 'l') return '/L';
+  if (u === 'mètres' || u === 'm') return '/m';
+  if (u === 'm²') return '/m²';
+  if (u === 'paires') return '/paire';
+  return '/pce';
+}

@@ -45,7 +45,7 @@ import { generateEan13 } from '../services/barcode';
 import { getExportCompany } from '../services/exportContext';
 import { VariantModelModal, VariantGrid, VariantLabels, type VariantModalMode } from './VariantsUI';
 import { variantLabel, compareSizes } from '../services/variants';
-import { featuresFor, sizePresetsFor } from '../services/sectors';
+import { featuresFor, sizePresetsFor, productDefaultsFor } from '../services/sectors';
 
 // Unités de mesure proposées dans le formulaire produit (+ « Autre… » pour saisie libre).
 // Unité de BASE (le détail) dans laquelle le stock est compté. Le regroupement « Carton / Pack »
@@ -235,9 +235,10 @@ export default function Products({
     setPurchasePrice(0);
     setSalePrice(0);
     setVatRate(20);
-    setUnit('Pièces');
+    const defaults = productDefaultsFor(sectors); // ex. poissonnerie : Kg + Caisse
+    setUnit(defaults.unit);
     setPackSize(1);
-    setPackLabel('Carton');
+    setPackLabel(defaults.packLabel);
     setPackPurchasePrice('');
     setPackSalePrice('');
     setMinStock(5);
@@ -1506,10 +1507,10 @@ export default function Products({
                 {/* Conditionnement — vente en gros (carton ↔ pièces) */}
                 <div className="col-span-1 md:col-span-2 rounded-lg border border-slate-200 dark:border-slate-800 p-3 bg-slate-50/60 dark:bg-slate-950/20">
                   <label className="text-xs font-semibold text-slate-600 dark:text-slate-300 block mb-0.5">Conditionnement (vente en gros)</label>
-                  <p className="text-[10px] text-slate-400 mb-2.5">Le stock reste compté en pièces. Laissez la taille à 1 s'il n'y a pas de conditionnement.</p>
+                  <p className="text-[10px] text-slate-400 mb-2.5">Le stock reste compté en {(unit || 'pièces').toLowerCase()} (vente au détail). Le conditionnement sert à la vente en gros ; laissez la taille à 1 s'il n'y en a pas.</p>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     <div>
-                      <label className="text-[10px] text-slate-400 block mb-1">Pièces / carton</label>
+                      <label className="text-[10px] text-slate-400 block mb-1">{unit || 'Pièces'} / {(packLabel.trim() || 'carton').toLowerCase()}</label>
                       <input
                         type="number"
                         min={1}
@@ -1530,7 +1531,7 @@ export default function Products({
                       />
                     </div>
                     <div>
-                      <label className="text-[10px] text-slate-400 block mb-1">Prix d'achat / carton</label>
+                      <label className="text-[10px] text-slate-400 block mb-1">Prix d'achat / {(packLabel.trim() || 'carton').toLowerCase()}</label>
                       <input
                         type="number"
                         step="any"
@@ -1543,7 +1544,7 @@ export default function Products({
                       />
                     </div>
                     <div>
-                      <label className="text-[10px] text-slate-400 block mb-1">Prix de vente / carton</label>
+                      <label className="text-[10px] text-slate-400 block mb-1">Prix de vente / {(packLabel.trim() || 'carton').toLowerCase()}</label>
                       <input
                         type="number"
                         step="any"

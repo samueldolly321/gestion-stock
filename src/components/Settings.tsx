@@ -247,7 +247,7 @@ export default function Settings({
           <p className="text-[10px] text-slate-400 mt-1">
             Fonctions actives : {[
               sectorFeatures.variants && 'tailles / couleurs',
-              sectorFeatures.packs && 'carton ↔ pièce',
+              sectorFeatures.packs && 'gros (carton, caisse…) et détail',
               sectorFeatures.expiry && 'péremption et lots',
               sectorFeatures.serials && 'numéros de série (bientôt)',
             ].filter(Boolean).join(', ') || 'gestion standard'}

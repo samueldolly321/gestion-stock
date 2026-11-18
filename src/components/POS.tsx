@@ -24,6 +24,7 @@ import { createDelivery, DELIVERY_TYPES, defaultFeeFor, deliveryTypeLabel } from
 import ReceiptModal from './ReceiptModal';
 import BarcodeScannerModal from './BarcodeScannerModal';
 import { VariantPicker, groupForPos, modelVariants } from './VariantsUI';
+import { priceUnitSuffix } from '../services/sectors';
 import { showAlert } from '../services/dialog';
 import { showToast } from '../services/toast';
 import { useMoney } from '../services/CurrencyContext';
@@ -628,7 +629,7 @@ export default function POS({
                       <div className="flex justify-between items-end mt-1.5 pt-1.5 border-t border-slate-200 dark:border-slate-800/50">
                         <span className="text-xs font-bold font-mono text-cyan-400">
                           {format(p.salePrice)}
-                          <span className="text-[9px] font-normal text-slate-400"> /pce</span>
+                          <span className="text-[9px] font-normal text-slate-400"> {priceUnitSuffix(p.unit)}</span>
                         </span>
                         {quantityInCart > 0 && (
                           <span className="text-[10px] px-1.5 py-0.5 bg-cyan-500/10 text-cyan-400 font-mono rounded">
@@ -715,12 +716,12 @@ export default function POS({
                           value={item.saleUnit}
                           onChange={(e) => setSaleUnit(item.productId, e.target.value as 'piece' | 'pack')}
                           className="text-[9px] font-mono bg-transparent border border-slate-200 dark:border-slate-700 rounded px-1 py-0.5 text-slate-600 dark:text-slate-300 focus:outline-none focus:border-cyan-500"
-                          title="Vendre à la pièce ou au carton"
+                          title="Vendre au détail ou en gros (conditionnement)"
                         >
-                          <option value="piece">Pièce</option>
-                          <option value="pack">{item.packLabel || 'Carton'} ×{item.packSize}</option>
+                          <option value="piece">{priceUnitSuffix(products.find((x) => x.id === item.productId)?.unit) === '/kg' ? 'Au kg (détail)' : 'Pièce (détail)'}</option>
+                          <option value="pack">{item.packLabel || 'Carton'} ×{item.packSize} (gros)</option>
                         </select>
-                        <span className="text-[9px] text-slate-400 font-mono">= {item.quantity} pcs</span>
+                        <span className="text-[9px] text-slate-400 font-mono">= {item.quantity} {priceUnitSuffix(products.find((x) => x.id === item.productId)?.unit).slice(1)}</span>
                       </div>
                     )}
                   </div>
