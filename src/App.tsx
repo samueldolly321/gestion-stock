@@ -81,6 +81,7 @@ import Warehouses from './components/Warehouses';
 import Calendar from './components/Calendar';
 import Accounting from './components/Accounting';
 import Settings from './components/Settings';
+import SectorSetup from './components/SectorSetup';
 import NotificationCenter from './components/NotificationCenter';
 import { ToastMessage, showToast } from './services/toast';
 import DialogHost from './components/DialogHost';
@@ -113,6 +114,8 @@ export default function App() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [usersList, setUsersList] = useState<User[]>([]);
   const [settings, setSettings] = useState<Setting | null>(null);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
+  const [sectorSetupDismissed, setSectorSetupDismissed] = useState(false); // « Plus tard » (pour cette session)
   const [categories, setCategories] = useState<Category[]>([]);
   const [brands, setBrands] = useState<Brand[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
@@ -258,6 +261,7 @@ export default function App() {
           setExportCompany(s.companyName);
           if (s.currencySymbol) setCurrencySymbol(s.currencySymbol);
         }
+        setSettingsLoaded(true);
       })
       .catch((err) => console.error('Chargement des réglages échoué :', err));
   }, []);
@@ -605,6 +609,7 @@ export default function App() {
               currencySymbol={currencySymbol}
               initialStatus={productFilter}
               writePerms={settings?.writePermissions}
+              sectors={settings?.businessSectors}
             />
           )}
 
@@ -786,7 +791,8 @@ export default function App() {
             <Settings
               settings={settings}
               user={currentUser}
-              onRefresh={reloadSettings}
+              categories={categories}
+              onRefresh={() => { reloadSettings(); reloadCatalog(); }}
               currencySymbol={currencySymbol}
               setCurrencySymbol={setCurrencySymbol}
               theme={theme}
@@ -797,6 +803,17 @@ export default function App() {
         </main>
 
       </div>
+      {/* 1er démarrage : « Quel est votre commerce ? » (administrateurs, tant que rien n'est choisi) */}
+      {settingsLoaded && !sectorSetupDismissed && !settings?.businessSectors?.length &&
+        ['Super Admin', 'Admin'].includes(realRole || currentUser.role) && (
+        <SectorSetup
+          firstRun
+          initial={null}
+          categories={categories}
+          onClose={() => setSectorSetupDismissed(true)}
+          onSaved={(s) => { setSettings(s); reloadCatalog(); }}
+        />
+      )}
       <NotificationCenter auditLogs={auditLogs} />
       <DialogHost />
     </div>

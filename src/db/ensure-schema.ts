@@ -47,6 +47,8 @@ export async function ensureSchema(): Promise<void> {
   await db.execute(sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS pack_label text;`);
   await db.execute(sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS pack_purchase_price double precision;`);
   await db.execute(sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS pack_sale_price double precision;`);
+  // Secteurs d'activité (question du 1er démarrage).
+  await db.execute(sql`ALTER TABLE settings ADD COLUMN IF NOT EXISTS business_sectors jsonb;`);
   // Variantes taille × couleur (vêtements, chaussures…).
   await db.execute(sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS variant_group text;`);
   await db.execute(sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS model_name text;`);

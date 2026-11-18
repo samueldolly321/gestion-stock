@@ -12,6 +12,14 @@ export function saveSettings(data: Partial<Setting>): Promise<Setting> {
   return apiFetch<Setting>('/settings', { method: 'PUT', body: JSON.stringify(data) });
 }
 
+/** Secteurs d'activité + création optionnelle des catégories proposées. */
+export function saveSectors(
+  sectors: string[],
+  categories: { name: string; children?: string[] }[] = [],
+): Promise<{ settings: Setting; createdCategories: number }> {
+  return apiFetch('/settings/sectors', { method: 'PUT', body: JSON.stringify({ sectors, categories }) });
+}
+
 // Infos publiques (sans authentification) pour le portail de connexion.
 export interface PublicPages {
   brandName: string | null;

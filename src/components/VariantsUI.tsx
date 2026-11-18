@@ -119,9 +119,11 @@ function ChipPicker({
 export type VariantModalMode = { kind: 'create' } | { kind: 'add'; group: string } | { kind: 'edit'; group: string };
 
 export function VariantModelModal({
-  mode, products, categories, brands, suppliers, warehouses, onClose, onDone,
+  mode, products, categories, brands, suppliers, warehouses, onClose, onDone, sizePresets = SIZE_PRESETS,
 }: {
   mode: VariantModalMode;
+  /** Grilles de tailles, dans l'ordre utile au secteur (chaussures d'abord pour un chausseur) */
+  sizePresets?: typeof SIZE_PRESETS;
   products: Product[];
   categories: Category[];
   brands: Brand[];
@@ -305,7 +307,7 @@ export function VariantModelModal({
                   values={sizes}
                   onChange={setSizes}
                   suggestions={[]}
-                  presets={SIZE_PRESETS}
+                  presets={sizePresets}
                   locked={existingSizes}
                   placeholder="Autre taille (ex. 4XL, 47)…"
                 />

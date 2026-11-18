@@ -1,9 +1,10 @@
 import { Router } from 'express';
 import { eq } from 'drizzle-orm';
 import { db } from '../../db/index.ts';
-import { settings } from '../../db/schema.ts';
+import { settings, categories } from '../../db/schema.ts';
 import { requireAuth, requireRole, type AuthedRequest } from '../auth-middleware.ts';
-import { writeAuditLog } from '../helpers.ts';
+import { writeAuditLog, generateId } from '../helpers.ts';
+import { cleanSectors, sectorLabel } from '../../services/sectors.ts';
 
 export const settingsRouter = Router();
 
@@ -46,6 +47,71 @@ settingsRouter.get('/', requireAuth, async (_req, res) => {
   } catch (err) {
     console.error('get settings error:', err);
     res.status(500).json({ error: 'Erreur lors du chargement des réglages.' });
+  }
+});
+
+/**
+ * PUT /api/settings/sectors — enregistre les secteurs d'activité (« Quel est votre commerce ? »)
+ * et crée, en option, les catégories proposées choisies (celles qui existent déjà sont
+ * ignorées, sans tenir compte des majuscules). Ne touche à aucun autre réglage.
+ * Body : { sectors: string[], categories?: { name, children?: string[] }[] }
+ */
+settingsRouter.put('/sectors', requireAuth, requireRole(...MANAGE_ROLES), async (req: AuthedRequest, res) => {
+  try {
+    const b = req.body ?? {};
+    const chosen = cleanSectors(b.sectors);
+    if (chosen.length === 0) return res.status(400).json({ error: 'Choisissez au moins un secteur.' });
+    const wanted: { name: string; children: string[] }[] = (Array.isArray(b.categories) ? b.categories : [])
+      .map((c: any) => ({
+        name: String(c?.name ?? '').trim().slice(0, 80),
+        children: (Array.isArray(c?.children) ? c.children : []).map((x: any) => String(x ?? '').trim().slice(0, 80)).filter(Boolean),
+      }))
+      .filter((c: { name: string }) => c.name)
+      .slice(0, 60);
+
+    const result = await db.transaction(async (tx) => {
+      const now = new Date().toISOString();
+      await tx
+        .insert(settings)
+        .values({ id: 'global', businessSectors: chosen, updatedAt: now })
+        .onConflictDoUpdate({ target: settings.id, set: { businessSectors: chosen, updatedAt: now } });
+
+      let created = 0;
+      const existing = await tx.select().from(categories);
+      const key = (s: string) => s.toLowerCase();
+      for (const c of wanted) {
+        let parent = existing.find((e) => !e.parentId && key(e.name) === key(c.name));
+        if (!parent) {
+          const [row] = await tx.insert(categories).values({ id: generateId('CAT'), name: c.name, parentId: null, path: c.name }).returning();
+          existing.push(row);
+          parent = row;
+          created++;
+        }
+        for (const ch of c.children) {
+          if (existing.some((e) => e.parentId === parent!.id && key(e.name) === key(ch))) continue;
+          const [row] = await tx
+            .insert(categories)
+            .values({ id: generateId('CAT'), name: ch, parentId: parent.id, path: `${parent.name} > ${ch}` })
+            .returning();
+          existing.push(row);
+          created++;
+        }
+      }
+      const [row] = await tx.select().from(settings).where(eq(settings.id, 'global')).limit(1);
+      return { settings: row, createdCategories: created };
+    });
+
+    await writeAuditLog({
+      userId: req.user?.sub,
+      userName: req.user?.name,
+      action: `Secteur d'activité : ${chosen.map(sectorLabel).join(', ')}${result.createdCategories ? ` (+${result.createdCategories} catégories)` : ''}`,
+      module: 'Paramètres',
+      entityId: 'global',
+    });
+    res.json(result);
+  } catch (err) {
+    console.error('save sectors error:', err);
+    res.status(500).json({ error: "Erreur lors de l'enregistrement du secteur d'activité." });
   }
 });
 

@@ -391,5 +391,6 @@ export interface Setting {
   privacyText?: string | null; // page « Confidentialité » (éditable)
   rolePermissions?: Record<string, string[]> | null;
   writePermissions?: Record<string, string[]> | null;
+  businessSectors?: string[] | null; // secteurs d'activité (src/services/sectors.ts)
   updatedAt: string;
 }

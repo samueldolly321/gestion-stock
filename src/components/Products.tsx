@@ -45,11 +45,12 @@ import { generateEan13 } from '../services/barcode';
 import { getExportCompany } from '../services/exportContext';
 import { VariantModelModal, VariantGrid, VariantLabels, type VariantModalMode } from './VariantsUI';
 import { variantLabel, compareSizes } from '../services/variants';
+import { featuresFor, sizePresetsFor } from '../services/sectors';
 
 // Unités de mesure proposées dans le formulaire produit (+ « Autre… » pour saisie libre).
 // Unité de BASE (le détail) dans laquelle le stock est compté. Le regroupement « Carton / Pack »
 // est géré par la section Conditionnement — d'où l'absence de « Cartons/Packs » ici (évite la confusion).
-const UNIT_OPTIONS = ['Pièces', 'Unités', 'Litre', 'cl', 'Kg', 'mg', 'Bouteilles', 'Pots', 'Sacs'];
+const UNIT_OPTIONS = ['Pièces', 'Unités', 'Paires', 'Litre', 'cl', 'Kg', 'mg', 'Mètres', 'm²', 'Bouteilles', 'Pots', 'Sacs'];
 
 interface ProductsProps {
   products: Product[];
@@ -64,6 +65,7 @@ interface ProductsProps {
   currencySymbol: string;
   initialStatus?: string; // filtre de statut appliqué à l'arrivée (depuis le Dashboard)
   writePerms?: Record<string, string[]> | null;
+  sectors?: string[] | null; // secteurs d'activité → fonctions affichées
 }
 
 // Libellés d'affichage des mouvements de stock (historique par article).
@@ -99,8 +101,10 @@ export default function Products({
   onRefreshPurchases,
   currencySymbol,
   initialStatus,
-  writePerms
+  writePerms,
+  sectors
 }: ProductsProps) {
+  const features = useMemo(() => featuresFor(sectors), [sectors]);
   // Formatage monétaire (Ariary base / Euro converti)
   const { format } = useMoney();
 
@@ -749,7 +753,7 @@ export default function Products({
               Nouveau Produit
             </button>
           )}
-          {canWrite && (
+          {canWrite && features.variants && (
             <button
               onClick={() => setVariantModal({ kind: 'create' })}
               title="Vêtements, chaussures… : un modèle décliné en tailles et couleurs"
@@ -1498,6 +1502,7 @@ export default function Products({
                   )}
                 </div>
 
+                {(features.packs || Number(packSize) > 1) && (<>
                 {/* Conditionnement — vente en gros (carton ↔ pièces) */}
                 <div className="col-span-1 md:col-span-2 rounded-lg border border-slate-200 dark:border-slate-800 p-3 bg-slate-50/60 dark:bg-slate-950/20">
                   <label className="text-xs font-semibold text-slate-600 dark:text-slate-300 block mb-0.5">Conditionnement (vente en gros)</label>
@@ -1555,6 +1560,7 @@ export default function Products({
                     <p className="text-[10px] text-cyan-500 mt-2">1 {packLabel.trim() || 'Carton'} = {packSize} {unit || 'pièces'}.</p>
                   )}
                 </div>
+                </>)}
 
                 {/* Min Stock */}
                 <div>
@@ -1582,6 +1588,7 @@ export default function Products({
                   />
                 </div>
 
+                {(features.expiry || !!expirationDate || !!lotNumber) && (<>
                 {/* Expiry Date */}
                 <div>
                   <label className="text-xs text-slate-400 block mb-1">Date d'Expiration (Optionnel)</label>
@@ -1603,6 +1610,7 @@ export default function Products({
                     className="w-full bg-white dark:bg-slate-950/20 p-2.5 text-xs rounded-lg border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500"
                   />
                 </div>
+                </>)}
 
                 {/* Image : import fichier + aperçu + presets */}
                 <div className="col-span-1 md:col-span-2">
@@ -1686,6 +1694,7 @@ export default function Products({
       {variantModal && (
         <VariantModelModal
           mode={variantModal}
+          sizePresets={sizePresetsFor(sectors)}
           products={products}
           categories={categories}
           brands={brands}

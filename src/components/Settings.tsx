@@ -16,7 +16,9 @@ import {
   Info,
   AlertTriangle
 } from 'lucide-react';
-import { Setting, User } from '../types';
+import { Setting, User, Category } from '../types';
+import SectorSetup from './SectorSetup';
+import { sectorLabel, featuresFor } from '../services/sectors';
 import { useMoney } from '../services/CurrencyContext';
 import { saveSettings } from '../services/settingsService';
 import { resetFigures } from '../services/adminService';
@@ -28,6 +30,7 @@ import { ROLES, ALL_TABS, TAB_LABELS, DEFAULT_ROLE_TABS, WRITE_SCOPES, WRITE_LAB
 interface SettingsProps {
   settings: Setting | null;
   user: User;
+  categories?: Category[];
   onRefresh: () => void;
   currencySymbol: string;
   setCurrencySymbol: (s: string) => void;
@@ -38,6 +41,7 @@ interface SettingsProps {
 export default function Settings({
   settings,
   user,
+  categories = [],
   onRefresh,
   currencySymbol,
   setCurrencySymbol,
@@ -45,6 +49,9 @@ export default function Settings({
   setTheme
 }: SettingsProps) {
   
+  const [sectorOpen, setSectorOpen] = useState(false); // « Quel est votre commerce ? »
+  const sectorFeatures = featuresFor(settings?.businessSectors);
+
   // Local inputs
   const [companyName, setCompanyName] = useState(settings?.companyName || 'Vokatra-ko');
   const [brandName, setBrandName] = useState(settings?.brandName || '');
@@ -229,6 +236,41 @@ export default function Settings({
           </button>
         </div>
       </div>
+
+      {/* Secteur d'activité : pilote les fonctions affichées */}
+      <div className="bg-white dark:bg-slate-900/40 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h4 className="font-bold text-slate-950 dark:text-white">Secteur d'activité</h4>
+          <p className="text-slate-600 dark:text-slate-300 mt-1">
+            {settings?.businessSectors?.length ? settings.businessSectors.map(sectorLabel).join(' · ') : 'Pas encore choisi — toutes les fonctions sont affichées.'}
+          </p>
+          <p className="text-[10px] text-slate-400 mt-1">
+            Fonctions actives : {[
+              sectorFeatures.variants && 'tailles / couleurs',
+              sectorFeatures.packs && 'carton ↔ pièce',
+              sectorFeatures.expiry && 'péremption et lots',
+              sectorFeatures.serials && 'numéros de série (bientôt)',
+            ].filter(Boolean).join(', ') || 'gestion standard'}
+          </p>
+        </div>
+        {['Super Admin', 'Admin', 'Manager'].includes(user.role) && (
+          <button
+            type="button"
+            onClick={() => setSectorOpen(true)}
+            className="px-4 py-2 bg-cyan-500 hover:bg-cyan-600 text-white rounded-lg font-semibold shrink-0"
+          >
+            {settings?.businessSectors?.length ? 'Modifier le secteur' : 'Choisir mon secteur'}
+          </button>
+        )}
+      </div>
+      {sectorOpen && (
+        <SectorSetup
+          initial={settings?.businessSectors}
+          categories={categories}
+          onClose={() => setSectorOpen(false)}
+          onSaved={() => { setSectorOpen(false); onRefresh(); }}
+        />
+      )}
 
       {/* Entreprise (gauche) + Permissions (droite), côte à côte */}
       <form onSubmit={handleSaveSettings} className="bg-white dark:bg-slate-900/40 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-4 text-xs">

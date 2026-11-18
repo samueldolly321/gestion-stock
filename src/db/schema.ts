@@ -357,5 +357,7 @@ export const settings = pgTable('settings', {
   rolePermissions: jsonb('role_permissions').$type<Record<string, string[]>>(),
   // Droits d'écriture : rôle -> modules où créer/éditer/supprimer est permis.
   writePermissions: jsonb('write_permissions').$type<Record<string, string[]>>(),
+  // Secteurs d'activité choisis au 1er démarrage (null = pas encore choisi → tout affiché).
+  businessSectors: jsonb('business_sectors').$type<string[]>(),
   updatedAt,
 });
