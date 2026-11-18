@@ -124,7 +124,31 @@ export const products = pgTable('products', {
   modelName: text('model_name'),
   variantSize: text('variant_size'),
   variantColor: text('variant_color'),
+  // Suivi à l'unité (high-tech) : chaque pièce a un numéro de série / IMEI (table product_serials).
+  trackSerial: boolean('track_serial').default(false).notNull(),
+  warrantyMonths: integer('warranty_months').default(0).notNull(), // garantie client en mois (0 = aucune)
   status: text('status').default('in_stock').notNull(), // in_stock | low_stock | out_of_stock | expired
+  createdAt,
+  updatedAt,
+});
+
+// 7a. Numéros de série / IMEI — une ligne par appareil. Statuts : in_stock | sold | lost | defective.
+// Le stock (product_stock) reste la référence des quantités ; un appareil « in_stock » est rattaché
+// à un entrepôt. `events` = historique de l'appareil (entrée, transfert, vente, retour…).
+export const productSerials = pgTable('product_serials', {
+  id: text('id').primaryKey(),
+  productId: text('product_id').notNull(),
+  serial: text('serial').notNull().unique(),
+  status: text('status').default('in_stock').notNull(),
+  warehouseId: text('warehouse_id'),
+  saleId: text('sale_id'),
+  invoiceNumber: text('invoice_number'),
+  clientId: text('client_id'),
+  clientName: text('client_name'),
+  soldAt: text('sold_at'),
+  warrantyUntil: text('warranty_until'), // date AAAA-MM-JJ (fin de garantie client)
+  notes: text('notes'),
+  events: jsonb('events').$type<{ at: string; type: string; label: string; by?: string | null }[]>().default([]).notNull(),
   createdAt,
   updatedAt,
 });

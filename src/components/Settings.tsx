@@ -249,7 +249,7 @@ export default function Settings({
               sectorFeatures.variants && 'tailles / couleurs',
               sectorFeatures.packs && 'gros (carton, caisse…) et détail',
               sectorFeatures.expiry && 'péremption et lots',
-              sectorFeatures.serials && 'numéros de série (bientôt)',
+              sectorFeatures.serials && 'numéros de série / IMEI',
             ].filter(Boolean).join(', ') || 'gestion standard'}
           </p>
         </div>

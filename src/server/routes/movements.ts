@@ -56,6 +56,10 @@ movementsRouter.post('/', requireAuth, requireWrite('products'), async (req: Aut
     const result = await db.transaction(async (tx) => {
       const [product] = await tx.select().from(products).where(eq(products.id, b.productId)).limit(1);
       if (!product) throw new Error('PRODUCT_NOT_FOUND');
+      // Appareils suivis par numéro : transfert / perte / sortie se font appareil par appareil.
+      if (product.trackSerial && (type === 'transfer' || type === 'waste_loss' || type === 'exit_sale')) {
+        throw new Error('SERIAL_TRACKED');
+      }
 
       if (type === 'transfer') {
         // Transfert A → B : sort de la source, entre en destination, total inchangé.
@@ -120,6 +124,9 @@ movementsRouter.post('/', requireAuth, requireWrite('products'), async (req: Aut
 
     res.status(201).json(result);
   } catch (err: any) {
+    if (err?.message === 'SERIAL_TRACKED') {
+      return res.status(400).json({ error: "Cet article est suivi par numéro de série : transférez ou retirez chaque appareil depuis sa fiche (panneau « Numéros de série »)." });
+    }
     if (err?.message === 'PRODUCT_NOT_FOUND') {
       return res.status(404).json({ error: 'Produit introuvable.' });
     }

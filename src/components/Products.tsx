@@ -23,7 +23,8 @@ import {
   Download,
   Printer,
   ShoppingBag,
-  Shirt
+  Shirt,
+  ShieldCheck
 } from 'lucide-react';
 import { Product, Category, Brand, Supplier, User, Warehouse as WarehouseType, StockMovement, ProductStock } from '../types';
 import { generateId } from '../services/ids';
@@ -46,6 +47,7 @@ import { getExportCompany } from '../services/exportContext';
 import { VariantModelModal, VariantGrid, VariantLabels, type VariantModalMode } from './VariantsUI';
 import { variantLabel, compareSizes } from '../services/variants';
 import { featuresFor, sizePresetsFor, productDefaultsFor } from '../services/sectors';
+import { SerialPanel, SerialLookupModal } from './SerialsUI';
 
 // Unités de mesure proposées dans le formulaire produit (+ « Autre… » pour saisie libre).
 // Unité de BASE (le détail) dans laquelle le stock est compté. Le regroupement « Carton / Pack »
@@ -185,6 +187,9 @@ export default function Products({
   const [labelProduct, setLabelProduct] = useState<Product | null>(null); // étiquette code-barres à imprimer
   const [variantModal, setVariantModal] = useState<VariantModalMode | null>(null); // modèle taille × couleur
   const [labelsGroup, setLabelsGroup] = useState<string | null>(null); // étiquettes de toutes les variantes
+  const [trackSerial, setTrackSerial] = useState(false); // suivi par numéro de série / IMEI
+  const [warrantyMonths, setWarrantyMonths] = useState<number>(0); // garantie client (mois)
+  const [lookupOpen, setLookupOpen] = useState(false); // recherche « numéro de série / garantie »
 
   // Quick Adjustment State
   const [adjustingProduct, setAdjustingProduct] = useState<Product | null>(null);
@@ -236,6 +241,8 @@ export default function Products({
     setSalePrice(0);
     setVatRate(20);
     const defaults = productDefaultsFor(sectors); // ex. poissonnerie : Kg + Caisse
+    setTrackSerial(features.serials); // high-tech : suivi par IMEI proposé d'office
+    setWarrantyMonths(features.serials ? 12 : 0);
     setUnit(defaults.unit);
     setPackSize(1);
     setPackLabel(defaults.packLabel);
@@ -275,6 +282,8 @@ export default function Products({
     setImage(p.image || PRODUCT_IMAGES[0]);
     setExpirationDate(p.expirationDate || '');
     setLotNumber(p.lotNumber || '');
+    setTrackSerial(!!p.trackSerial);
+    setWarrantyMonths(Number(p.warrantyMonths) || 0);
     setSupplierId(p.supplierId || '');
     setLocationId(p.locationId || '');
     setInitialQuantity(p.quantity);
@@ -325,7 +334,9 @@ export default function Products({
       supplierId,
       supplierName: supObj?.name || '',
       locationId,
-      quantity: Number(initialQuantity),
+      quantity: trackSerial ? 0 : Number(initialQuantity),
+      trackSerial,
+      warrantyMonths: Number(warrantyMonths) || 0,
       status: calculatedStatus,
       createdAt: editingProduct ? editingProduct.createdAt : new Date().toISOString(),
       updatedAt: new Date().toISOString()
@@ -338,7 +349,7 @@ export default function Products({
       } else {
         const result = await createProduct({ ...prodData, quantity: 0 });
         // Crée le mouvement d'entrée initiale (qui fixe la quantité) si > 0
-        if (Number(initialQuantity) > 0) {
+        if (!trackSerial && Number(initialQuantity) > 0) { // suivi par IMEI : le stock entre avec les numéros
           await createMovement({
             type: 'entry_reception',
             productId: result.id,
@@ -694,6 +705,10 @@ export default function Products({
         )}
       </div>
 
+      {vp.trackSerial && (
+        <SerialPanel product={vp} warehouses={warehouses} productStock={productStock} canWrite={canWrite} onChanged={onRefresh} />
+      )}
+
       {vp.variantGroup && (
         <VariantGrid
           products={products}
@@ -752,6 +767,16 @@ export default function Products({
             >
               <Plus className="w-4 h-4 shrink-0" />
               Nouveau Produit
+            </button>
+          )}
+          {(features.serials || products.some((p) => p.trackSerial)) && (
+            <button
+              onClick={() => setLookupOpen(true)}
+              title="Retrouver un appareil par son numéro de série / IMEI : vente, client, garantie"
+              className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-200 text-xs font-semibold rounded-lg border border-slate-200 dark:border-slate-700/60 cursor-pointer flex items-center gap-1.5"
+            >
+              <ShieldCheck className="w-4 h-4 text-cyan-400" />
+              N° de série / garantie
             </button>
           )}
           {canWrite && features.variants && (
@@ -877,6 +902,11 @@ export default function Products({
                             <span className="text-[10px] text-slate-400 block truncate">
                               <span className="inline-block px-1.5 rounded bg-cyan-500/10 text-cyan-500 font-semibold mr-1">{variantLabel(p) || 'Variante'}</span>
                               modèle {p.modelName}
+                            </span>
+                          ) : p.trackSerial ? (
+                            <span className="text-[10px] text-slate-400 block">
+                              <span className="inline-block px-1.5 rounded bg-cyan-500/10 text-cyan-500 font-semibold mr-1">IMEI</span>
+                              {p.warrantyMonths ? `garantie ${p.warrantyMonths} mois` : 'suivi à l\'unité'}
                             </span>
                           ) : (
                             <span className="text-[10px] text-slate-400 block font-mono">ID: {p.id}</span>
@@ -1044,6 +1074,12 @@ export default function Products({
               </div>
 
               <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed mb-4">{viewProduct.description || 'Aucune description disponible.'}</p>
+
+              {viewProduct.trackSerial && (
+                <div className="mb-4">
+                  <SerialPanel product={viewProduct} warehouses={warehouses} productStock={productStock} canWrite={canWrite} onChanged={onRefresh} />
+                </div>
+              )}
 
               {viewProduct.variantGroup && (
                 <div className="mb-4">
@@ -1466,7 +1502,12 @@ export default function Products({
                 </div>
 
                 {/* Initial quantity (Only on create) */}
-                {!editingProduct && (
+                {!editingProduct && trackSerial && (
+                  <div className="text-[11px] text-slate-500 p-2.5 rounded-lg bg-slate-50 dark:bg-slate-950/20 border border-slate-200 dark:border-slate-800">
+                    Stock initial : après la création, ouvrez la fiche de l'article et <b>scannez les numéros</b> des appareils (« Ajouter des numéros »).
+                  </div>
+                )}
+                {!editingProduct && !trackSerial && (
                   <div>
                     <label className="text-xs text-slate-400 block mb-1">Quantité Initiale *</label>
                     <input
@@ -1502,6 +1543,36 @@ export default function Products({
                     />
                   )}
                 </div>
+
+                {(features.serials || trackSerial || !!editingProduct?.trackSerial) && (
+                  <div className="col-span-1 md:col-span-2 rounded-lg border border-slate-200 dark:border-slate-800 p-3 bg-slate-50/60 dark:bg-slate-950/20 grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
+                    <label className="flex items-start gap-2 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={trackSerial}
+                        disabled={!!editingProduct?.trackSerial}
+                        onChange={(e) => setTrackSerial(e.target.checked)}
+                        className="w-4 h-4 mt-0.5 accent-cyan-600"
+                      />
+                      <span>
+                        <span className="text-xs font-semibold text-slate-700 dark:text-slate-200 block">Suivi par numéro de série / IMEI</span>
+                        <span className="text-[10px] text-slate-400">Chaque appareil a son numéro : vente, garantie et retour suivis à l'unité.{editingProduct?.trackSerial ? ' (ne peut plus être désactivé)' : ''}</span>
+                      </span>
+                    </label>
+                    <div>
+                      <label className="text-xs text-slate-400 block mb-1">Garantie client (mois)</label>
+                      <input
+                        type="number"
+                        min={0}
+                        max={120}
+                        step={1}
+                        value={warrantyMonths}
+                        onChange={(e) => setWarrantyMonths(Math.max(0, Math.min(120, Math.floor(Number(e.target.value) || 0))))}
+                        className="w-full bg-white dark:bg-slate-950/20 p-2.5 text-xs rounded-lg border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500"
+                      />
+                    </div>
+                  </div>
+                )}
 
                 {(features.packs || (Number(editingProduct?.packSize) || 1) > 1 || (parseDecimal(packSize) || 1) > 1) && (<>
                 {/* Conditionnement — vente en gros (carton ↔ pièces) */}
@@ -1711,6 +1782,7 @@ export default function Products({
         />
       )}
       {labelsGroup && <VariantLabels products={products} group={labelsGroup} onClose={() => setLabelsGroup(null)} />}
+      {lookupOpen && <SerialLookupModal onClose={() => setLookupOpen(false)} />}
 
       {/* ÉTIQUETTE CODE-BARRES À IMPRIMER */}
       {labelProduct && (

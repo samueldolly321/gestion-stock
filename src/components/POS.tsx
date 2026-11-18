@@ -17,7 +17,9 @@ import {
   Truck,
   ScanLine
 } from 'lucide-react';
-import { Product, Client, ClientPrice, Sale, User, TransactionItem, DeliveryType, Warehouse, ProductStock } from '../types';
+import { Product, Client, ClientPrice, Sale, User, TransactionItem, DeliveryType, Warehouse, ProductStock, ProductSerial } from '../types';
+import { SerialPicker } from './SerialsUI';
+import { listSerials } from '../services/serialsService';
 import { packSizeOf, hasPack, fmtQty } from '../services/pack';
 import { createSale } from '../services/salesService';
 import { createDelivery, DELIVERY_TYPES, defaultFeeFor, deliveryTypeLabel } from '../services/deliveriesService';
@@ -69,6 +71,8 @@ interface CartLine extends TransactionItem {
   saleUnit: 'piece' | 'pack';
   packSize: number;
   packLabel?: string | null;
+  /** Article suivi à l'unité : numéros de série / IMEI vendus (quantity = nombre de numéros) */
+  serials?: string[];
 }
 
 export default function POS({
@@ -124,6 +128,13 @@ export default function POS({
   const searchRef = useRef<HTMLInputElement>(null);
   const [pickerGroup, setPickerGroup] = useState<string | null>(null); // choix taille × couleur
   const [cart, setCart] = useState<CartLine[]>([]);
+  // Appareils suivis par numéro de série / IMEI, en stock (tous entrepôts) — rechargés après chaque vente.
+  const [serialStock, setSerialStock] = useState<ProductSerial[]>([]);
+  const [serialPickFor, setSerialPickFor] = useState<Product | null>(null);
+  const reloadSerials = React.useCallback(() => {
+    listSerials({ status: 'in_stock' }).then(setSerialStock).catch(() => setSerialStock([]));
+  }, []);
+  React.useEffect(() => { if (products.some((p) => p.trackSerial)) reloadSerials(); }, [products, reloadSerials]);
   const [selectedClientId, setSelectedClientId] = useState<string>(clients[0]?.id || '');
   const [paymentMethod, setPaymentMethod] = useState<Sale['paymentMethod']>('cash');
   const [discountPercent, setDiscountPercent] = useState<number>(0);
@@ -199,6 +210,7 @@ export default function POS({
 
   // Add product to cart
   const addToCart = (product: Product) => {
+    if (product.trackSerial) { setSerialPickFor(product); return; } // choix des appareils (IMEI)
     const cartItem = cart.find((item) => item.productId === product.id);
     if (cartItem) {
       const step = stepFor(cartItem);
@@ -246,6 +258,22 @@ export default function POS({
       showAlert(message, { variant: 'warning' }).then(() => searchRef.current?.focus());
       return false;
     };
+    // IMEI / numéro de série scanné → ajoute CET appareil.
+    const device = serialStock.find((s) => s.serial.toUpperCase() === code.toUpperCase());
+    if (device) {
+      const prod = products.find((p) => p.id === device.productId);
+      if (!prod) return refuse(`Article introuvable pour le numéro ${code}.`);
+      if (activeWarehouseId && device.warehouseId && device.warehouseId !== activeWarehouseId) {
+        return refuse(`L'appareil ${device.serial} se trouve dans ${warehouses.find((w) => w.id === device.warehouseId)?.name || 'un autre entrepôt'}.`);
+      }
+      const line = cart.find((i) => i.productId === prod.id);
+      if (line?.serials?.includes(device.serial)) return refuse(`L'appareil ${device.serial} est déjà dans le panier.`);
+      setSerialsInCart(prod, [...(line?.serials || []), device.serial]);
+      beep(true);
+      showToast(`${prod.name} — ${device.serial} ajouté`, { title: 'Scan ✓', type: 'success', duration: 1200 });
+      setSearchTerm('');
+      return true;
+    }
     const match =
       products.find((p) => (p.barcode || '') === code) ||
       products.find((p) => p.sku.toLowerCase() === code.toLowerCase()) ||
@@ -346,6 +374,23 @@ export default function POS({
   };
 
   // Remove item from cart
+  // Article suivi : la ligne porte la liste des numéros ; quantité = nombre de numéros.
+  const setSerialsInCart = (product: Product, serials: string[]) => {
+    const uniq = [...new Set(serials)];
+    setCart((prev) => {
+      if (uniq.length === 0) return prev.filter((i) => i.productId !== product.id);
+      const existing = prev.find((i) => i.productId === product.id);
+      const price = existing ? existing.unitPrice : priceForClient(product);
+      const line: CartLine = {
+        productId: product.id, productName: product.name, sku: product.sku,
+        quantity: uniq.length, unitPrice: price, discount: existing?.discount || 0, tax: product.vatRate,
+        total: uniq.length * price * (1 - (existing?.discount || 0) / 100),
+        saleUnit: 'piece', packSize: 1, packLabel: null, serials: uniq,
+      };
+      return existing ? prev.map((i) => (i.productId === product.id ? line : i)) : [...prev, line];
+    });
+  };
+
   const removeFromCart = (productId: string) => {
     setCart(cart.filter((item) => item.productId !== productId));
   };
@@ -468,6 +513,7 @@ export default function POS({
       });
 
       setShowReceipt(created);
+      if (cart.some((i) => i.serials?.length)) reloadSerials(); // appareils vendus
       clearCart();
       setNotes('');
       setPaymentRef('');
@@ -709,8 +755,24 @@ export default function POS({
                         </span>
                       )}
                     </div>
+                    {/* Appareils suivis : numéros vendus (cliquer × pour retirer) */}
+                    {item.serials && (
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {item.serials.map((sn) => (
+                          <span key={sn} className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 text-[9px] font-mono">
+                            {sn}
+                            <button
+                              type="button"
+                              aria-label={`Retirer ${sn}`}
+                              onClick={() => { const prod = products.find((p) => p.id === item.productId); if (prod) setSerialsInCart(prod, item.serials!.filter((x) => x !== sn)); }}
+                              className="hover:text-red-500"
+                            >×</button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
                     {/* Unité de vente : pièce ou carton (uniquement si le produit a un conditionnement) */}
-                    {hasPack(item.packSize) && (
+                    {!item.serials && hasPack(item.packSize) && (
                       <div className="flex items-center gap-1.5 mt-1">
                         <select
                           value={item.saleUnit}
@@ -728,7 +790,10 @@ export default function POS({
 
                   <div className="flex items-center gap-2 shrink-0">
                     <button
-                      onClick={() => updateQuantity(item.productId, -1)}
+                      onClick={() => {
+                        if (item.serials) { const prod = products.find((p) => p.id === item.productId); if (prod) setSerialsInCart(prod, item.serials.slice(0, -1)); return; }
+                        updateQuantity(item.productId, -1);
+                      }}
                       className="p-1 bg-slate-200 dark:bg-slate-800 hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded cursor-pointer"
                     >
                       <Minus className="w-3 h-3" />
@@ -740,11 +805,15 @@ export default function POS({
                       value={item.saleUnit === 'pack' ? Math.round((item.quantity / item.packSize) * 1000) / 1000 : item.quantity}
                       onFocus={(e) => e.target.select()}
                       onChange={(e) => setQuantity(item.productId, e.target.value)}
+                      readOnly={!!item.serials}
                       title={item.saleUnit === 'pack' ? 'Nombre de cartons' : 'Quantité (pièces / kg / L)'}
                       className="font-mono text-xs font-bold text-slate-900 dark:text-white w-14 text-center bg-transparent border border-slate-200 dark:border-slate-700 rounded p-0.5 focus:outline-none focus:border-cyan-500"
                     />
                     <button
-                      onClick={() => updateQuantity(item.productId, 1)}
+                      onClick={() => {
+                        if (item.serials) { const prod = products.find((p) => p.id === item.productId); if (prod) setSerialPickFor(prod); return; }
+                        updateQuantity(item.productId, 1);
+                      }}
                       className="p-1 bg-slate-200 dark:bg-slate-800 hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded cursor-pointer"
                     >
                       <Plus className="w-3 h-3" />
@@ -997,6 +1066,17 @@ export default function POS({
       {/* Reçu / facture imprimable (composant partagé avec l'onglet Ventes) */}
       {showReceipt && (
         <ReceiptModal sale={showReceipt} company={company} onClose={() => setShowReceipt(null)} />
+      )}
+
+      {/* Choix des appareils (numéros de série / IMEI) */}
+      {serialPickFor && (
+        <SerialPicker
+          product={serialPickFor}
+          available={serialStock.filter((s) => s.productId === serialPickFor.id && (!activeWarehouseId || !s.warehouseId || s.warehouseId === activeWarehouseId))}
+          already={cart.find((i) => i.productId === serialPickFor.id)?.serials || []}
+          onConfirm={(sns) => { setSerialsInCart(serialPickFor, sns); setSerialPickFor(null); searchRef.current?.focus(); }}
+          onClose={() => { setSerialPickFor(null); searchRef.current?.focus(); }}
+        />
       )}
 
       {/* Choix taille × couleur d'un modèle */}

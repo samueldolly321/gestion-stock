@@ -191,6 +191,28 @@ export interface TransactionItem {
   // Affichage « vente en gros » (n'affecte ni le stock ni les montants — quantity reste en pièces) :
   unitLabel?: string | null; // ex. « Carton » si la ligne a été saisie au carton
   packQty?: number | null; // nombre de cartons saisis (packQty × packSize = quantity)
+  // Articles suivis à l'unité : numéros de série / IMEI vendus et fin de garantie (AAAA-MM-JJ)
+  serials?: string[];
+  warrantyUntil?: string | null;
+}
+
+/** Un appareil suivi par numéro de série / IMEI. */
+export interface ProductSerial {
+  id: string;
+  productId: string;
+  serial: string;
+  status: 'in_stock' | 'sold' | 'lost' | 'defective';
+  warehouseId?: string | null;
+  saleId?: string | null;
+  invoiceNumber?: string | null;
+  clientId?: string | null;
+  clientName?: string | null;
+  soldAt?: string | null;
+  warrantyUntil?: string | null;
+  notes?: string | null;
+  events: { at: string; type: string; label: string; by?: string | null }[];
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface Sale {
@@ -351,6 +373,9 @@ export interface Product {
   modelName?: string | null;
   variantSize?: string | null;
   variantColor?: string | null;
+  // Suivi à l'unité (high-tech) : numéro de série / IMEI par pièce + garantie client
+  trackSerial?: boolean;
+  warrantyMonths?: number;
   status: 'in_stock' | 'low_stock' | 'out_of_stock' | 'expired';
   createdAt: string;
   updatedAt: string;

@@ -28,7 +28,7 @@ export function paySale(id: string, amount: number, method?: string, note?: stri
   return apiFetch<Sale>(`/sales/${id}/pay`, { method: 'POST', body: JSON.stringify({ amount, method, note }) });
 }
 
-export interface CreditNoteLine { productId: string; quantity: number; }
+export interface CreditNoteLine { productId: string; quantity: number; serials?: string[] } // serials : appareils suivis retournés
 
 /**
  * Établit un avoir (note de crédit) sur une facture : le serveur crée l'avoir

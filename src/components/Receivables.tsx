@@ -33,6 +33,19 @@ export default function Receivables({ sales, clients, user, onRefresh }: Receiva
   const [onlyDue, setOnlyDue] = useState(true);
 
   // Quantités déjà avoirées par facture / produit (avoirs = ventes type 'return' liées).
+  // Appareils déjà repris par avoir, par facture (numéros de série / IMEI).
+  const returnedSerials = useMemo(() => {
+    const m: Record<string, Set<string>> = {};
+    for (const s of sales) {
+      if (s.type === 'return' && s.relatedSaleId) {
+        const set = (m[s.relatedSaleId] ||= new Set());
+        for (const it of s.items || []) for (const sn of it.serials || []) set.add(sn);
+      }
+    }
+    return m;
+  }, [sales]);
+  const [cnSerials, setCnSerials] = useState<Record<string, string[]>>({}); // productId -> numéros retournés
+
   const returnedByInvoice = useMemo(() => {
     const m: Record<string, Record<string, number>> = {};
     for (const s of sales) {
@@ -119,6 +132,7 @@ export default function Receivables({ sales, clients, user, onRefresh }: Receiva
   const openCreditNote = (s: Sale) => {
     setCnTarget(s);
     setCnQty({});
+    setCnSerials({});
     setCnReason('');
     setCnRestock(true);
   };
@@ -136,7 +150,7 @@ export default function Receivables({ sales, clients, user, onRefresh }: Receiva
     e.preventDefault();
     if (!cnTarget) return;
     const lines = Object.entries(cnQty)
-      .map(([productId, quantity]) => ({ productId, quantity: Number(quantity) || 0 }))
+      .map(([productId, quantity]) => ({ productId, quantity: Number(quantity) || 0, serials: cnSerials[productId] }))
       .filter((l) => l.quantity > 0);
     if (lines.length === 0) { showAlert('Sélectionnez au moins une quantité à créditer.', { variant: 'warning' }); return; }
     setCnLoading(true);
@@ -350,8 +364,34 @@ export default function Receivables({ sales, clients, user, onRefresh }: Receiva
                       <div className="min-w-0 flex-1">
                         <span className="font-semibold text-slate-900 dark:text-white block truncate">{it.productName}</span>
                         <span className="text-[10px] text-slate-400">Facturé {it.quantity} · {format(it.unitPrice)}{already ? ` · déjà avoiré ${already}` : ''} · retournable {max}</span>
+                        {it.serials && it.serials.length > 0 && (
+                          <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1.5">
+                            {it.serials.map((sn) => {
+                              const done = returnedSerials[cnTarget.id]?.has(sn);
+                              const on = (cnSerials[it.productId] || []).includes(sn);
+                              return (
+                                <label key={sn} className={`flex items-center gap-1 text-[10px] font-mono ${done ? 'opacity-40 line-through' : 'cursor-pointer'}`}>
+                                  <input
+                                    type="checkbox"
+                                    disabled={done}
+                                    checked={on}
+                                    onChange={() => {
+                                      const next = on ? (cnSerials[it.productId] || []).filter((x) => x !== sn) : [...(cnSerials[it.productId] || []), sn];
+                                      setCnSerials((m) => ({ ...m, [it.productId]: next }));
+                                      setCnQty((q) => ({ ...q, [it.productId]: next.length }));
+                                    }}
+                                    className="w-3 h-3 accent-orange-500"
+                                  />
+                                  {sn}
+                                </label>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
                       <input
+                        readOnly={!!it.serials?.length}
+                        title={it.serials?.length ? 'Cochez les appareils retournés' : undefined}
                         type="number" min={0} max={max} step="any" disabled={max === 0}
                         value={cnQty[it.productId] ?? 0}
                         onChange={(e) => {

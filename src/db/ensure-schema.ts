@@ -51,6 +51,29 @@ export async function ensureSchema(): Promise<void> {
   await db.execute(sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS pack_sale_price double precision;`);
   // Secteurs d'activité (question du 1er démarrage).
   await db.execute(sql`ALTER TABLE settings ADD COLUMN IF NOT EXISTS business_sectors jsonb;`);
+  // Numéros de série / IMEI à l'unité + garantie (high-tech).
+  await db.execute(sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS track_serial boolean DEFAULT false NOT NULL;`);
+  await db.execute(sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS warranty_months integer DEFAULT 0 NOT NULL;`);
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS product_serials (
+      id text PRIMARY KEY NOT NULL,
+      product_id text NOT NULL,
+      serial text NOT NULL UNIQUE,
+      status text DEFAULT 'in_stock' NOT NULL,
+      warehouse_id text,
+      sale_id text,
+      invoice_number text,
+      client_id text,
+      client_name text,
+      sold_at text,
+      warranty_until text,
+      notes text,
+      events jsonb DEFAULT '[]'::jsonb NOT NULL,
+      created_at timestamp DEFAULT now() NOT NULL,
+      updated_at timestamp DEFAULT now() NOT NULL
+    );
+  `);
+  await db.execute(sql`CREATE INDEX IF NOT EXISTS product_serials_product_idx ON product_serials (product_id, status);`);
   // Variantes taille × couleur (vêtements, chaussures…).
   await db.execute(sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS variant_group text;`);
   await db.execute(sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS model_name text;`);

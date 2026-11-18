@@ -5,6 +5,7 @@ import { sales, products, clients, stockMovements, payments } from '../../db/sch
 import { requireAuth, requireRole, requireAnyTab, type AuthedRequest } from '../auth-middleware.ts';
 import { generateId, computeProductStatus, writeAuditLog, nextDocNumber } from '../helpers.ts';
 import { adjustWarehouseStock, resolveWarehouseId } from '../stock.ts';
+import { SerialError, cleanSerials, sellSerials, returnSerials } from './serials.ts';
 
 export const salesRouter = Router();
 
@@ -53,6 +54,9 @@ salesRouter.post('/', requireAuth, requireRole(...CASHIER_ROLES), async (req: Au
       const quantity = Math.max(0, Math.round((Number(it.quantity) || 0) * 1000) / 1000);
       const unitPrice = Math.max(0, Number(it.unitPrice) || 0);
       // Garde-fou marge : refus si prix de vente sous le prix d'achat (sauf avoir/retour).
+      if (product?.trackSerial && !Number.isInteger(quantity)) {
+        return res.status(400).json({ error: `« ${product.name} » se vend à l'unité (quantité entière).` });
+      }
       if (product && saleType !== 'return' && unitPrice < product.purchasePrice) {
         return res.status(400).json({
           error: `Vente à perte refusée pour « ${product.name} » : prix de vente (${unitPrice}) inférieur au prix d'achat (${product.purchasePrice}).`,
@@ -74,6 +78,9 @@ salesRouter.post('/', requireAuth, requireRole(...CASHIER_ROLES), async (req: Au
         // Affichage « vente en gros » (n'affecte ni stock ni montants : quantity est en pièces).
         unitLabel: it.unitLabel ?? null,
         packQty: it.packQty != null ? Math.round(Number(it.packQty)) : null,
+        // Articles suivis à l'unité : numéros vendus (vérifiés dans la transaction).
+        serials: product?.trackSerial ? cleanSerials(it.serials) : undefined,
+        warrantyUntil: null as string | null,
       });
     }
     const discountAmount = subtotal * (discountPercent / 100);
@@ -127,6 +134,15 @@ salesRouter.post('/', requireAuth, requireRole(...CASHIER_ROLES), async (req: Au
         if (!product) continue; // article introuvable : on ignore
         const qty = Number(item.quantity) || 0;
         const whId = await resolveWarehouseId(tx, b.warehouseId, product.id);
+
+        // Numéros de série / IMEI : chaque pièce vendue doit être identifiée (garantie client).
+        if (product.trackSerial && saleType !== 'return') {
+          item.warrantyUntil = await sellSerials(tx, {
+            product, serials: item.serials || [], quantity: qty, warehouseId: whId, saleId, invoiceNumber,
+            clientId: b.clientId && b.clientId !== 'PASSAGE' ? b.clientId : null,
+            clientName: b.clientName ?? null, by: req.user?.name ?? null,
+          });
+        }
 
         await tx.insert(stockMovements).values({
           id: generateId('MVT'),
@@ -185,6 +201,11 @@ salesRouter.post('/', requireAuth, requireRole(...CASHIER_ROLES), async (req: Au
           .where(eq(clients.id, b.clientId));
       }
 
+      // Lignes enrichies (fin de garantie des articles suivis) → reçu.
+      if (normalizedItems.some((it) => it.serials?.length)) {
+        const [withWarranty] = await tx.update(sales).set({ items: normalizedItems }).where(eq(sales.id, saleId)).returning();
+        return withWarranty;
+      }
       return createdSale;
     });
 
@@ -198,6 +219,7 @@ salesRouter.post('/', requireAuth, requireRole(...CASHIER_ROLES), async (req: Au
 
     res.status(201).json(sale);
   } catch (err) {
+    if (err instanceof SerialError) return res.status(400).json({ error: err.message });
     console.error('create sale error:', err);
     res.status(500).json({ error: 'Erreur lors de l\'encaissement de la vente.' });
   }
@@ -323,6 +345,8 @@ salesRouter.post('/:id/credit-note', requireAuth, requireRole(...CASHIER_ROLES),
           productId: src.productId, productName: src.productName, sku: src.sku,
           quantity: -qty, unitPrice: Number(src.unitPrice) || 0,
           discount: Number(src.discount) || 0, tax: Number(src.tax) || 0, total: -lineHT,
+          // Appareils suivis : numéros retournés (vérifiés plus bas)
+          serials: Array.isArray(src.serials) && src.serials.length ? cleanSerials(line.serials) : undefined,
         });
       }
       if (creditItems.length === 0) throw new Error('Aucune quantité valide à créditer.');
@@ -358,6 +382,16 @@ salesRouter.post('/:id/credit-note', requireAuth, requireRole(...CASHIER_ROLES),
         warehouseId: invoice.warehouseId ?? null,
         warehouseName: invoice.warehouseName ?? null,
       }).returning();
+
+      // 1b. Numéros de série retournés : remis en stock, ou « défectueux » si non réintégrés.
+      for (const it of creditItems) {
+        if (!it.serials) continue;
+        const whId = await resolveWarehouseId(tx, invoice.warehouseId, it.productId);
+        await returnSerials(tx, {
+          productName: it.productName, productId: it.productId, serials: it.serials, quantity: Math.abs(Number(it.quantity) || 0),
+          invoiceId: invoice.id, restock, warehouseId: whId, creditNumber, by: req.user?.name ?? null,
+        });
+      }
 
       // 2. Réintégration du stock (sauf marchandise détruite) dans l'entrepôt de la facture.
       if (restock) {
@@ -443,7 +477,7 @@ salesRouter.post('/:id/credit-note', requireAuth, requireRole(...CASHIER_ROLES),
     res.status(201).json(result);
   } catch (err: any) {
     console.error('credit-note error:', err);
-    const msg = typeof err?.message === 'string' && /créditer|retournable|facture|Article|Aucune/.test(err.message)
+    const msg = err instanceof SerialError || (typeof err?.message === 'string' && /créditer|retournable|facture|Article|Aucune/.test(err.message))
       ? err.message
       : 'Erreur lors de l\'établissement de l\'avoir.';
     res.status(400).json({ error: msg });

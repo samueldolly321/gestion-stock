@@ -15,7 +15,7 @@ const FEATURE_TEXT: Record<string, string> = {
   variants: 'Tailles et couleurs (variantes)',
   packs: 'Vente en gros (carton, caisse, sac…) et au détail',
   expiry: 'Dates de péremption et lots',
-  serials: 'Numéros de série / IMEI et garantie (bientôt)',
+  serials: 'Numéros de série / IMEI et garantie',
 };
 
 export default function SectorSetup({

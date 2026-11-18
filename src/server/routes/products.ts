@@ -48,6 +48,9 @@ function pickProductFields(body: any) {
     supplierName: body.supplierName ?? null,
     locationId: body.locationId ?? null,
     quantity: Number(body.quantity) || 0,
+    // Absents de la requête → inchangés (undefined est ignoré par l'UPDATE, défaut à l'INSERT).
+    trackSerial: body.trackSerial === undefined ? undefined : body.trackSerial === true,
+    warrantyMonths: body.warrantyMonths === undefined ? undefined : Math.max(0, Math.min(120, Math.floor(Number(body.warrantyMonths) || 0))),
   };
 }
 

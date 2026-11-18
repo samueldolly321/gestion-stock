@@ -53,6 +53,16 @@ export default function ReceiptModal({ sale, company, onClose }: ReceiptModalPro
                     ? `${item.packQty} ${item.unitLabel} (${item.quantity} pcs) x ${format(item.unitPrice)}`
                     : `${item.quantity} x ${format(item.unitPrice)}`}
                 </span>
+                {item.serials && item.serials.length > 0 && (
+                  <span className="text-[9px] text-slate-600 block font-mono">
+                    N° série / IMEI : {item.serials.join(', ')}
+                  </span>
+                )}
+                {item.warrantyUntil && (
+                  <span className="text-[9px] text-slate-600 block">
+                    Garantie jusqu'au {item.warrantyUntil.split('-').reverse().join('/')}
+                  </span>
+                )}
               </div>
               <span className="font-mono">{format(item.quantity * item.unitPrice)}</span>
             </div>

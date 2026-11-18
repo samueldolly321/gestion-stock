@@ -34,6 +34,7 @@ import { paymentsRouter } from './server/routes/payments.ts';
 import { eventsRouter } from './server/routes/events.ts';
 import { aiRouter } from './server/routes/ai.ts';
 import { adminRouter } from './server/routes/admin.ts';
+import { serialsRouter } from './server/routes/serials.ts';
 
 const app = express();
 // Derrière le proxy Render : permet à req.ip de refléter l'IP réelle du client
@@ -59,6 +60,7 @@ app.use('/api/categories', categoriesRouter);
 // Routes produits & mouvements de stock
 app.use('/api/products', productsRouter);
 app.use('/api/movements', movementsRouter);
+app.use('/api/serials', serialsRouter); // numéros de série / IMEI + garantie
 
 // Routes partenaires : clients & fournisseurs
 app.use('/api/clients', clientsRouter);
