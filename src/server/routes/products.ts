@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { desc, eq } from 'drizzle-orm';
+import { and, desc, eq, ne } from 'drizzle-orm';
 import { db } from '../../db/index.ts';
 import { products, productStock } from '../../db/schema.ts';
 import { requireAuth, requireWrite, type AuthedRequest } from '../auth-middleware.ts';
@@ -14,7 +14,7 @@ const MANAGE_ROLES = ['Super Admin', 'Admin', 'Manager', 'Magasinier'];
 function pickProductFields(body: any) {
   return {
     sku: body.sku,
-    barcode: body.barcode ?? null,
+    barcode: typeof body.barcode === 'string' && body.barcode.trim() ? body.barcode.trim() : null,
     qrCode: body.qrCode ?? null,
     name: body.name,
     description: body.description ?? null,
@@ -49,6 +49,16 @@ function pickProductFields(body: any) {
   };
 }
 
+/** Article qui utilise déjà ce code-barres (hors `exceptId`), sinon null. */
+async function barcodeOwner(barcode: string | null, exceptId?: string) {
+  if (!barcode) return null;
+  const where = exceptId ? and(eq(products.barcode, barcode), ne(products.id, exceptId)) : eq(products.barcode, barcode);
+  const [row] = await db.select({ name: products.name, sku: products.sku }).from(products).where(where).limit(1);
+  return row ?? null;
+}
+const barcodeTakenMessage = (code: string, owner: { name: string; sku: string }) =>
+  `Le code-barres ${code} est déjà utilisé par « ${owner.name} » (${owner.sku}). Chaque article doit avoir son propre code.`;
+
 /** GET /api/products — liste tous les produits (plus récents d'abord). */
 productsRouter.get('/', requireAuth, async (_req, res) => {
   try {
@@ -70,6 +80,8 @@ productsRouter.post('/', requireAuth, requireWrite('products'), async (req: Auth
     if (f.purchasePrice < 0 || f.salePrice < 0) {
       return res.status(400).json({ error: 'Les prix ne peuvent pas être négatifs.' });
     }
+    const owner = await barcodeOwner(f.barcode);
+    if (owner) return res.status(409).json({ error: barcodeTakenMessage(f.barcode!, owner) });
 
     const id = generateId('PRD');
     const status = computeProductStatus(f.quantity, f.minStock, f.expirationDate);
@@ -103,6 +115,8 @@ productsRouter.put('/:id', requireAuth, requireWrite('products'), async (req: Au
     if (!f.name || !f.sku) {
       return res.status(400).json({ error: 'Le nom et le SKU sont requis.' });
     }
+    const owner = await barcodeOwner(f.barcode, req.params.id);
+    if (owner) return res.status(409).json({ error: barcodeTakenMessage(f.barcode!, owner) });
     // Le stock est dérivé des entrepôts : on ne l'écrase pas directement ici.
     const { quantity: submittedQty, ...rest } = f;
     const updated = await db.transaction(async (tx) => {

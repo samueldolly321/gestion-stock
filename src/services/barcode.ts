@@ -17,11 +17,19 @@ export function ean13Checksum(digits12: string): number {
   return (10 - (sum % 10)) % 10;
 }
 
-/** Génère un code-barres EAN-13 valide (12 chiffres aléatoires + clé de contrôle). */
-export function generateEan13(): string {
-  let base = '';
-  for (let i = 0; i < 12; i++) base += Math.floor(Math.random() * 10);
-  return base + ean13Checksum(base);
+/**
+ * Génère un code-barres EAN-13 valide pour un article du magasin.
+ * Préfixe « 2 » : plage GS1 réservée à l'usage interne (en magasin), donc jamais
+ * le code d'un vrai produit du commerce. `taken` = codes déjà utilisés, à éviter.
+ */
+export function generateEan13(taken: Iterable<string | null | undefined> = []): string {
+  const used = new Set(taken);
+  for (;;) {
+    let base = '2';
+    for (let i = 0; i < 11; i++) base += Math.floor(Math.random() * 10);
+    const code = base + ean13Checksum(base);
+    if (!used.has(code)) return code;
+  }
 }
 
 /** Vrai si `code` est un EAN-13 syntaxiquement et arithmétiquement valide. */

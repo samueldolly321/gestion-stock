@@ -218,7 +218,7 @@ export default function Products({
     setEditingProduct(null);
     setName('');
     setSku('SKU-' + generateId().slice(0, 6));
-    setBarcode(Math.floor(1000000000000 + Math.random() * 900000000000).toString());
+    setBarcode(generateEan13(products.map((p) => p.barcode)));
     setDescription('');
     setCategoryId(topCategories[0]?.id || '');
     setSubCategoryId('');
@@ -1227,7 +1227,7 @@ export default function Products({
                 <div>
                   <div className="flex justify-between items-center mb-1">
                     <label className="text-xs text-slate-400 block">Code-barres (EAN-13)</label>
-                    <button type="button" onClick={() => setBarcode(generateEan13())} className="text-[10px] text-cyan-400 hover:underline">Générer</button>
+                    <button type="button" onClick={() => setBarcode(generateEan13(products.map((p) => p.barcode)))} className="text-[10px] text-cyan-400 hover:underline">Générer</button>
                   </div>
                   <input
                     type="text"
@@ -1238,6 +1238,12 @@ export default function Products({
                     placeholder="13 chiffres — ou cliquez sur « Générer »"
                     className="w-full bg-white dark:bg-slate-950/20 p-2.5 text-xs rounded-lg border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500 font-mono"
                   />
+                  {(() => {
+                    const dup = barcode && products.find((p) => p.barcode === barcode && p.id !== editingProduct?.id);
+                    return dup ? (
+                      <p className="mt-1 text-[10px] text-red-500">Déjà utilisé par « {dup.name} » ({dup.sku}) — chaque article doit avoir son propre code.</p>
+                    ) : null;
+                  })()}
                   {barcode.length === 13 && (
                     <div className="mt-2 flex justify-center p-2 bg-white rounded-lg border border-slate-200 dark:border-slate-700">
                       <BarcodeSVG code={barcode} height={44} />

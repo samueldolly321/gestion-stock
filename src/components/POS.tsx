@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import {
   Search,
   ShoppingCart,
@@ -119,6 +119,7 @@ export default function POS({
 
   const [searchTerm, setSearchTerm] = useState('');
   const [scannerOpen, setScannerOpen] = useState(false);
+  const searchRef = useRef<HTMLInputElement>(null);
   const [cart, setCart] = useState<CartLine[]>([]);
   const [selectedClientId, setSelectedClientId] = useState<string>(clients[0]?.id || '');
   const [paymentMethod, setPaymentMethod] = useState<Sale['paymentMethod']>('cash');
@@ -234,20 +235,22 @@ export default function POS({
   const addByCode = (raw: string): boolean => {
     const code = raw.trim();
     if (!code) return false;
+    // Refus : message visible ; un code scanné (chiffres) est effacé et le curseur revient
+    // dans la recherche pour le scan suivant. Un texte tapé à la main est conservé.
+    const refuse = (message: string) => {
+      beep(false);
+      if (/^\d+$/.test(code)) setSearchTerm('');
+      showAlert(message, { variant: 'warning' }).then(() => searchRef.current?.focus());
+      return false;
+    };
     const match =
       products.find((p) => (p.barcode || '') === code) ||
       products.find((p) => p.sku.toLowerCase() === code.toLowerCase()) ||
       (availableProducts.length === 1 ? availableProducts[0] : null);
-    if (!match) {
-      beep(false);
-      showAlert(`Aucun produit ne correspond au code « ${code} ».`, { variant: 'warning' });
-      return false;
-    }
+    if (!match) return refuse(`Aucun produit ne correspond au code « ${code} ».`);
     const inCart = cart.find((i) => i.productId === match.id)?.quantity || 0;
     if (availOf(match) - inCart <= 0) {
-      beep(false);
-      showAlert(`« ${match.name} » est en rupture dans ${activeWarehouse?.name || 'cet entrepôt'}.`, { variant: 'warning' });
-      return false;
+      return refuse(`« ${match.name} » est en rupture dans ${activeWarehouse?.name || 'cet entrepôt'}.`);
     }
     addToCart(match);
     beep(true);
@@ -516,6 +519,7 @@ export default function POS({
             <div className="relative flex-1">
               <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
               <input
+                ref={searchRef}
                 type="text"
                 autoFocus
                 placeholder="Rechercher, ou scanner un code-barres (douchette) puis Entrée…"

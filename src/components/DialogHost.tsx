@@ -52,8 +52,13 @@ export default function DialogHost() {
       if (e.key === 'Escape') resolveDialog(current.id, false);
       if (e.key === 'Enter') resolveDialog(current.id, true);
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    // Branché au tour suivant : la touche Entrée qui a OUVERT le message (ex. douchette
+    // en caisse : code + Entrée) ne doit pas le refermer aussitôt.
+    const t = window.setTimeout(() => window.addEventListener('keydown', onKey), 0);
+    return () => {
+      window.clearTimeout(t);
+      window.removeEventListener('keydown', onKey);
+    };
   }, [current]);
 
   return (
