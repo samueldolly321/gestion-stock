@@ -44,6 +44,8 @@ export async function ensureSchema(): Promise<void> {
 
   // Conditionnement (vente en gros) sur products : carton ↔ pièces.
   await db.execute(sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS pack_size integer DEFAULT 1 NOT NULL;`);
+  // Taille de colis décimale (1 caisse = 12,5 kg ; 1 bidon = 1,5 L). Sans effet si déjà en double.
+  await db.execute(sql`ALTER TABLE products ALTER COLUMN pack_size TYPE double precision;`);
   await db.execute(sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS pack_label text;`);
   await db.execute(sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS pack_purchase_price double precision;`);
   await db.execute(sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS pack_sale_price double precision;`);

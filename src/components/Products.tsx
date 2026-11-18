@@ -39,7 +39,7 @@ import { exportPdf } from '../services/exportPdf';
 import { exportExcel } from '../services/exportExcel';
 import Pagination, { usePagination } from './Pagination';
 import { canWrite as hasWritePerm } from '../services/permissions';
-import { hasPack, packBreakdown } from '../services/pack';
+import { hasPack, packBreakdown, fmtQty, parseDecimal } from '../services/pack';
 import BarcodeSVG from './Barcode';
 import { generateEan13 } from '../services/barcode';
 import { getExportCompany } from '../services/exportContext';
@@ -149,7 +149,7 @@ export default function Products({
   const [vatRate, setVatRate] = useState(20);
   const [unit, setUnit] = useState('Pièces');
   // Conditionnement (vente en gros) : 1 carton = packSize pièces.
-  const [packSize, setPackSize] = useState(1);
+  const [packSize, setPackSize] = useState<number | string>(1); // texte pendant la saisie (« 12,5 »)
   const [packLabel, setPackLabel] = useState('Carton');
   const [packPurchasePrice, setPackPurchasePrice] = useState<number | ''>('');
   const [packSalePrice, setPackSalePrice] = useState<number | ''>('');
@@ -257,9 +257,9 @@ export default function Products({
     setEditingProduct(p);
     setName(p.name);
     setSku(p.sku);
-    setBarcode(p.barcode);
+    setBarcode(p.barcode || ''); // article sans code-barres (import, API) : évite l'écran blanc
     setDescription(p.description || '');
-    setCategoryId(p.categoryId);
+    setCategoryId(p.categoryId || '');
     setSubCategoryId(p.subCategoryId || '');
     setBrandId(p.brandId || '');
     setPurchasePrice(p.purchasePrice);
@@ -313,8 +313,8 @@ export default function Products({
       salePrice: Number(salePrice),
       vatRate: Number(vatRate),
       unit,
-      packSize: Math.max(1, Math.floor(Number(packSize) || 1)),
-      packLabel: (Number(packSize) || 1) > 1 ? (packLabel.trim() || 'Carton') : null,
+      packSize: Math.max(1, Math.round((parseDecimal(packSize) || 1) * 1000) / 1000),
+      packLabel: (parseDecimal(packSize) || 1) > 1 ? (packLabel.trim() || 'Carton') : null,
       packPurchasePrice: packPurchasePrice === '' ? null : Number(packPurchasePrice),
       packSalePrice: packSalePrice === '' ? null : Number(packSalePrice),
       minStock: Number(minStock),
@@ -909,10 +909,10 @@ export default function Products({
                               : 'text-slate-900 dark:text-emerald-400'
                           }
                         >
-                          {p.quantity} {p.unit}
+                          {fmtQty(p.quantity)} {p.unit}
                         </span>
                         {hasPack(p.packSize) && (
-                          <span className="block text-[9px] text-slate-400 font-mono mt-0.5">{packBreakdown(p.quantity, p.packSize, p.packLabel)}</span>
+                          <span className="block text-[9px] text-slate-400 font-mono mt-0.5">{packBreakdown(p.quantity, p.packSize, p.packLabel, ['Pièces', 'Unités'].includes(p.unit) ? null : p.unit)}</span>
                         )}
                       </td>
                       <td className="py-3.5 px-4 text-[11px] text-slate-500 dark:text-slate-300 min-w-[120px]">
@@ -1503,7 +1503,7 @@ export default function Products({
                   )}
                 </div>
 
-                {(features.packs || Number(packSize) > 1) && (<>
+                {(features.packs || (Number(editingProduct?.packSize) || 1) > 1 || (parseDecimal(packSize) || 1) > 1) && (<>
                 {/* Conditionnement — vente en gros (carton ↔ pièces) */}
                 <div className="col-span-1 md:col-span-2 rounded-lg border border-slate-200 dark:border-slate-800 p-3 bg-slate-50/60 dark:bg-slate-950/20">
                   <label className="text-xs font-semibold text-slate-600 dark:text-slate-300 block mb-0.5">Conditionnement (vente en gros)</label>
@@ -1512,10 +1512,12 @@ export default function Products({
                     <div>
                       <label className="text-[10px] text-slate-400 block mb-1">{unit || 'Pièces'} / {(packLabel.trim() || 'carton').toLowerCase()}</label>
                       <input
-                        type="number"
-                        min={1}
-                        value={packSize}
-                        onChange={(e) => setPackSize(Math.max(1, Math.floor(Number(e.target.value) || 1)))}
+                        type="text"
+                        inputMode="decimal"
+                        value={String(packSize).replace('.', ',')}
+                        onChange={(e) => setPackSize(e.target.value.replace(/[^0-9,.]/g, ''))}
+                        onBlur={() => setPackSize(Math.max(1, Math.round((parseDecimal(packSize) || 1) * 1000) / 1000))}
+                        placeholder="ex. 12 ou 12,5"
                         className="w-full bg-white dark:bg-slate-950/20 p-2.5 text-xs rounded-lg border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500"
                       />
                     </div>
@@ -1525,7 +1527,7 @@ export default function Products({
                         type="text"
                         value={packLabel}
                         onChange={(e) => setPackLabel(e.target.value)}
-                        disabled={packSize <= 1}
+                        disabled={(parseDecimal(packSize) || 1) <= 1}
                         placeholder="Carton"
                         className="w-full bg-white dark:bg-slate-950/20 p-2.5 text-xs rounded-lg border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500 disabled:opacity-50"
                       />
@@ -1538,7 +1540,7 @@ export default function Products({
                         min={0}
                         value={packPurchasePrice}
                         onChange={(e) => setPackPurchasePrice(e.target.value === '' ? '' : Number(e.target.value))}
-                        disabled={packSize <= 1}
+                        disabled={(parseDecimal(packSize) || 1) <= 1}
                         placeholder="optionnel"
                         className="w-full bg-white dark:bg-slate-950/20 p-2.5 text-xs rounded-lg border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500 disabled:opacity-50"
                       />
@@ -1551,14 +1553,14 @@ export default function Products({
                         min={0}
                         value={packSalePrice}
                         onChange={(e) => setPackSalePrice(e.target.value === '' ? '' : Number(e.target.value))}
-                        disabled={packSize <= 1}
+                        disabled={(parseDecimal(packSize) || 1) <= 1}
                         placeholder="optionnel"
                         className="w-full bg-white dark:bg-slate-950/20 p-2.5 text-xs rounded-lg border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500 disabled:opacity-50"
                       />
                     </div>
                   </div>
-                  {packSize > 1 && (
-                    <p className="text-[10px] text-cyan-500 mt-2">1 {packLabel.trim() || 'Carton'} = {packSize} {unit || 'pièces'}.</p>
+                  {(parseDecimal(packSize) || 1) > 1 && (
+                    <p className="text-[10px] text-cyan-500 mt-2">1 {packLabel.trim() || 'Carton'} = {fmtQty(parseDecimal(packSize))} {unit || 'pièces'}.</p>
                   )}
                 </div>
                 </>)}

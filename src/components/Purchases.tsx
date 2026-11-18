@@ -6,7 +6,7 @@ import { Purchase, Supplier, Product, User, PurchaseItem, PurchaseStatus, Suppli
 import { useMoney } from '../services/CurrencyContext';
 import { createPurchase, receivePurchase, payPurchase, deletePurchase } from '../services/purchasesService';
 import { canWrite as hasWritePerm } from '../services/permissions';
-import { hasPack, packSizeOf } from '../services/pack';
+import { hasPack, packSizeOf, fmtQty } from '../services/pack';
 import { showAlert, showConfirm } from '../services/dialog';
 import { showToast } from '../services/toast';
 import { exportPdf } from '../services/exportPdf';
@@ -190,7 +190,7 @@ export default function Purchases({ purchases, suppliers, products, supplierProd
         const enteredQty = Number(l.quantity) || 0;
         const enteredCost = Number(l.unitCost) || 0;
         // Conversion en unité de base (pièces) : le stock et le PMP restent en pièces.
-        const quantity = isPack ? enteredQty * size : enteredQty;
+        const quantity = isPack ? Math.round(enteredQty * size * 1000) / 1000 : enteredQty;
         const unitCost = isPack ? enteredCost / size : enteredCost;
         return {
           productId: l.productId,
@@ -447,7 +447,7 @@ export default function Purchases({ purchases, suppliers, products, supplierProd
                     {canPack ? (
                       <select value={l.unit} onChange={(e) => onSelectUnit(i, e.target.value as 'piece' | 'pack')} className={`${inputCls} col-span-2`} title="Unité de saisie">
                         <option value="piece">Pièce</option>
-                        <option value="pack">{(prod?.packLabel || 'Carton')} ×{size}</option>
+                        <option value="pack">{(prod?.packLabel || 'Carton')} ×{fmtQty(size)}</option>
                       </select>
                     ) : (
                       <span className="col-span-2 text-[10px] font-mono text-slate-400 text-center">Pièce</span>
@@ -457,7 +457,7 @@ export default function Purchases({ purchases, suppliers, products, supplierProd
                     <span className="col-span-1 text-[10px] font-mono text-slate-400 text-center">{applyVat ? l.tax : 0}%</span>
                     <button type="button" onClick={() => setLines((p) => p.filter((_, idx) => idx !== i))} className="col-span-1 text-slate-400 hover:text-red-500 flex justify-center"><Trash2 className="w-3.5 h-3.5" /></button>
                     {isPack && (Number(l.quantity) || 0) > 0 && (
-                      <span className="col-span-12 text-[10px] text-cyan-500 font-mono -mt-1">= {(Number(l.quantity) || 0) * size} pièces en stock (coût {format(((Number(l.unitCost) || 0) / size))}/pièce)</span>
+                      <span className="col-span-12 text-[10px] text-cyan-500 font-mono -mt-1">= {fmtQty((Number(l.quantity) || 0) * size)} {(prod?.unit || 'pièces').toLowerCase()} en stock (coût {format(((Number(l.unitCost) || 0) / size))}/{['Pièces', 'Unités'].includes(prod?.unit || '') || !prod?.unit ? 'pièce' : prod.unit.toLowerCase()})</span>
                     )}
                   </div>
                   );

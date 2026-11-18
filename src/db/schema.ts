@@ -103,7 +103,7 @@ export const products = pgTable('products', {
   unit: text('unit').default('Unités').notNull(),
   // Conditionnement (vente en gros) : 1 carton = packSize pièces (base unit).
   // packSize=1 → pas de conditionnement (comportement inchangé).
-  packSize: integer('pack_size').default(1).notNull(),
+  packSize: doublePrecision('pack_size').default(1).notNull(), // décimal : 1 caisse = 12,5 kg
   packLabel: text('pack_label'), // ex. « Carton », « Pack »
   packPurchasePrice: doublePrecision('pack_purchase_price'), // prix d'achat au carton (optionnel)
   packSalePrice: doublePrecision('pack_sale_price'), // prix de vente au carton (optionnel)

@@ -18,7 +18,7 @@ import {
   ScanLine
 } from 'lucide-react';
 import { Product, Client, ClientPrice, Sale, User, TransactionItem, DeliveryType, Warehouse, ProductStock } from '../types';
-import { packSizeOf, hasPack } from '../services/pack';
+import { packSizeOf, hasPack, fmtQty } from '../services/pack';
 import { createSale } from '../services/salesService';
 import { createDelivery, DELIVERY_TYPES, defaultFeeFor, deliveryTypeLabel } from '../services/deliveriesService';
 import ReceiptModal from './ReceiptModal';
@@ -273,7 +273,7 @@ export default function POS({
       const newPrice = perPiecePrice(prod, saleUnit);
       let qty = item.quantity;
       if (saleUnit === 'pack') {
-        qty = Math.max(size, Math.round(item.quantity / size) * size); // multiple de la taille de colis
+        qty = Math.round(Math.max(size, Math.round(item.quantity / size) * size) * 1000) / 1000; // multiple de la taille de colis (décimale possible)
         const avail = availOf(prod);
         if (qty > avail) qty = Math.max(size, Math.floor(avail / size) * size);
       }
@@ -590,7 +590,7 @@ export default function POS({
                             <span className="text-[9px] font-normal text-slate-400"> /pce</span>
                           </span>
                           {inCart > 0 && (
-                            <span className="text-[10px] px-1.5 py-0.5 bg-cyan-500/10 text-cyan-400 font-mono rounded">{inCart} dans panier</span>
+                            <span className="text-[10px] px-1.5 py-0.5 bg-cyan-500/10 text-cyan-400 font-mono rounded">{fmtQty(inCart)} dans panier</span>
                           )}
                         </div>
                       </div>
@@ -624,7 +624,7 @@ export default function POS({
                     <div className="mt-3 w-full">
                       <div className="flex justify-between text-[10px] text-slate-400">
                         <span>Disponible :</span>
-                        <span className="font-mono font-semibold text-slate-900 dark:text-slate-300">{round3(availOf(p) - quantityInCart)}</span>
+                        <span className="font-mono font-semibold text-slate-900 dark:text-slate-300">{fmtQty(round3(availOf(p) - quantityInCart))}</span>
                       </div>
                       <div className="flex justify-between items-end mt-1.5 pt-1.5 border-t border-slate-200 dark:border-slate-800/50">
                         <span className="text-xs font-bold font-mono text-cyan-400">
@@ -633,13 +633,13 @@ export default function POS({
                         </span>
                         {quantityInCart > 0 && (
                           <span className="text-[10px] px-1.5 py-0.5 bg-cyan-500/10 text-cyan-400 font-mono rounded">
-                            {quantityInCart} dans panier
+                            {fmtQty(quantityInCart)} dans panier
                           </span>
                         )}
                       </div>
                       {hasPack(p.packSize) && (
                         <div className="flex justify-between items-center mt-1 text-[10px] font-mono text-amber-600 dark:text-amber-400">
-                          <span>{p.packLabel || 'Carton'} ×{packSizeOf(p.packSize)}</span>
+                          <span>{p.packLabel || 'Carton'} ×{fmtQty(packSizeOf(p.packSize))}</span>
                           <span className="font-bold">{format(p.packSalePrice != null ? p.packSalePrice : p.salePrice * packSizeOf(p.packSize))}</span>
                         </div>
                       )}
@@ -719,9 +719,9 @@ export default function POS({
                           title="Vendre au détail ou en gros (conditionnement)"
                         >
                           <option value="piece">{priceUnitSuffix(products.find((x) => x.id === item.productId)?.unit) === '/kg' ? 'Au kg (détail)' : 'Pièce (détail)'}</option>
-                          <option value="pack">{item.packLabel || 'Carton'} ×{item.packSize} (gros)</option>
+                          <option value="pack">{item.packLabel || 'Carton'} ×{fmtQty(item.packSize)} (gros)</option>
                         </select>
-                        <span className="text-[9px] text-slate-400 font-mono">= {item.quantity} {priceUnitSuffix(products.find((x) => x.id === item.productId)?.unit).slice(1)}</span>
+                        <span className="text-[9px] text-slate-400 font-mono">= {fmtQty(item.quantity)} {priceUnitSuffix(products.find((x) => x.id === item.productId)?.unit).slice(1)}</span>
                       </div>
                     )}
                   </div>
