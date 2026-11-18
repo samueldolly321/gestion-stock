@@ -22,7 +22,8 @@ import {
   FolderTree,
   Download,
   Printer,
-  ShoppingBag
+  ShoppingBag,
+  Shirt
 } from 'lucide-react';
 import { Product, Category, Brand, Supplier, User, Warehouse as WarehouseType, StockMovement, ProductStock } from '../types';
 import { generateId } from '../services/ids';
@@ -42,6 +43,8 @@ import { hasPack, packBreakdown } from '../services/pack';
 import BarcodeSVG from './Barcode';
 import { generateEan13 } from '../services/barcode';
 import { getExportCompany } from '../services/exportContext';
+import { VariantModelModal, VariantGrid, VariantLabels, type VariantModalMode } from './VariantsUI';
+import { variantLabel, compareSizes } from '../services/variants';
 
 // Unités de mesure proposées dans le formulaire produit (+ « Autre… » pour saisie libre).
 // Unité de BASE (le détail) dans laquelle le stock est compté. Le regroupement « Carton / Pack »
@@ -176,6 +179,8 @@ export default function Products({
     return () => { cancelled = true; };
   }, [viewProduct, historyKey]);
   const [labelProduct, setLabelProduct] = useState<Product | null>(null); // étiquette code-barres à imprimer
+  const [variantModal, setVariantModal] = useState<VariantModalMode | null>(null); // modèle taille × couleur
+  const [labelsGroup, setLabelsGroup] = useState<string | null>(null); // étiquettes de toutes les variantes
 
   // Quick Adjustment State
   const [adjustingProduct, setAdjustingProduct] = useState<Product | null>(null);
@@ -567,7 +572,7 @@ export default function Products({
 
   // Filtered products list — toujours les plus récents en premier.
   const filteredProducts = useMemo(() => {
-    return products.filter((p) => {
+    const list = products.filter((p) => {
       const matchSearch =
         p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         p.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -583,7 +588,20 @@ export default function Products({
       else if (selectedStatus === 'expired') matchStatus = p.status === 'expired';
 
       return matchSearch && matchCat && matchWarehouse && matchStatus;
-    }).sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+    });
+    // Plus récents d'abord ; les variantes d'un même modèle restent groupées (date de la plus
+    // récente du modèle), triées par taille (XS < S < M… / 36 < 40) puis par couleur.
+    const groupDate = new Map<string, string>();
+    for (const p of list) {
+      if (p.variantGroup && (p.createdAt || '') > (groupDate.get(p.variantGroup) || '')) groupDate.set(p.variantGroup, p.createdAt || '');
+    }
+    const dateOf = (p: Product) => (p.variantGroup ? groupDate.get(p.variantGroup) : p.createdAt) || '';
+    return list.sort((a, b) =>
+      dateOf(b).localeCompare(dateOf(a)) ||
+      (a.variantGroup || a.id).localeCompare(b.variantGroup || b.id) ||
+      compareSizes(a.variantSize || '', b.variantSize || '') ||
+      (a.variantColor || '').localeCompare(b.variantColor || '', 'fr'),
+    );
   }, [products, searchTerm, selectedCategory, selectedWarehouse, selectedStatus]);
 
   const productsPage = usePagination<Product>(filteredProducts);
@@ -671,6 +689,19 @@ export default function Products({
         )}
       </div>
 
+      {vp.variantGroup && (
+        <VariantGrid
+          products={products}
+          group={vp.variantGroup}
+          selectedId={vp.id}
+          onSelect={(v) => setViewProduct(v)}
+          onAdd={() => setVariantModal({ kind: 'add', group: vp.variantGroup! })}
+          onEdit={() => setVariantModal({ kind: 'edit', group: vp.variantGroup! })}
+          onLabels={() => setLabelsGroup(vp.variantGroup!)}
+          canWrite={canWrite}
+        />
+      )}
+
       <div className="mt-5 pt-3.5 border-t border-slate-200 dark:border-slate-800/60 flex flex-col justify-center items-center gap-1">
         <QrCode className="w-16 h-16 text-slate-400" />
         <span className="text-[10px] font-mono text-slate-500 mt-1">{vp.sku}-QR</span>
@@ -716,6 +747,16 @@ export default function Products({
             >
               <Plus className="w-4 h-4 shrink-0" />
               Nouveau Produit
+            </button>
+          )}
+          {canWrite && (
+            <button
+              onClick={() => setVariantModal({ kind: 'create' })}
+              title="Vêtements, chaussures… : un modèle décliné en tailles et couleurs"
+              className="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 text-white text-xs font-semibold rounded-lg cursor-pointer flex items-center gap-1.5 transition duration-150"
+            >
+              <Shirt className="w-4 h-4 shrink-0 text-cyan-400" />
+              Nouveau modèle (tailles / couleurs)
             </button>
           )}
         </div>
@@ -827,7 +868,14 @@ export default function Products({
                         />
                         <div className="min-w-0">
                           <span className="font-semibold text-slate-900 dark:text-white block truncate">{p.name}</span>
-                          <span className="text-[10px] text-slate-400 block font-mono">ID: {p.id}</span>
+                          {p.variantGroup ? (
+                            <span className="text-[10px] text-slate-400 block truncate">
+                              <span className="inline-block px-1.5 rounded bg-cyan-500/10 text-cyan-500 font-semibold mr-1">{variantLabel(p) || 'Variante'}</span>
+                              modèle {p.modelName}
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-slate-400 block font-mono">ID: {p.id}</span>
+                          )}
                         </div>
                       </td>
                       <td className="py-3.5 px-4 text-slate-600 dark:text-slate-300 whitespace-nowrap">
@@ -991,6 +1039,21 @@ export default function Products({
               </div>
 
               <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed mb-4">{viewProduct.description || 'Aucune description disponible.'}</p>
+
+              {viewProduct.variantGroup && (
+                <div className="mb-4">
+                  <VariantGrid
+                    products={products}
+                    group={viewProduct.variantGroup}
+                    selectedId={viewProduct.id}
+                    onSelect={(v) => setViewProduct(v)}
+                    onAdd={() => setVariantModal({ kind: 'add', group: viewProduct.variantGroup! })}
+                    onEdit={() => setVariantModal({ kind: 'edit', group: viewProduct.variantGroup! })}
+                    onLabels={() => setLabelsGroup(viewProduct.variantGroup!)}
+                    canWrite={canWrite}
+                  />
+                </div>
+              )}
 
               <div className="space-y-2 border-t border-slate-200 dark:border-slate-800/60 pt-3.5 text-xs">
                 <div className="space-y-2">
@@ -1618,6 +1681,24 @@ export default function Products({
           </div>
         </div>
       )}
+
+      {/* MODÈLE TAILLES × COULEURS */}
+      {variantModal && (
+        <VariantModelModal
+          mode={variantModal}
+          products={products}
+          categories={categories}
+          brands={brands}
+          suppliers={suppliers}
+          warehouses={warehouses}
+          onClose={() => setVariantModal(null)}
+          onDone={() => {
+            setVariantModal(null);
+            onRefresh();
+          }}
+        />
+      )}
+      {labelsGroup && <VariantLabels products={products} group={labelsGroup} onClose={() => setLabelsGroup(null)} />}
 
       {/* ÉTIQUETTE CODE-BARRES À IMPRIMER */}
       {labelProduct && (

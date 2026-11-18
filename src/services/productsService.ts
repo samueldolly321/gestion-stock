@@ -19,3 +19,42 @@ export function updateProduct(id: string, data: Partial<Product>): Promise<Produ
 export function deleteProduct(id: string): Promise<{ ok: boolean }> {
   return apiFetch<{ ok: boolean }>(`/products/${id}`, { method: 'DELETE' });
 }
+
+// ---------- Variantes (modèle taille × couleur) ----------
+
+export interface VariantGridInput {
+  modelName?: string;
+  baseSku?: string;
+  /** Modèle existant : ajoute seulement les cases manquantes. */
+  variantGroup?: string;
+  sizes: string[];
+  colors: string[];
+  /** Stock initial par case, clé « taille|couleur ». */
+  quantities?: Record<string, number>;
+  warehouseId?: string;
+  description?: string;
+  categoryId?: string;
+  categoryName?: string;
+  subCategoryId?: string | null;
+  subCategoryName?: string;
+  brandId?: string;
+  brandName?: string;
+  supplierId?: string;
+  supplierName?: string;
+  image?: string;
+  unit?: string;
+  purchasePrice?: number;
+  salePrice?: number;
+  vatRate?: number;
+  minStock?: number;
+  maxStock?: number;
+}
+
+export function createVariants(data: VariantGridInput): Promise<{ variantGroup: string; modelName: string; products: Product[] }> {
+  return apiFetch('/products/variants', { method: 'POST', body: JSON.stringify(data) });
+}
+
+/** Modifie les champs communs (nom du modèle, prix, catégorie…) de toutes les variantes. */
+export function updateModel(variantGroup: string, data: Partial<VariantGridInput>): Promise<{ ok: boolean; count: number }> {
+  return apiFetch(`/products/variants/${encodeURIComponent(variantGroup)}`, { method: 'PUT', body: JSON.stringify(data) });
+}

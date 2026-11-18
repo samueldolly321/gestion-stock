@@ -47,6 +47,12 @@ export async function ensureSchema(): Promise<void> {
   await db.execute(sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS pack_label text;`);
   await db.execute(sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS pack_purchase_price double precision;`);
   await db.execute(sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS pack_sale_price double precision;`);
+  // Variantes taille × couleur (vêtements, chaussures…).
+  await db.execute(sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS variant_group text;`);
+  await db.execute(sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS model_name text;`);
+  await db.execute(sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS variant_size text;`);
+  await db.execute(sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS variant_color text;`);
+  await db.execute(sql`CREATE INDEX IF NOT EXISTS products_variant_group_idx ON products (variant_group);`);
 
   // Table `client_prices` — tarifs de vente négociés par client.
   await db.execute(sql`

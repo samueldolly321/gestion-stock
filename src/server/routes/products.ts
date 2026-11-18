@@ -1,10 +1,12 @@
 import { Router } from 'express';
 import { and, desc, eq, ne } from 'drizzle-orm';
 import { db } from '../../db/index.ts';
-import { products, productStock } from '../../db/schema.ts';
+import { products, productStock, stockMovements } from '../../db/schema.ts';
 import { requireAuth, requireWrite, type AuthedRequest } from '../auth-middleware.ts';
 import { generateId, computeProductStatus, writeAuditLog } from '../helpers.ts';
-import { setWarehouseStock, resolveWarehouseId, recomputeProductTotal } from '../stock.ts';
+import { setWarehouseStock, resolveWarehouseId, recomputeProductTotal, adjustWarehouseStock } from '../stock.ts';
+import { generateEan13 } from '../../services/barcode.ts';
+import { cleanList, cellKey, skuPart, variantName } from '../../services/variants.ts';
 
 export const productsRouter = Router();
 
@@ -58,6 +60,187 @@ async function barcodeOwner(barcode: string | null, exceptId?: string) {
 }
 const barcodeTakenMessage = (code: string, owner: { name: string; sku: string }) =>
   `Le code-barres ${code} est déjà utilisé par « ${owner.name} » (${owner.sku}). Chaque article doit avoir son propre code.`;
+
+// Champs communs à toutes les variantes d'un modèle (modifiables en une fois).
+function pickModelFields(body: any) {
+  const out: Record<string, unknown> = {};
+  const text = ['description', 'categoryId', 'categoryName', 'subCategoryId', 'subCategoryName', 'brandId', 'brandName', 'supplierId', 'supplierName', 'image', 'unit'];
+  for (const k of text) if (body[k] !== undefined) out[k] = body[k] === '' && k !== 'description' ? null : body[k];
+  for (const k of ['purchasePrice', 'salePrice', 'vatRate', 'minStock', 'maxStock']) {
+    if (body[k] !== undefined && body[k] !== '' && body[k] !== null) {
+      const n = Number(body[k]);
+      if (!Number.isFinite(n) || n < 0) throw new Error(`INVALID:${k}`);
+      out[k] = n;
+    }
+  }
+  return out;
+}
+
+/**
+ * POST /api/products/variants — crée la grille taille × couleur d'un modèle (ou ajoute des
+ * cases à un modèle existant via `variantGroup`). Une variante = un article complet :
+ * SKU et code-barres propres, stock initial optionnel par case dans l'entrepôt choisi.
+ * Body : { modelName, baseSku?, variantGroup?, sizes[], colors[], quantities?: {"M|Noir": 5},
+ *          warehouseId?, + champs communs (prix, catégorie, marque, fournisseur, image…) }
+ */
+productsRouter.post('/variants', requireAuth, requireWrite('products'), async (req: AuthedRequest, res) => {
+  const b = req.body ?? {};
+  try {
+    const sizes = cleanList(b.sizes);
+    const colors = cleanList(b.colors);
+    if (sizes.length === 0 && colors.length === 0) {
+      return res.status(400).json({ error: 'Choisissez au moins une taille ou une couleur.' });
+    }
+    let common: Record<string, unknown>;
+    try { common = pickModelFields(b); } catch { return res.status(400).json({ error: 'Prix ou seuils invalides.' }); }
+
+    // Modèle existant (ajout de cases) ou nouveau modèle.
+    let group: string = typeof b.variantGroup === 'string' && b.variantGroup ? b.variantGroup : '';
+    let modelName = String(b.modelName || '').trim().replace(/\s+/g, ' ');
+    let existing: (typeof products.$inferSelect)[] = [];
+    if (group) {
+      existing = await db.select().from(products).where(eq(products.variantGroup, group));
+      if (existing.length === 0) return res.status(404).json({ error: 'Modèle introuvable.' });
+      const ref = existing[0];
+      modelName = ref.modelName || modelName;
+      // Les nouvelles cases reprennent les champs communs du modèle.
+      common = {
+        description: ref.description, categoryId: ref.categoryId, categoryName: ref.categoryName,
+        subCategoryId: ref.subCategoryId, subCategoryName: ref.subCategoryName, brandId: ref.brandId,
+        brandName: ref.brandName, supplierId: ref.supplierId, supplierName: ref.supplierName, image: ref.image,
+        unit: ref.unit, purchasePrice: ref.purchasePrice, salePrice: ref.salePrice, vatRate: ref.vatRate,
+        minStock: ref.minStock, maxStock: ref.maxStock,
+      };
+    } else {
+      group = generateId('MDL');
+    }
+    if (modelName.length < 2) return res.status(400).json({ error: 'Le nom du modèle est requis.' });
+
+    const taken = new Set(existing.map((p) => cellKey(p.variantSize, p.variantColor)));
+    const combos: { size: string | null; color: string | null }[] = [];
+    for (const size of sizes.length ? sizes : [null]) {
+      for (const color of colors.length ? colors : [null]) {
+        if (!taken.has(cellKey(size, color))) combos.push({ size, color });
+      }
+    }
+    if (combos.length === 0) return res.status(400).json({ error: 'Toutes ces tailles/couleurs existent déjà pour ce modèle.' });
+    if (combos.length > 300) return res.status(400).json({ error: 'Trop de variantes en une fois (300 maximum).' });
+
+    const baseSku = skuPart(String(b.baseSku || '')) || existing[0]?.sku.split('-')[0] || skuPart(modelName).slice(0, 6) || 'MDL';
+    const quantities: Record<string, unknown> = b.quantities && typeof b.quantities === 'object' ? b.quantities : {};
+
+    // Codes déjà utilisés (code-barres et SKU) — chaque variante a les siens.
+    const all = await db.select({ barcode: products.barcode, sku: products.sku }).from(products);
+    const usedBarcodes = new Set(all.map((p) => p.barcode).filter(Boolean) as string[]);
+    const usedSkus = new Set(all.map((p) => p.sku.toUpperCase()));
+
+    const created = await db.transaction(async (tx) => {
+      const whId = await resolveWarehouseId(tx, b.warehouseId || null, ''); // '' : pas encore d'article → entrepôt choisi, sinon le premier
+      const rows: (typeof products.$inferSelect)[] = [];
+      for (const { size, color } of combos) {
+        const skuBase = [baseSku, size && skuPart(size), color && skuPart(color)].filter(Boolean).join('-');
+        let sku = skuBase;
+        for (let i = 2; usedSkus.has(sku.toUpperCase()); i++) sku = `${skuBase}-${i}`;
+        usedSkus.add(sku.toUpperCase());
+        const barcode = generateEan13(usedBarcodes);
+        usedBarcodes.add(barcode);
+        const id = generateId('PRD');
+        const [row] = await tx.insert(products).values({
+          ...(common as any),
+          id,
+          sku,
+          barcode,
+          name: variantName(modelName, size, color),
+          unit: (common.unit as string) || 'Pièces',
+          quantity: 0,
+          status: 'out_of_stock',
+          locationId: whId ?? null,
+          variantGroup: group,
+          modelName,
+          variantSize: size,
+          variantColor: color,
+        }).returning();
+
+        const qty = Math.max(0, Math.floor(Number(quantities[cellKey(size, color)]) || 0));
+        if (qty > 0 && whId) {
+          await adjustWarehouseStock(tx, id, whId, qty);
+          const cost = Number(common.purchasePrice) || 0;
+          await tx.insert(stockMovements).values({
+            id: generateId('MVT'),
+            type: 'entry_reception',
+            productId: id,
+            productName: row.name,
+            sku,
+            warehouseId: whId,
+            quantity: qty,
+            reason: "Quantité d'entrée initiale",
+            performedBy: req.user?.name ?? 'Système',
+            referenceId: 'INITIAL',
+            costPrice: cost,
+            costTotal: cost * qty,
+          });
+        } else {
+          await recomputeProductTotal(tx, id);
+        }
+        const [fresh] = await tx.select().from(products).where(eq(products.id, id)).limit(1);
+        rows.push(fresh);
+      }
+      return rows;
+    });
+
+    await writeAuditLog({
+      userId: req.user?.sub,
+      userName: req.user?.name,
+      action: `${existing.length ? 'Ajout de variantes' : 'Création modèle'} : ${modelName} (${created.length} variante${created.length > 1 ? 's' : ''})`,
+      module: 'Articles',
+      entityId: group,
+    });
+    res.status(201).json({ variantGroup: group, modelName, products: created });
+  } catch (err) {
+    console.error('create variants error:', err);
+    res.status(500).json({ error: 'Erreur lors de la création des variantes.' });
+  }
+});
+
+/**
+ * PUT /api/products/variants/:group — modifie en une fois les champs communs de toutes
+ * les variantes d'un modèle (nom du modèle, prix, catégorie, marque, image…).
+ * Le stock, les SKU et les codes-barres de chaque variante ne sont pas touchés.
+ */
+productsRouter.put('/variants/:group', requireAuth, requireWrite('products'), async (req: AuthedRequest, res) => {
+  const b = req.body ?? {};
+  try {
+    let common: Record<string, unknown>;
+    try { common = pickModelFields(b); } catch { return res.status(400).json({ error: 'Prix ou seuils invalides.' }); }
+    const variants = await db.select().from(products).where(eq(products.variantGroup, req.params.group));
+    if (variants.length === 0) return res.status(404).json({ error: 'Modèle introuvable.' });
+    const modelName = b.modelName !== undefined ? String(b.modelName).trim().replace(/\s+/g, ' ') : variants[0].modelName || '';
+    if (modelName.length < 2) return res.status(400).json({ error: 'Le nom du modèle est requis.' });
+
+    await db.transaction(async (tx) => {
+      for (const v of variants) {
+        await tx.update(products).set({
+          ...(common as any),
+          modelName,
+          name: variantName(modelName, v.variantSize, v.variantColor),
+          updatedAt: new Date().toISOString(),
+        }).where(eq(products.id, v.id));
+        await recomputeProductTotal(tx, v.id); // statut (le seuil mini a pu changer)
+      }
+    });
+    await writeAuditLog({
+      userId: req.user?.sub,
+      userName: req.user?.name,
+      action: `Modification modèle : ${modelName} (${variants.length} variantes)`,
+      module: 'Articles',
+      entityId: req.params.group,
+    });
+    res.json({ ok: true, count: variants.length });
+  } catch (err) {
+    console.error('update model error:', err);
+    res.status(500).json({ error: 'Erreur lors de la modification du modèle.' });
+  }
+});
 
 /** GET /api/products — liste tous les produits (plus récents d'abord). */
 productsRouter.get('/', requireAuth, async (_req, res) => {

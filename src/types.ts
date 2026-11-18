@@ -346,6 +346,11 @@ export interface Product {
   supplierName?: string;
   locationId?: string; // warehouse or specific zone/ray
   quantity: number;
+  // Variantes (vêtements, chaussures…) — voir src/services/variants.ts
+  variantGroup?: string | null;
+  modelName?: string | null;
+  variantSize?: string | null;
+  variantColor?: string | null;
   status: 'in_stock' | 'low_stock' | 'out_of_stock' | 'expired';
   createdAt: string;
   updatedAt: string;

@@ -23,6 +23,7 @@ import { createSale } from '../services/salesService';
 import { createDelivery, DELIVERY_TYPES, defaultFeeFor, deliveryTypeLabel } from '../services/deliveriesService';
 import ReceiptModal from './ReceiptModal';
 import BarcodeScannerModal from './BarcodeScannerModal';
+import { VariantPicker, groupForPos, modelVariants } from './VariantsUI';
 import { showAlert } from '../services/dialog';
 import { showToast } from '../services/toast';
 import { useMoney } from '../services/CurrencyContext';
@@ -120,6 +121,7 @@ export default function POS({
   const [searchTerm, setSearchTerm] = useState('');
   const [scannerOpen, setScannerOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
+  const [pickerGroup, setPickerGroup] = useState<string | null>(null); // choix taille × couleur
   const [cart, setCart] = useState<CartLine[]>([]);
   const [selectedClientId, setSelectedClientId] = useState<string>(clients[0]?.id || '');
   const [paymentMethod, setPaymentMethod] = useState<Sale['paymentMethod']>('cash');
@@ -551,12 +553,54 @@ export default function POS({
                 Aucun produit disponible en stock ne correspond à la recherche.
               </p>
             ) : (
-              availableProducts.map((p) => {
+              groupForPos(availableProducts).map(({ key, product: p, group, count }) => {
+                if (group) {
+                  // Modèle à variantes : une seule carte, la grille taille × couleur s'ouvre au clic.
+                  const { variants } = modelVariants(products, group);
+                  const left = variants.reduce((s, v) => s + Math.max(0, availOf(v) - (cart.find((i) => i.productId === v.id)?.quantity || 0)), 0);
+                  const prices = [...new Set(variants.map((v) => v.salePrice))];
+                  const inCart = variants.reduce((s, v) => s + (cart.find((i) => i.productId === v.id)?.quantity || 0), 0);
+                  return (
+                    <button
+                      key={key}
+                      onClick={() => setPickerGroup(group)}
+                      className="p-3 bg-white hover:bg-slate-50 dark:bg-slate-900/40 dark:hover:bg-slate-800/60 border border-slate-200 dark:border-slate-800 rounded-xl transition duration-150 flex flex-col justify-between text-left cursor-pointer"
+                    >
+                      <img
+                        src={p.image || 'https://api.dicebear.com/7.x/identicon/svg'}
+                        alt={p.modelName || p.name}
+                        className="w-full h-40 rounded-lg object-cover bg-slate-100 dark:bg-slate-800/40 mb-2.5"
+                        referrerPolicy="no-referrer"
+                      />
+                      <div className="min-w-0">
+                        <h4 className="text-sm font-bold text-slate-900 dark:text-white leading-tight truncate">{p.modelName || p.name}</h4>
+                        <span className="text-[10px] text-cyan-500 font-semibold block mt-0.5">
+                          {count} variante{count > 1 ? 's' : ''} en stock — choisir taille / couleur
+                        </span>
+                      </div>
+                      <div className="mt-3 w-full">
+                        <div className="flex justify-between text-[10px] text-slate-400">
+                          <span>Disponible :</span>
+                          <span className="font-mono font-semibold text-slate-900 dark:text-slate-300">{round3(left)}</span>
+                        </div>
+                        <div className="flex justify-between items-end mt-1.5 pt-1.5 border-t border-slate-200 dark:border-slate-800/50">
+                          <span className="text-xs font-bold font-mono text-cyan-400">
+                            {prices.length === 1 ? format(prices[0]) : `${format(Math.min(...prices))} – ${format(Math.max(...prices))}`}
+                            <span className="text-[9px] font-normal text-slate-400"> /pce</span>
+                          </span>
+                          {inCart > 0 && (
+                            <span className="text-[10px] px-1.5 py-0.5 bg-cyan-500/10 text-cyan-400 font-mono rounded">{inCart} dans panier</span>
+                          )}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                }
                 const quantityInCart = cart.find((i) => i.productId === p.id)?.quantity || 0;
                 const isMax = quantityInCart >= availOf(p);
                 return (
                   <button
-                    key={p.id}
+                    key={key}
                     onClick={() => addToCart(p)}
                     disabled={isMax}
                     className="p-3 bg-white hover:bg-slate-50 dark:bg-slate-900/40 dark:hover:bg-slate-800/60 disabled:opacity-40 border border-slate-200 dark:border-slate-800 rounded-xl transition duration-150 flex flex-col justify-between text-left cursor-pointer"
@@ -952,6 +996,17 @@ export default function POS({
       {/* Reçu / facture imprimable (composant partagé avec l'onglet Ventes) */}
       {showReceipt && (
         <ReceiptModal sale={showReceipt} company={company} onClose={() => setShowReceipt(null)} />
+      )}
+
+      {/* Choix taille × couleur d'un modèle */}
+      {pickerGroup && (
+        <VariantPicker
+          products={products}
+          group={pickerGroup}
+          available={(v) => round3(availOf(v) - (cart.find((i) => i.productId === v.id)?.quantity || 0))}
+          onPick={(v) => { addToCart(v); beep(true); showToast(`${v.name} ajouté au panier`, { title: 'Caisse', type: 'success', duration: 1200 }); }}
+          onClose={() => { setPickerGroup(null); searchRef.current?.focus(); }}
+        />
       )}
 
       {/* Scan de code-barres par la caméra */}

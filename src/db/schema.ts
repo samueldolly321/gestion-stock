@@ -119,6 +119,11 @@ export const products = pgTable('products', {
   locationId: text('location_id'),
   // Quantité en double : autorise les quantités décimales (ex. 1,5 kg / 0,75 L).
   quantity: doublePrecision('quantity').default(0).notNull(),
+  // Variantes (vêtements, chaussures…) : les variantes d'un même modèle partagent variantGroup.
+  variantGroup: text('variant_group'),
+  modelName: text('model_name'),
+  variantSize: text('variant_size'),
+  variantColor: text('variant_color'),
   status: text('status').default('in_stock').notNull(), // in_stock | low_stock | out_of_stock | expired
   createdAt,
   updatedAt,
