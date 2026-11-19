@@ -12,6 +12,8 @@ import { setExportCompany } from '../services/exportContext';
 import { showAlert } from '../services/dialog';
 import { showToast } from '../services/toast';
 
+const DEFAULT_NAME = 'Vokatra-ko';
+
 const inputCls =
   'w-full bg-white dark:bg-slate-950/20 px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500';
 
@@ -22,7 +24,8 @@ export default function CompanySetup({
   onClose: () => void;
   onSaved: (s: Setting) => void;
 }) {
-  const [companyName, setCompanyName] = useState(settings?.companyName || '');
+  // Nom proposé par défaut : « Vokatra-ko », à remplacer par celui de la société.
+  const [companyName, setCompanyName] = useState(settings?.companyName?.trim() || DEFAULT_NAME);
   const [logo, setLogo] = useState<string | null>(settings?.logo || null);
   const [taxId, setTaxId] = useState(settings?.taxId || '');
   const [statNumber, setStatNumber] = useState(settings?.statNumber || '');
@@ -81,7 +84,8 @@ export default function CompanySetup({
 
           <div>
             <label htmlFor="co-name" className="text-slate-500 font-semibold block mb-1">Nom de la société (raison sociale) *</label>
-            <input id="co-name" required autoFocus maxLength={120} value={companyName} onChange={(e) => setCompanyName(e.target.value)} placeholder="Ex. : Épicerie Rasoa SARL" className={inputCls} />
+            <input id="co-name" required autoFocus maxLength={120} value={companyName} onChange={(e) => setCompanyName(e.target.value)} onFocus={(e) => e.target.select()} placeholder="Ex. : Épicerie Rasoa SARL" className={inputCls} />
+            <p className="text-[10px] text-slate-500 mt-1">« {DEFAULT_NAME} » par défaut : tapez simplement le nom de votre société pour le remplacer.</p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

@@ -125,7 +125,7 @@ export default function Settings({
   // Synchronise le formulaire quand les réglages arrivent/évoluent depuis l'API.
   useEffect(() => {
     if (!settings) return;
-    setCompanyName(settings.companyName || '');
+    setCompanyName(settings.companyName || 'Vokatra-ko');
     setBrandName(settings.brandName || '');
     setLogoInitials(settings.logoInitials || '');
     setLogo(settings.logo || null);
