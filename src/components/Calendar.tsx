@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { CalendarDays, ChevronLeft, ChevronRight, Truck, ShoppingBag, HandCoins, Plus, X, Trash2 } from 'lucide-react';
+import { CalendarDays, ChevronLeft, ChevronRight, Truck, ShoppingBag, HandCoins, Plus, X, Trash2, MapPin, User as UserIcon } from 'lucide-react';
 import { Delivery, Purchase, Sale, Supplier, Product, SupplierProduct, Client, User, PurchaseItem, DeliveryType } from '../types';
 import { deliveryTypeLabel, DELIVERY_TYPES, defaultFeeFor, createDelivery } from '../services/deliveriesService';
 import { createPurchase } from '../services/purchasesService';
@@ -7,6 +7,8 @@ import { canWrite as hasWritePerm } from '../services/permissions';
 import { showAlert } from '../services/dialog';
 import { showToast } from '../services/toast';
 import { useMoney } from '../services/CurrencyContext';
+import { fmtQty } from '../services/pack';
+import DeliveryItemsEditor, { emptyLine, toDeliveryItems, deliveryItemsOf, itemsSummary, type ItemLine } from './DeliveryItemsEditor';
 
 interface CalendarProps {
   deliveries: Delivery[];
@@ -24,7 +26,9 @@ interface CalendarProps {
 
 interface QLine { productId: string; quantity: number; unitCost: number; tax: number }
 
-type Ev = { kind: 'delivery' | 'purchase' | 'receivable'; label: string; sub: string };
+type Ev = { kind: 'delivery' | 'purchase' | 'receivable'; label: string; sub: string; delivery?: Delivery };
+
+const DELIVERY_STATUS: Record<string, string> = { pending: 'En attente', in_transit: 'En cours', delivered: 'Livré', cancelled: 'Annulé' };
 
 const WEEKDAYS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
 
@@ -45,6 +49,8 @@ export default function Calendar({ deliveries, purchases, sales, suppliers, prod
   const [qaType, setQaType] = useState<DeliveryType>('moto');
   const [qaFee, setQaFee] = useState<number>(defaultFeeFor('moto'));
   const [qaDriver, setQaDriver] = useState('');
+  const [qaItems, setQaItems] = useState<ItemLine[]>([emptyLine()]);
+  const [detail, setDetail] = useState<Delivery | null>(null); // fiche d'une livraison cliquée
   const [qaBusy, setQaBusy] = useState(false);
 
   // Catalogue d'un fournisseur = union supplier_products + produits rattachés (fiche).
@@ -76,6 +82,7 @@ export default function Calendar({ deliveries, purchases, sales, suppliers, prod
     setQaType('moto');
     setQaFee(defaultFeeFor('moto'));
     setQaDriver('');
+    setQaItems([emptyLine()]);
   };
   const onQaSupplier = (sid: string) => { setQaSupplierId(sid); setQaLines(linesForSupplier(sid)); };
   const setQaLine = (i: number, patch: Partial<QLine>) => setQaLines((prev) => prev.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
@@ -100,8 +107,11 @@ export default function Calendar({ deliveries, purchases, sales, suppliers, prod
         await createPurchase({ supplierId: qaSupplierId, supplierName: sup?.name, items, expectedDate: qaDate });
         showToast('Commande d\'achat créée (réception prévue).', { title: 'Calendrier' });
       } else {
+        const items = toDeliveryItems(qaItems, products);
+        if (!items.length) { showAlert('Indiquez au moins un article à livrer (et sa quantité).', { variant: 'warning' }); setQaBusy(false); return; }
         const cli = clients.find((c) => c.id === qaClientId);
         await createDelivery({
+          items,
           saleId: null,
           clientId: qaClientId || null,
           clientName: cli?.name || null,
@@ -142,7 +152,14 @@ export default function Calendar({ deliveries, purchases, sales, suppliers, prod
     };
     deliveries.forEach((d) => {
       if (d.status === 'cancelled') return;
-      add(d.scheduledDate, { kind: 'delivery', label: d.clientName || 'Livraison', sub: deliveryTypeLabel(d.type) });
+      const items = deliveryItemsOf(d, sales);
+      add(d.scheduledDate, {
+        kind: 'delivery',
+        // « Rakoto · Riz 25 kg +1 » : on voit tout de suite quoi livrer
+        label: [d.clientName || 'Livraison', items[0]?.productName].filter(Boolean).join(' · ') + (items.length > 1 ? ` +${items.length - 1}` : ''),
+        sub: `${deliveryTypeLabel(d.type)} — ${items.length ? itemsSummary(items) : 'articles non précisés'}`,
+        delivery: d,
+      });
     });
     purchases.forEach((p) => {
       if (p.status === 'ordered') add(p.expectedDate, { kind: 'purchase', label: p.supplierName || 'Commande', sub: 'Réception prévue' });
@@ -242,7 +259,7 @@ export default function Calendar({ deliveries, purchases, sales, suppliers, prod
                   return (
                     <button
                       key={j}
-                      onClick={() => onNavigate(tab)}
+                      onClick={() => (e.delivery ? setDetail(e.delivery) : onNavigate(tab))}
                       title={`${e.label} — ${e.sub}`}
                       className={`w-full text-left px-1.5 py-0.5 rounded text-[9px] truncate flex items-center gap-1 cursor-pointer transition ${cls}`}
                     >
@@ -316,6 +333,7 @@ export default function Calendar({ deliveries, purchases, sales, suppliers, prod
                 </>
               ) : (
                 <>
+                  <DeliveryItemsEditor lines={qaItems} onChange={setQaItems} products={products} />
                   <div>
                     <label className="text-slate-500 dark:text-slate-400 block mb-1">Client (optionnel)</label>
                     <select value={qaClientId} onChange={(e) => setQaClientId(e.target.value)} className="w-full bg-white dark:bg-slate-950/20 p-2 text-xs rounded-lg border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500">
@@ -351,6 +369,61 @@ export default function Calendar({ deliveries, purchases, sales, suppliers, prod
           </div>
         </div>
       )}
+
+      {/* Fiche d'une livraison (clic sur une livraison du calendrier) */}
+      {detail && <DeliveryDetail d={detail} sales={sales} onClose={() => setDetail(null)} onOpen={() => { setDetail(null); onNavigate('deliveries'); }} />}
+    </div>
+  );
+}
+
+function DeliveryDetail({ d, sales, onClose, onOpen }: { d: Delivery; sales: Sale[]; onClose: () => void; onOpen: () => void }) {
+  const { format } = useMoney();
+  const items = deliveryItemsOf(d, sales);
+  const dateLabel = d.scheduledDate
+    ? new Date(d.scheduledDate.slice(0, 10) + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
+    : 'Date non fixée';
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl animate-fade-in text-xs">
+        <div className="bg-slate-50 dark:bg-slate-950/40 p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-start gap-3">
+          <div>
+            <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              <Truck className="w-4 h-4 text-cyan-500" /> Livraison — {d.clientName || 'sans client'}
+            </h3>
+            <p className="text-[11px] text-slate-500 mt-0.5">{dateLabel} · {DELIVERY_STATUS[d.status] || d.status}</p>
+          </div>
+          <button onClick={onClose} aria-label="Fermer" className="text-slate-400 hover:text-slate-900 dark:hover:text-white"><X className="w-4 h-4" /></button>
+        </div>
+        <div className="p-5 space-y-4">
+          <div>
+            <p className="font-semibold text-slate-700 dark:text-slate-200 mb-1.5">Articles à livrer</p>
+            {items.length ? (
+              <ul className="divide-y divide-slate-100 dark:divide-slate-800 border border-slate-200 dark:border-slate-800 rounded-lg">
+                {items.map((it, k) => (
+                  <li key={k} className="flex justify-between gap-3 px-3 py-2">
+                    <span className="text-slate-900 dark:text-white">{it.productName}</span>
+                    <span className="font-mono font-semibold text-cyan-600 dark:text-cyan-400 whitespace-nowrap">
+                      {fmtQty(it.quantity)}{it.unit && !['Pièces', 'Unités'].includes(it.unit) ? ` ${it.unit}` : ''}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-slate-400">Articles non précisés — ajoutez-les depuis l'onglet Livraisons (Modifier).</p>
+            )}
+          </div>
+          <div className="space-y-1.5 text-slate-600 dark:text-slate-300">
+            {d.address && <p className="flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5 text-slate-400" /> {d.address}</p>}
+            <p className="flex items-center gap-1.5"><Truck className="w-3.5 h-3.5 text-slate-400" /> {deliveryTypeLabel(d.type)} · {format(d.fee)}</p>
+            {d.driverName && <p className="flex items-center gap-1.5"><UserIcon className="w-3.5 h-3.5 text-slate-400" /> {d.driverName}</p>}
+            {d.notes && <p className="text-slate-500">{d.notes}</p>}
+          </div>
+          <div className="flex justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-800 font-semibold">
+            <button type="button" onClick={onClose} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-white rounded-lg">Fermer</button>
+            <button type="button" onClick={onOpen} className="px-4 py-2 bg-cyan-500 hover:bg-cyan-600 text-white rounded-lg">Ouvrir Livraisons</button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

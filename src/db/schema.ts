@@ -348,6 +348,8 @@ export const deliveries = pgTable('deliveries', {
   driverName: text('driver_name'),
   scheduledDate: text('scheduled_date'),
   notes: text('notes'),
+  // Articles à livrer : { productId, productName, quantity, unit }[] (vide = repris de la vente liée)
+  items: jsonb('items').$type<{ productId?: string | null; productName: string; quantity: number; unit?: string | null }[]>(),
   createdBy: text('created_by'),
   createdAt,
   updatedAt,

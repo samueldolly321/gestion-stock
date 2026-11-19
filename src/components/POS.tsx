@@ -509,6 +509,13 @@ export default function POS({
             driverName: null,
             scheduledDate: null,
             notes: `Facture ${created.id}`,
+            // Articles à livrer = ceux de la vente (au carton si saisis au carton)
+            items: itemsForSale.map((it) => ({
+              productId: it.productId,
+              productName: it.productName,
+              quantity: it.packQty && it.unitLabel ? it.packQty : it.quantity,
+              unit: it.packQty && it.unitLabel ? it.unitLabel : (products.find((p) => p.id === it.productId)?.unit ?? null),
+            })),
           });
         } catch (delErr) {
           console.error('Création livraison échouée :', delErr);

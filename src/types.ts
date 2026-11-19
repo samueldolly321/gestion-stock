@@ -328,9 +328,18 @@ export interface Delivery {
   driverName?: string | null;
   scheduledDate?: string | null;
   notes?: string | null;
+  items?: DeliveryItem[] | null; // articles à livrer (vide = ceux de la vente liée)
   createdBy?: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+/** Article à livrer (quantité dans l'unité de l'article : pièces, kg…). */
+export interface DeliveryItem {
+  productId?: string | null;
+  productName: string;
+  quantity: number;
+  unit?: string | null;
 }
 
 export interface Product {

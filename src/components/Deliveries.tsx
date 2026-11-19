@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Truck, Plus, Edit2, Trash2, MapPin, User as UserIcon, Download, X } from 'lucide-react';
-import { Delivery, Client, User, DeliveryType, DeliveryStatus } from '../types';
+import { Delivery, Client, User, DeliveryType, DeliveryStatus, Product, Sale } from '../types';
+import DeliveryItemsEditor, { emptyLine, toDeliveryItems, toItemLines, deliveryItemsOf, itemsSummary, type ItemLine } from './DeliveryItemsEditor';
 import { useMoney } from '../services/CurrencyContext';
 import {
   DELIVERY_TYPES,
@@ -20,6 +21,8 @@ import { canWrite as hasWritePerm } from '../services/permissions';
 interface DeliveriesProps {
   deliveries: Delivery[];
   clients: Client[];
+  products: Product[];
+  sales: Sale[];
   user: User;
   onRefresh: () => void;
   currencySymbol: string;
@@ -33,7 +36,7 @@ const STATUS_META: Record<DeliveryStatus, { label: string; cls: string }> = {
   cancelled: { label: 'Annulé', cls: 'bg-red-500/10 text-red-500' },
 };
 
-export default function Deliveries({ deliveries, clients, user, onRefresh, writePerms }: DeliveriesProps) {
+export default function Deliveries({ deliveries, clients, products, sales, user, onRefresh, writePerms }: DeliveriesProps) {
   const { format } = useMoney();
 
   const canWrite = useMemo(() => hasWritePerm(user.role, 'deliveries', writePerms), [user.role, writePerms]);
@@ -53,6 +56,7 @@ export default function Deliveries({ deliveries, clients, user, onRefresh, write
   const [driverName, setDriverName] = useState('');
   const [scheduledDate, setScheduledDate] = useState('');
   const [notes, setNotes] = useState('');
+  const [itemLines, setItemLines] = useState<ItemLine[]>([]);
 
   const filtered = useMemo(() => {
     return deliveries.filter((d) => {
@@ -61,11 +65,12 @@ export default function Deliveries({ deliveries, clients, user, onRefresh, write
         (d.clientName || '').toLowerCase().includes(s) ||
         (d.address || '').toLowerCase().includes(s) ||
         (d.driverName || '').toLowerCase().includes(s) ||
+        itemsSummary(deliveryItemsOf(d, sales)).toLowerCase().includes(s) ||
         d.id.toLowerCase().includes(s);
       const matchStatus = statusFilter === 'all' || d.status === statusFilter;
       return matchSearch && matchStatus;
     });
-  }, [deliveries, search, statusFilter]);
+  }, [deliveries, search, statusFilter, sales]);
 
   const page = usePagination<Delivery>(filtered);
 
@@ -80,6 +85,7 @@ export default function Deliveries({ deliveries, clients, user, onRefresh, write
     setDriverName('');
     setScheduledDate('');
     setNotes('');
+    setItemLines([emptyLine()]);
     setIsModalOpen(true);
   };
 
@@ -94,6 +100,9 @@ export default function Deliveries({ deliveries, clients, user, onRefresh, write
     setDriverName(d.driverName || '');
     setScheduledDate(d.scheduledDate || '');
     setNotes(d.notes || '');
+    // Articles de la livraison, sinon ceux de la vente liée (livraison créée en caisse)
+    const lines = toItemLines(deliveryItemsOf(d, sales));
+    setItemLines(lines.length ? lines : [emptyLine()]);
     setIsModalOpen(true);
   };
 
@@ -129,6 +138,7 @@ export default function Deliveries({ deliveries, clients, user, onRefresh, write
       driverName: driverName.trim() || null,
       scheduledDate: scheduledDate || null,
       notes: notes.trim() || null,
+      items: toDeliveryItems(itemLines, products),
     };
     try {
       if (editing) {
@@ -169,6 +179,7 @@ export default function Deliveries({ deliveries, clients, user, onRefresh, write
     { label: 'ID', value: (d: Delivery) => d.id },
     { label: 'Client', value: (d: Delivery) => d.clientName || '' },
     { label: 'Adresse', value: (d: Delivery) => d.address || '' },
+    { label: 'Articles', value: (d: Delivery) => itemsSummary(deliveryItemsOf(d, sales)) },
     { label: 'Type', value: (d: Delivery) => deliveryTypeLabel(d.type) },
     { label: 'Tarif', value: (d: Delivery) => d.fee },
     { label: 'Chauffeur', value: (d: Delivery) => d.driverName || '' },
@@ -247,6 +258,7 @@ export default function Deliveries({ deliveries, clients, user, onRefresh, write
             <thead>
               <tr className="bg-slate-50 dark:bg-slate-950/20 border-b border-slate-200 dark:border-slate-800/60 text-[10px] font-mono text-slate-400 uppercase tracking-wider">
                 <th className="py-3 px-4">Client</th>
+                <th className="py-3 px-4">Articles</th>
                 <th className="py-3 px-4 hidden md:table-cell">Adresse</th>
                 <th className="py-3 px-4">Type</th>
                 <th className="py-3 px-4 text-right">Tarif</th>
@@ -259,7 +271,7 @@ export default function Deliveries({ deliveries, clients, user, onRefresh, write
             <tbody className="divide-y divide-slate-200 dark:divide-slate-800/60 text-xs text-slate-600 dark:text-gray-300">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-slate-500">
+                  <td colSpan={9} className="py-12 text-center text-slate-500">
                     Aucune livraison enregistrée.
                   </td>
                 </tr>
@@ -267,6 +279,14 @@ export default function Deliveries({ deliveries, clients, user, onRefresh, write
                 page.paged.map((d) => (
                   <tr key={d.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/10 transition">
                     <td className="py-3.5 px-4 font-bold text-slate-900 dark:text-white">{d.clientName || '—'}</td>
+                    <td className="py-3.5 px-4 max-w-[220px]">
+                      {(() => {
+                        const its = deliveryItemsOf(d, sales);
+                        return its.length
+                          ? <span className="block truncate" title={itemsSummary(its)}>{itemsSummary(its)}</span>
+                          : <span className="text-slate-400">Non précisés</span>;
+                      })()}
+                    </td>
                     <td className="py-3.5 px-4 max-w-xs truncate hidden md:table-cell">
                       <span className="flex items-center gap-1.5 truncate">
                         <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
@@ -365,6 +385,10 @@ export default function Deliveries({ deliveries, clients, user, onRefresh, write
                       </option>
                     ))}
                   </select>
+                </div>
+
+                <div className="col-span-1 sm:col-span-2">
+                  <DeliveryItemsEditor lines={itemLines} onChange={setItemLines} products={products} />
                 </div>
 
                 <div className="col-span-1 sm:col-span-2">

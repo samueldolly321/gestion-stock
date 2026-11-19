@@ -24,7 +24,23 @@ function pickFields(b: any) {
     driverName: b.driverName ?? null,
     scheduledDate: b.scheduledDate ?? null,
     notes: b.notes ?? null,
+    items: cleanItems(b.items),
   };
+}
+
+/** Articles à livrer : nom obligatoire, quantité > 0, 100 lignes max. */
+function cleanItems(v: unknown) {
+  if (!Array.isArray(v)) return null;
+  const items = v
+    .map((x: any) => ({
+      productId: x?.productId ? String(x.productId).slice(0, 64) : null,
+      productName: String(x?.productName ?? '').trim().slice(0, 160),
+      quantity: Number(x?.quantity) || 0,
+      unit: x?.unit ? String(x.unit).slice(0, 30) : null,
+    }))
+    .filter((x) => x.productName && x.quantity > 0)
+    .slice(0, 100);
+  return items.length ? items : null;
 }
 
 deliveriesRouter.get('/', requireAuth, async (_req, res) => {

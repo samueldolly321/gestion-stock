@@ -49,6 +49,8 @@ export async function ensureSchema(): Promise<void> {
   await db.execute(sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS pack_label text;`);
   await db.execute(sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS pack_purchase_price double precision;`);
   await db.execute(sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS pack_sale_price double precision;`);
+  // Articles à livrer sur une livraison.
+  await db.execute(sql`ALTER TABLE deliveries ADD COLUMN IF NOT EXISTS items jsonb;`);
   // Numéro STAT de la société (NIF = tax_id).
   await db.execute(sql`ALTER TABLE settings ADD COLUMN IF NOT EXISTS stat_number text;`);
   // Secteurs d'activité (question du 1er démarrage).

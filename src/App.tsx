@@ -726,6 +726,8 @@ export default function App() {
             <Deliveries
               deliveries={deliveries}
               clients={clients}
+              products={products}
+              sales={sales}
               user={currentUser}
               onRefresh={reloadDeliveries}
               currencySymbol={currencySymbol}
