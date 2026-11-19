@@ -205,6 +205,16 @@ export default function POS({
     });
   }, [products, searchTerm, availOf]);
 
+  // Caisse vide : pourquoi ? (aucun article, tout en rupture ici, ou recherche sans résultat)
+  const emptyInfo = useMemo(() => {
+    const inStockHere = products.filter((p) => availOf(p) > 0).length;
+    // Autres entrepôts qui ont encore du stock (pour suggérer d'en changer)
+    const elsewhere = sellableWarehouses.filter(
+      (w) => w.id !== activeWarehouseId && productStock.some((s) => s.warehouseId === w.id && Number(s.quantity) > 0),
+    );
+    return { inStockHere, outHere: products.length - inStockHere, elsewhere };
+  }, [products, availOf, sellableWarehouses, activeWarehouseId, productStock]);
+
   // Pas de progression (+/-) d'une ligne : 1 carton si la ligne est en mode carton, sinon 1 pièce.
   const stepFor = (item: CartLine) => (item.saleUnit === 'pack' ? item.packSize : 1);
 
@@ -596,9 +606,29 @@ export default function POS({
           {/* Product grid list */}
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3.5 max-h-[580px] overflow-y-auto pr-1">
             {availableProducts.length === 0 ? (
-              <p className="text-xs text-slate-500 py-12 text-center col-span-3">
-                Aucun produit disponible en stock ne correspond à la recherche.
-              </p>
+              <div className="text-xs text-slate-500 py-12 px-4 text-center col-span-3 space-y-1.5">
+                {products.length === 0 ? (
+                  <>
+                    <p className="font-semibold text-slate-700 dark:text-slate-200">Aucun article n’a encore été créé.</p>
+                    <p>Ajoutez vos articles dans « Articles &amp; Stocks », puis faites une réception d’achat pour avoir du stock.</p>
+                  </>
+                ) : emptyInfo.inStockHere === 0 ? (
+                  <>
+                    <p className="font-semibold text-slate-700 dark:text-slate-200">
+                      Aucun article en stock{activeWarehouse ? ` dans ${activeWarehouse.name}` : ''}
+                      {' '}— {emptyInfo.outHere} article{emptyInfo.outHere > 1 ? 's sont' : ' est'} en rupture.
+                    </p>
+                    <p>La caisse n’affiche que les articles disponibles. Faites une réception d’achat (onglet Achats) ou un ajustement de stock (Articles &amp; Stocks).</p>
+                    {emptyInfo.elsewhere.length > 0 && (
+                      <p className="text-cyan-600 dark:text-cyan-400">
+                        Du stock est disponible dans {emptyInfo.elsewhere.map((w) => w.name).join(', ')} : changez d’entrepôt en haut de la caisse.
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <p>Aucun article en stock ne correspond à « {searchTerm} ».</p>
+                )}
+              </div>
             ) : (
               groupForPos(availableProducts).map(({ key, product: p, group, count }) => {
                 if (group) {
