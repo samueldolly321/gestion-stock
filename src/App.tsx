@@ -118,6 +118,7 @@ export default function App() {
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [sectorSetupDismissed, setSectorSetupDismissed] = useState(false); // « Plus tard » (pour cette session)
   const [companySetupOpen, setCompanySetupOpen] = useState(false); // fiche société, juste après le secteur
+  const [companySetupDismissed, setCompanySetupDismissed] = useState(false); // « Plus tard » (pour cette session)
   const [categories, setCategories] = useState<Category[]>([]);
   const [brands, setBrands] = useState<Brand[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
@@ -449,6 +450,13 @@ export default function App() {
   // Onglets réellement visibles pour le rôle actif (matrice personnalisable dans Config ERP).
   const allowedTabs = allowedTabsFor(currentUser.role, settings?.rolePermissions);
   const visibleMenu = menuItems.filter((m) => allowedTabs.includes(m.id));
+
+  // Écrans du 1er démarrage (administrateurs) : secteur d'abord, puis fiche société
+  // — celle-ci revient à chaque démarrage tant que le nom de la société est vide.
+  const isAdmin = ['Super Admin', 'Admin'].includes(realRole || currentUser.role);
+  const showSectorSetup = settingsLoaded && isAdmin && !sectorSetupDismissed && !settings?.businessSectors?.length;
+  const showCompanySetup = settingsLoaded && isAdmin && !showSectorSetup && !companySetupDismissed &&
+    (companySetupOpen || !settings?.companyName?.trim());
 
   // En-tête des reçus / factures.
   const companyInfo = {
@@ -811,8 +819,7 @@ export default function App() {
 
       </div>
       {/* 1er démarrage : « Quel est votre commerce ? » (administrateurs, tant que rien n'est choisi) */}
-      {settingsLoaded && !sectorSetupDismissed && !settings?.businessSectors?.length &&
-        ['Super Admin', 'Admin'].includes(realRole || currentUser.role) && (
+      {showSectorSetup && (
         <SectorSetup
           firstRun
           initial={null}
@@ -822,11 +829,12 @@ export default function App() {
         />
       )}
       {/* …puis tout de suite la fiche société : nom, logo, NIF, STAT, adresse, téléphone, email */}
-      {companySetupOpen && (
+      {/* (et à chaque démarrage tant que le nom de la société est vide) */}
+      {showCompanySetup && (
         <CompanySetup
           settings={settings}
-          onClose={() => setCompanySetupOpen(false)}
-          onSaved={(s) => { setSettings(s); setCompanySetupOpen(false); }}
+          onClose={() => { setCompanySetupOpen(false); setCompanySetupDismissed(true); }}
+          onSaved={(s) => { setSettings(s); setCompanySetupOpen(false); setCompanySetupDismissed(true); }}
         />
       )}
       <NotificationCenter auditLogs={auditLogs} />
