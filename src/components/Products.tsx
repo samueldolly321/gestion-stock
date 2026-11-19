@@ -871,14 +871,13 @@ export default function Products({
                   <th className="py-3 px-4 text-right">Prix Vente</th>
                   <th className="py-3 px-4 text-center">Quantité</th>
                   <th className="py-3 px-4">Entrepôt(s)</th>
-                  <th className="py-3 px-4 text-center">Statut</th>
                   <th className="py-3 px-4 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200 dark:divide-slate-800/60 text-xs">
                 {filteredProducts.length === 0 ? (
                   <tr>
-                    <td colSpan={10} className="py-12 text-center text-slate-500">
+                    <td colSpan={9} className="py-12 text-center text-slate-500">
                       Aucun produit ne correspond aux filtres appliqués.
                     </td>
                   </tr>
@@ -961,27 +960,6 @@ export default function Products({
                           );
                         })()}
                       </td>
-                      <td className="py-3.5 px-4 text-center">
-                        <span
-                          className={`inline-block px-2 py-0.5 text-[9px] font-mono rounded-md ${
-                            p.status === 'in_stock'
-                              ? 'bg-emerald-500/10 text-emerald-400'
-                              : p.status === 'low_stock'
-                              ? 'bg-amber-500/10 text-amber-500'
-                              : p.status === 'expired'
-                              ? 'bg-red-500/10 text-red-400 border border-red-500/20'
-                              : 'bg-red-500/10 text-red-500 font-bold'
-                          }`}
-                        >
-                          {p.status === 'in_stock'
-                            ? 'ACTIF'
-                            : p.status === 'low_stock'
-                            ? 'STOCK FAIBLE'
-                            : p.status === 'expired'
-                            ? 'PÉRIMÉ'
-                            : 'RUPTURE'}
-                        </span>
-                      </td>
                       <td className="py-3.5 px-4 text-right">
                         <div
                           className="flex justify-end gap-1.5"
@@ -1024,7 +1002,7 @@ export default function Products({
                     {/* Fiche article en ligne (mobile/tablette uniquement, sous le produit cliqué) */}
                     {viewProduct?.id === p.id && (
                       <tr className="xl:hidden">
-                        <td colSpan={10} className="p-3 bg-slate-50 dark:bg-slate-950/20 border-b border-slate-200 dark:border-slate-800/60">
+                        <td colSpan={9} className="p-3 bg-slate-50 dark:bg-slate-950/20 border-b border-slate-200 dark:border-slate-800/60">
                           {renderFiche(p)}
                         </td>
                       </tr>
