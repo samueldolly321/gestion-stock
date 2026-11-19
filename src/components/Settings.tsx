@@ -25,6 +25,7 @@ import { resetFigures } from '../services/adminService';
 import { showAlert } from '../services/dialog';
 import { showToast } from '../services/toast';
 import { setExportCompany } from '../services/exportContext';
+import LogoPicker from './LogoPicker';
 import { ROLES, ALL_TABS, TAB_LABELS, DEFAULT_ROLE_TABS, WRITE_SCOPES, WRITE_LABELS, DEFAULT_WRITE_PERMS } from '../services/permissions';
 
 interface SettingsProps {
@@ -56,10 +57,12 @@ export default function Settings({
   const [companyName, setCompanyName] = useState(settings?.companyName || 'Vokatra-ko');
   const [brandName, setBrandName] = useState(settings?.brandName || '');
   const [logoInitials, setLogoInitials] = useState(settings?.logoInitials || '');
-  const [taxId, setTaxId] = useState(settings?.taxId || 'FR-993821034');
-  const [address, setAddress] = useState(settings?.address || '42 Avenue de la République, 75011 Paris');
-  const [phone, setPhone] = useState(settings?.phone || '+33 1 42 34 56 78');
-  const [email, setEmail] = useState(settings?.email || 'contact@vokatra.mg');
+  const [logo, setLogo] = useState<string | null>(settings?.logo || null);
+  const [taxId, setTaxId] = useState(settings?.taxId || '');
+  const [statNumber, setStatNumber] = useState(settings?.statNumber || '');
+  const [address, setAddress] = useState(settings?.address || '');
+  const [phone, setPhone] = useState(settings?.phone || '');
+  const [email, setEmail] = useState(settings?.email || '');
   const [defaultVatRate, setDefaultVatRate] = useState(settings?.defaultVatRate || 20);
   const [alertExpirationDays, setAlertExpirationDays] = useState(settings?.alertExpirationDays || 30);
   const [invoicePrefix, setInvoicePrefix] = useState(settings?.invoicePrefix || 'FAC');
@@ -125,7 +128,9 @@ export default function Settings({
     setCompanyName(settings.companyName || '');
     setBrandName(settings.brandName || '');
     setLogoInitials(settings.logoInitials || '');
+    setLogo(settings.logo || null);
     setTaxId(settings.taxId || '');
+    setStatNumber(settings.statNumber || '');
     setAddress(settings.address || '');
     setPhone(settings.phone || '');
     setEmail(settings.email || '');
@@ -167,7 +172,9 @@ export default function Settings({
         companyName,
         brandName: brandName || null,
         logoInitials: logoInitials || null,
+        logo,
         taxId,
+        statNumber,
         address,
         phone,
         email,
@@ -325,12 +332,29 @@ export default function Settings({
                 <p className="text-[10px] text-slate-500 mt-1">Vide = 1re lettre du nom. Affiché en haut à gauche.</p>
               </div>
 
+              <div className="col-span-1 sm:col-span-2">
+                <label className="text-slate-400 block mb-1">Logo (reçus, factures, barre latérale)</label>
+                <LogoPicker value={logo} onChange={setLogo} fallback={(logoInitials || companyName.trim().slice(0, 1) || 'S').toUpperCase()} />
+              </div>
+
               <div>
-                <label className="text-slate-400 block mb-1">NIF / Stat</label>
+                <label className="text-slate-400 block mb-1">NIF</label>
                 <input
                   type="text"
+                  maxLength={40}
                   value={taxId}
                   onChange={(e) => setTaxId(e.target.value)}
+                  className="w-full bg-white dark:bg-slate-950/20 p-2 text-xs rounded-lg border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="text-slate-400 block mb-1">STAT</label>
+                <input
+                  type="text"
+                  maxLength={40}
+                  value={statNumber}
+                  onChange={(e) => setStatNumber(e.target.value)}
                   className="w-full bg-white dark:bg-slate-950/20 p-2 text-xs rounded-lg border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none"
                 />
               </div>

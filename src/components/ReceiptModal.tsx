@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { Printer, FileText, Receipt } from 'lucide-react';
-import { Sale } from '../types';
+import { Sale, CompanyInfo } from '../types';
 import { useMoney } from '../services/CurrencyContext';
 
 interface ReceiptModalProps {
   sale: Sale;
-  company?: { name?: string; address?: string; phone?: string; taxId?: string };
+  company?: CompanyInfo;
   onClose: () => void;
 }
 
@@ -26,10 +26,16 @@ export default function ReceiptModal({ sale, company, onClose }: ReceiptModalPro
       <div className={`bg-white text-slate-950 rounded-2xl w-full ${printFormat === 'a4' ? 'max-w-md print-a4-card' : 'max-w-sm'} overflow-hidden shadow-2xl p-6 space-y-4 print-card animate-scale-up`}>
 
         <div className="text-center space-y-1">
+          {company?.logo && <img src={company.logo} alt="" className="mx-auto max-h-14 max-w-[160px] object-contain" />}
           <span className="font-bold tracking-tight text-lg uppercase">{company?.name || 'Vokatra-ko ERP'}</span>
           {company?.address && <p className="text-[10px] text-slate-500">{company.address}</p>}
           {company?.phone && <p className="text-[10px] text-slate-500">Tél: {company.phone}</p>}
-          {company?.taxId && <p className="text-[10px] text-slate-500">NIF / Stat: {company.taxId}</p>}
+          {company?.email && <p className="text-[10px] text-slate-500">{company.email}</p>}
+          {(company?.taxId || company?.statNumber) && (
+            <p className="text-[10px] text-slate-500">
+              {[company?.taxId && `NIF : ${company.taxId}`, company?.statNumber && `STAT : ${company.statNumber}`].filter(Boolean).join(' · ')}
+            </p>
+          )}
           <div className="border-b border-dashed border-slate-300 py-1"></div>
         </div>
 

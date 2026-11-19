@@ -362,7 +362,8 @@ export const settings = pgTable('settings', {
   logoInitials: text('logo_initials'), // 1-2 lettres affichées dans le logo (sinon dérivées du nom)
   currency: text('currency').default('EUR').notNull(),
   currencySymbol: text('currency_symbol').default('€').notNull(),
-  taxId: text('tax_id'),
+  taxId: text('tax_id'), // NIF
+  statNumber: text('stat_number'), // numéro STAT (statistique)
   address: text('address'),
   phone: text('phone'),
   email: text('email'),

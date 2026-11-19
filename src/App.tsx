@@ -82,6 +82,7 @@ import Calendar from './components/Calendar';
 import Accounting from './components/Accounting';
 import Settings from './components/Settings';
 import SectorSetup from './components/SectorSetup';
+import CompanySetup from './components/CompanySetup';
 import NotificationCenter from './components/NotificationCenter';
 import { ToastMessage, showToast } from './services/toast';
 import DialogHost from './components/DialogHost';
@@ -116,6 +117,7 @@ export default function App() {
   const [settings, setSettings] = useState<Setting | null>(null);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [sectorSetupDismissed, setSectorSetupDismissed] = useState(false); // « Plus tard » (pour cette session)
+  const [companySetupOpen, setCompanySetupOpen] = useState(false); // fiche société, juste après le secteur
   const [categories, setCategories] = useState<Category[]>([]);
   const [brands, setBrands] = useState<Brand[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
@@ -448,6 +450,17 @@ export default function App() {
   const allowedTabs = allowedTabsFor(currentUser.role, settings?.rolePermissions);
   const visibleMenu = menuItems.filter((m) => allowedTabs.includes(m.id));
 
+  // En-tête des reçus / factures.
+  const companyInfo = {
+    name: settings?.companyName,
+    address: settings?.address,
+    phone: settings?.phone,
+    email: settings?.email,
+    taxId: settings?.taxId,
+    statNumber: settings?.statNumber,
+    logo: settings?.logo,
+  };
+
   return (
     <CurrencyProvider>
     <div className="h-dvh overflow-hidden bg-slate-100 dark:bg-slate-950 text-slate-900 dark:text-gray-100 flex flex-col transition-colors duration-150">
@@ -494,9 +507,13 @@ export default function App() {
             {/* Header logo */}
             <div className="flex justify-between items-center">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 bg-cyan-500 rounded-lg text-white font-extrabold text-sm flex items-center justify-center shrink-0">
-                  {(settings?.logoInitials || settings?.companyName?.trim().slice(0, 1) || 'S').toUpperCase()}
-                </div>
+                {settings?.logo ? (
+                  <img src={settings.logo} alt="" className="w-8 h-8 rounded-lg object-contain bg-white shrink-0" />
+                ) : (
+                  <div className="w-8 h-8 bg-cyan-500 rounded-lg text-white font-extrabold text-sm flex items-center justify-center shrink-0">
+                    {(settings?.logoInitials || settings?.companyName?.trim().slice(0, 1) || 'S').toUpperCase()}
+                  </div>
+                )}
                 <div className="min-w-0">
                   <h1 className="font-extrabold text-sm text-slate-900 dark:text-white tracking-wider">{(settings?.brandName || 'Vokatra-ko').toUpperCase()}</h1>
                   <span className="text-[10px] text-cyan-400 font-mono block truncate">
@@ -623,12 +640,7 @@ export default function App() {
               user={currentUser}
               onRefresh={reloadAfterSale}
               currencySymbol={currencySymbol}
-              company={{
-                name: settings?.companyName,
-                address: settings?.address,
-                phone: settings?.phone,
-                taxId: settings?.taxId,
-              }}
+              company={companyInfo}
             />
           )}
 
@@ -676,12 +688,7 @@ export default function App() {
               sales={sales}
               user={currentUser}
               currencySymbol={currencySymbol}
-              company={{
-                name: settings?.companyName,
-                address: settings?.address,
-                phone: settings?.phone,
-                taxId: settings?.taxId,
-              }}
+              company={companyInfo}
             />
           )}
 
@@ -811,7 +818,15 @@ export default function App() {
           initial={null}
           categories={categories}
           onClose={() => setSectorSetupDismissed(true)}
-          onSaved={(s) => { setSettings(s); reloadCatalog(); }}
+          onSaved={(s) => { setSettings(s); reloadCatalog(); setCompanySetupOpen(true); }}
+        />
+      )}
+      {/* …puis tout de suite la fiche société : nom, logo, NIF, STAT, adresse, téléphone, email */}
+      {companySetupOpen && (
+        <CompanySetup
+          settings={settings}
+          onClose={() => setCompanySetupOpen(false)}
+          onSaved={(s) => { setSettings(s); setCompanySetupOpen(false); }}
         />
       )}
       <NotificationCenter auditLogs={auditLogs} />

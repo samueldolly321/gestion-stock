@@ -397,11 +397,12 @@ export interface Setting {
   id: string; // 'global'
   companyName: string;
   brandName?: string | null;
-  logo?: string;
+  logo?: string | null; // image du logo (Data URL, réduite à 256 px)
   logoInitials?: string | null;
   currency: string;
   currencySymbol: string;
-  taxId?: string;
+  taxId?: string; // NIF
+  statNumber?: string | null; // STAT
   address?: string;
   phone?: string;
   email?: string;
@@ -418,4 +419,15 @@ export interface Setting {
   writePermissions?: Record<string, string[]> | null;
   businessSectors?: string[] | null; // secteurs d'activité (src/services/sectors.ts)
   updatedAt: string;
+}
+
+/** Coordonnées de la société imprimées sur les reçus / factures. */
+export interface CompanyInfo {
+  name?: string;
+  address?: string;
+  phone?: string;
+  email?: string;
+  taxId?: string; // NIF
+  statNumber?: string | null;
+  logo?: string | null;
 }

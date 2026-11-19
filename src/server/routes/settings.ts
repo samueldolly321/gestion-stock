@@ -115,6 +115,62 @@ settingsRouter.put('/sectors', requireAuth, requireRole(...MANAGE_ROLES), async 
   }
 });
 
+/** Logo : Data URL d'image uniquement, ~300 Ko max (le client le réduit à 256 px). */
+function cleanLogo(v: unknown): string | null {
+  if (typeof v !== 'string' || !v) return null;
+  if (!/^data:image\/(png|jpeg|webp|gif|svg\+xml);base64,/.test(v)) return null;
+  return v.length <= 400_000 ? v : null;
+}
+const txt = (v: unknown, max: number) => {
+  const s = v == null ? '' : String(v).trim();
+  return s ? s.slice(0, max) : null;
+};
+
+/**
+ * PUT /api/settings/company — fiche société (écran qui suit le choix du secteur) :
+ * raison sociale, logo, NIF, STAT, adresse, téléphone, email. Ne touche à rien d'autre.
+ */
+settingsRouter.put('/company', requireAuth, requireRole(...MANAGE_ROLES), async (req: AuthedRequest, res) => {
+  try {
+    const b = req.body ?? {};
+    const companyName = txt(b.companyName, 120);
+    if (!companyName) return res.status(400).json({ error: 'Le nom de la société est obligatoire.' });
+    const email = txt(b.email, 120);
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ error: 'Adresse email invalide.' });
+    }
+    if (b.logo && !cleanLogo(b.logo)) {
+      return res.status(400).json({ error: 'Logo refusé : image non reconnue ou trop lourde.' });
+    }
+    const values = {
+      companyName,
+      logo: cleanLogo(b.logo),
+      taxId: txt(b.taxId, 40),
+      statNumber: txt(b.statNumber, 40),
+      address: txt(b.address, 250),
+      phone: txt(b.phone, 60),
+      email,
+      updatedAt: new Date().toISOString(),
+    };
+    const [row] = await db
+      .insert(settings)
+      .values({ id: 'global', ...values })
+      .onConflictDoUpdate({ target: settings.id, set: values })
+      .returning();
+    await writeAuditLog({
+      userId: req.user?.sub,
+      userName: req.user?.name,
+      action: `Fiche société : ${companyName}`,
+      module: 'Paramètres',
+      entityId: 'global',
+    });
+    res.json(row);
+  } catch (err) {
+    console.error('save company error:', err);
+    res.status(500).json({ error: "Erreur lors de l'enregistrement de la fiche société." });
+  }
+});
+
 /** PUT /api/settings — crée ou met à jour la ligne unique 'global' (upsert). */
 settingsRouter.put('/', requireAuth, requireRole(...MANAGE_ROLES), async (req: AuthedRequest, res) => {
   try {
@@ -123,11 +179,12 @@ settingsRouter.put('/', requireAuth, requireRole(...MANAGE_ROLES), async (req: A
       id: 'global',
       companyName: b.companyName ?? null,
       brandName: b.brandName ? String(b.brandName).slice(0, 40) : null,
-      logo: b.logo ?? null,
+      logo: cleanLogo(b.logo),
       logoInitials: b.logoInitials ? String(b.logoInitials).slice(0, 2).toUpperCase() : null,
       currency: b.currency || 'MGA',
       currencySymbol: b.currencySymbol || 'Ar',
       taxId: b.taxId ?? null,
+      statNumber: txt(b.statNumber, 40),
       address: b.address ?? null,
       phone: b.phone ?? null,
       email: b.email ?? null,

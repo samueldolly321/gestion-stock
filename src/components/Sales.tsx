@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import {
   ShoppingCart, ChevronLeft, ChevronRight, Download, Eye, X, Printer,
 } from 'lucide-react';
-import { Sale, TransactionItem, User } from '../types';
+import { Sale, TransactionItem, User, CompanyInfo } from '../types';
 import { useMoney } from '../services/CurrencyContext';
 import { exportPdf } from '../services/exportPdf';
 import { exportExcel } from '../services/exportExcel';
@@ -15,7 +15,7 @@ interface SalesProps {
   sales: Sale[];
   user: User;
   currencySymbol: string;
-  company?: { name?: string; address?: string; phone?: string; taxId?: string };
+  company?: CompanyInfo;
 }
 
 const PAY_META: Record<string, { label: string; cls: string }> = {

@@ -12,6 +12,19 @@ export function saveSettings(data: Partial<Setting>): Promise<Setting> {
   return apiFetch<Setting>('/settings', { method: 'PUT', body: JSON.stringify(data) });
 }
 
+/** Fiche société (nom, logo, NIF, STAT, coordonnées) — écran qui suit le choix du secteur. */
+export function saveCompany(data: {
+  companyName: string;
+  logo?: string | null;
+  taxId?: string;
+  statNumber?: string;
+  address?: string;
+  phone?: string;
+  email?: string;
+}): Promise<Setting> {
+  return apiFetch<Setting>('/settings/company', { method: 'PUT', body: JSON.stringify(data) });
+}
+
 /** Secteurs d'activité + création optionnelle des catégories proposées. */
 export function saveSectors(
   sectors: string[],

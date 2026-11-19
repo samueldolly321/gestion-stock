@@ -40,7 +40,7 @@ const app = express();
 // Derrière le proxy Render : permet à req.ip de refléter l'IP réelle du client
 // (via X-Forwarded-For) — utilisé par le limiteur anti-force-brute du login.
 app.set('trust proxy', 1);
-app.use(express.json());
+app.use(express.json({ limit: '1mb' })); // logo de la société (Data URL)
 
 // CORS simple pour le dev (front sur :3000, API sur :3001)
 app.use((req, res, next) => {

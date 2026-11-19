@@ -17,7 +17,7 @@ import {
   Truck,
   ScanLine
 } from 'lucide-react';
-import { Product, Client, ClientPrice, Sale, User, TransactionItem, DeliveryType, Warehouse, ProductStock, ProductSerial } from '../types';
+import { Product, Client, ClientPrice, Sale, User, TransactionItem, DeliveryType, Warehouse, ProductStock, ProductSerial, CompanyInfo } from '../types';
 import { SerialPicker } from './SerialsUI';
 import { listSerials } from '../services/serialsService';
 import { packSizeOf, hasPack, fmtQty } from '../services/pack';
@@ -62,7 +62,7 @@ interface POSProps {
   user: User;
   onRefresh: () => void;
   currencySymbol: string;
-  company?: { name?: string; address?: string; phone?: string; taxId?: string };
+  company?: CompanyInfo;
 }
 
 // Ligne de panier : quantity est TOUJOURS en pièces, unitPrice TOUJOURS à la pièce.
