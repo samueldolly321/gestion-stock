@@ -42,17 +42,20 @@ export const TAB_LABELS: Record<string, string> = {
   settings: 'Configuration ERP',
 };
 
+// Rôles proposés (création de compte, rôle simulé, matrice des droits).
+// Pour 3 caisses : 3 COMPTES ayant chacun le rôle « Caissier » (un rôle = un profil de droits).
 export const ROLES = [
   'Super Admin',
   'Admin',
   'Manager',
-  'Commercial',
   'Caissier',
-  'Acheteur',
-  'Auditeur',
-  'Comptable',
   'Magasinier',
+  'Comptable',
 ];
+
+// Anciens rôles retirés des listes (2026-11-20). Gardés dans les droits par défaut ci-dessous
+// pour qu'un compte qui les porte encore continue de fonctionner ; à réattribuer dans Utilisateurs.
+export const LEGACY_ROLES = ['Commercial', 'Acheteur', 'Auditeur'];
 
 export const DEFAULT_ROLE_TABS: Record<string, string[]> = {
   'Super Admin': [...ALL_TABS],

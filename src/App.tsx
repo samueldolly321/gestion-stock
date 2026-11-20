@@ -530,11 +530,8 @@ export default function App() {
               <option value="Super Admin">🛡️ Super Admin (Tous droits)</option>
               <option value="Admin">🛠️ Admin</option>
               <option value="Manager">💼 Gérant / Manager</option>
-              <option value="Commercial">📈 Commercial</option>
               <option value="Caissier">💵 Caissier</option>
-              <option value="Acheteur">📦 Acheteur</option>
               <option value="Comptable">🧮 Comptable</option>
-              <option value="Auditeur">🔍 Auditeur</option>
               <option value="Magasinier">🏗️ Magasinier</option>
             </select>
           </div>
