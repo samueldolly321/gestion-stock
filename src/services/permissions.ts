@@ -42,7 +42,7 @@ export const TAB_LABELS: Record<string, string> = {
   settings: 'Configuration ERP',
 };
 
-// Rôles proposés (création de compte, rôle simulé, matrice des droits).
+// Rôles proposés (création de compte, matrice des droits).
 // Pour 3 caisses : 3 COMPTES ayant chacun le rôle « Caissier » (un rôle = un profil de droits).
 export const ROLES = [
   'Super Admin',

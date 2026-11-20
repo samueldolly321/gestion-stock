@@ -91,8 +91,8 @@ import { setExportCompany } from './services/exportContext';
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  // Rôle RÉEL issu du jeton (immuable) — le simulateur ne le modifie jamais.
-  // Sert à n'exposer le simulateur qu'au vrai Super Admin (anti-escalade côté UI).
+  // Rôle RÉEL issu du jeton (immuable).
+  // (Le simulateur de rôle a été retiré le 2026-11-20 : pour tester un rôle, se connecter avec un compte de ce rôle.)
   const [realRole, setRealRole] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<string>('dashboard');
@@ -436,14 +436,6 @@ export default function App() {
   }, [currentUser, activeTab, settings]);
 
 
-  // Change simulation role
-  const handleRoleChange = (newRole: string) => {
-    if (!currentUser) return;
-    const updated = { ...currentUser, role: newRole as any };
-    setCurrentUser(updated);
-    localStorage.setItem(`role_${currentUser.uid}`, newRole);
-  };
-
   // Logout — efface le jeton JWT et réinitialise la session
   const handleLogout = () => {
     authLogout();
@@ -511,35 +503,6 @@ export default function App() {
     <CurrencyProvider>
     <div className="h-dvh overflow-hidden bg-slate-100 dark:bg-slate-950 text-slate-900 dark:text-gray-100 flex flex-col transition-colors duration-150">
       
-      {/* 1. TOP UTILITY ACTION BAR — outils Super Admin uniquement (simulateur de rôle).
-             Réservé au rôle RÉEL Super Admin : un utilisateur normal ne peut donc pas
-             se donner d'autres rôles depuis l'UI (le serveur reste la source de vérité). */}
-      {realRole === 'Super Admin' && (
-      <div className="bg-slate-950 text-white border-b border-slate-800/80 px-4 py-2 flex flex-col sm:flex-row justify-between items-center gap-3 text-xs z-30">
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 bg-yellow-500/10 text-yellow-400 rounded border border-yellow-500/20">
-            Simulateur de Rôles (prévisualisation UI)
-          </span>
-          <div className="flex items-center gap-1">
-            <span className="text-slate-400 text-[11px]">Rôle simulé :</span>
-            <select
-              value={currentUser.role}
-              onChange={(e) => handleRoleChange(e.target.value)}
-              className="bg-slate-900 border border-slate-800 text-xs px-2 py-1 rounded text-cyan-400 font-bold focus:outline-none"
-            >
-              <option value="Super Admin">🛡️ Super Admin (Tous droits)</option>
-              <option value="Admin">🛠️ Admin</option>
-              <option value="Manager">💼 Gérant / Manager</option>
-              <option value="Caissier">💵 Caissier</option>
-              <option value="Comptable">🧮 Comptable</option>
-              <option value="Magasinier">🏗️ Magasinier</option>
-            </select>
-          </div>
-          <span className="text-[10px] text-slate-500 hidden md:inline">Prévisualisation seulement — les droits serveur restent ceux de votre compte.</span>
-        </div>
-      </div>
-      )}
-
       {/* Main ERP Frame Structure */}
       <div className="flex-1 flex flex-col md:flex-row min-h-0">
         

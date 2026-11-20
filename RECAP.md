@@ -84,7 +84,7 @@ Système à **deux dimensions**, **configurable** depuis Configuration ERP et **
 - Matrices éditables via cases à cocher dans Config ERP (réservé SA/Admin/Manager).
 - **Défaut par rôle** dans `src/services/permissions.ts` (repli si non configuré).
 - **Sécurité serveur** : middleware `requireWrite(scope)` (`src/server/auth-middleware.ts`) lit la matrice en base et refuse (403) les mutations non autorisées — les routes CRUD sont protégées (products, partners, purchases, expenses, deliveries, audits).
-- **Simulateur de rôle** (barre du haut) : prévisualise l'UI par rôle (à retirer en prod).
+- ~~Simulateur de rôle~~ : **retiré le 2026-11-20** (pour tester un rôle, se connecter avec un compte de ce rôle).
 
 ---
 
