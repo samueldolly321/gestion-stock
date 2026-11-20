@@ -13,6 +13,38 @@ d'Internet pour activer.
 
 ---
 
+## Avant de commencer
+
+### Quel .exe utiliser ?
+
+Après `npm run desktop:build`, le dossier `release\` contient :
+
+| Fichier | À quoi il sert |
+|---|---|
+| `release\Vokatra-ko Setup X.Y.Z.exe` | **L'installateur** : c'est lui qu'on donne aux clients (raccourcis, désinstallation propre). |
+| `release\win-unpacked\Vokatra-ko.exe` | L'application **déjà décompressée** : se lance directement, sans installation. Pratique pour tester. Si on le déplace, copier **tout** le dossier `win-unpacked` (le `.exe` seul ne marche pas). |
+
+Les autres fichiers (`.blockmap`, `latest.yml`, `builder-debug.yml`) ne sont pas à distribuer.
+
+### Ce qu'il faut sur votre PC pour générer des clés
+
+- **Node.js** installé (déjà le cas si vous compilez le projet).
+- Le **dossier du projet** (pour `generer-licence.cmd` et `scripts\licence.mjs`).
+- Votre **clé privée** dans `C:\Users\<vous>\.vokatra-ko-licences\cle-privee.pem`.
+  Pour générer des clés depuis un **autre PC**, copiez-y ce fichier au même endroit
+  (avec `registre-licences.csv` si vous voulez garder un seul registre).
+
+### Tester l'activation sur votre propre PC
+
+1. Lancez `release\win-unpacked\Vokatra-ko.exe` (ou installez le Setup).
+2. Cliquez sur **« Activer une licence »** et copiez le code machine affiché.
+3. Double-cliquez sur `generer-licence.cmd`, collez ce code, mettez un nom (ex. « Test »).
+4. Collez la clé obtenue dans l'application → **« Licence activée »**.
+
+La ligne « Test » apparaîtra dans `registre-licences.csv` : vous pouvez la supprimer dans Excel.
+
+---
+
 ## 1. Ce qu'il faut garder précieusement
 
 Votre **clé privée** sert à fabriquer les licences :
