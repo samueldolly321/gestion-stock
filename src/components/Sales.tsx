@@ -29,6 +29,7 @@ export default function Sales({ sales, user, currencySymbol, company }: SalesPro
   const [gran, setGran] = useState<Gran>('day');
   const [anchor, setAnchor] = useState<Date>(() => new Date());
   const [search, setSearch] = useState('');
+  const [cashier, setCashier] = useState(''); // '' = tous les caissiers
   const [dateFrom, setDateFrom] = useState(''); // intervalle personnalisé (prioritaire sur la granularité)
   const [dateTo, setDateTo] = useState('');
   const customRange = !!(dateFrom || dateTo);
@@ -53,11 +54,19 @@ export default function Sales({ sales, user, currencySymbol, company }: SalesPro
     return sales
       .filter((s) => s.type !== 'return')
       .filter((s) => { const t = new Date(s.createdAt).getTime(); return t >= s0 && t <= s1; })
+      .filter((s) => !cashier || (s.cashierName || '') === cashier)
       .filter((s) => !q
         || (s.invoiceNumber || s.id).toLowerCase().includes(q)
-        || (s.clientName || '').toLowerCase().includes(q))
+        || (s.clientName || '').toLowerCase().includes(q)
+        || (s.cashierName || '').toLowerCase().includes(q))
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  }, [sales, range, search, customRange, dateFrom, dateTo]);
+  }, [sales, range, search, cashier, customRange, dateFrom, dateTo]);
+
+  // Caissiers ayant déjà encaissé (filtre « Caissier »).
+  const cashiers = useMemo(
+    () => [...new Set(sales.map((s) => s.cashierName).filter(Boolean) as string[])].sort((a, b) => a.localeCompare(b, 'fr')),
+    [sales],
+  );
 
   const totals = useMemo(() => {
     const ca = periodSales.reduce((a, s) => a + (Number(s.totalAmount) || 0), 0);
@@ -150,7 +159,11 @@ export default function Sales({ sales, user, currencySymbol, company }: SalesPro
 
       {/* Search + intervalle de dates personnalisé */}
       <div className="bg-white dark:bg-slate-900/40 p-3 rounded-xl border border-slate-200 dark:border-slate-800/80 shadow-sm flex flex-col lg:flex-row gap-3">
-        <input type="text" placeholder="Rechercher par n° facture ou client..." value={search} onChange={(e) => setSearch(e.target.value)} className={`${inputCls} flex-1`} />
+        <input type="text" placeholder="Rechercher par n° facture, client ou caissier..." value={search} onChange={(e) => setSearch(e.target.value)} className={`${inputCls} flex-1`} />
+        <select value={cashier} onChange={(e) => setCashier(e.target.value)} className={`${inputCls} lg:w-48`} aria-label="Filtrer par caissier">
+          <option value="">Tous les caissiers</option>
+          {cashiers.map((c) => <option key={c} value={c}>{c}</option>)}
+        </select>
         <div className="flex items-center gap-2">
           <label className="text-[10px] font-mono uppercase text-slate-400 shrink-0">Du</label>
           <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className={`${inputCls} sm:w-40`} title="Intervalle personnalisé — début (prioritaire sur Jour/Mois/Année)" />
@@ -174,6 +187,7 @@ export default function Sales({ sales, user, currencySymbol, company }: SalesPro
                 <th className="py-3 px-4">N° Facture</th>
                 <th className="py-3 px-4">Date</th>
                 <th className="py-3 px-4">Client</th>
+                <th className="py-3 px-4">Caissier</th>
                 <th className="py-3 px-4 hidden md:table-cell">Entrepôt</th>
                 <th className="py-3 px-4 text-right">Total TTC</th>
                 <th className="py-3 px-4 text-right hidden md:table-cell">Reste dû</th>
@@ -183,7 +197,7 @@ export default function Sales({ sales, user, currencySymbol, company }: SalesPro
             </thead>
             <tbody className="divide-y divide-slate-200 dark:divide-slate-800/60 text-xs text-slate-600 dark:text-gray-300">
               {periodSales.length === 0 ? (
-                <tr><td colSpan={8} className="py-12 text-center text-slate-500">Aucune vente sur cette période.</td></tr>
+                <tr><td colSpan={9} className="py-12 text-center text-slate-500">Aucune vente sur cette période.</td></tr>
               ) : (
                 page.paged.map((s) => {
                   const reste = s.totalAmount - (s.paidAmount || 0);
@@ -192,6 +206,7 @@ export default function Sales({ sales, user, currencySymbol, company }: SalesPro
                       <td className="py-3 px-4 font-mono font-bold text-[11px] text-cyan-500">{s.invoiceNumber || s.id}</td>
                       <td className="py-3 px-4 font-mono text-[11px] text-slate-400 whitespace-nowrap">{new Date(s.createdAt).toLocaleString()}</td>
                       <td className="py-3 px-4 font-semibold text-slate-900 dark:text-white">{s.clientName || '—'}</td>
+                      <td className="py-3 px-4 text-slate-600 dark:text-slate-300 whitespace-nowrap">{s.cashierName || '—'}</td>
                       <td className="py-3 px-4 hidden md:table-cell text-slate-500 dark:text-slate-300">{s.warehouseName || '—'}</td>
                       <td className="py-3 px-4 text-right font-mono font-bold text-slate-900 dark:text-white">{format(s.totalAmount)}</td>
                       <td className="py-3 px-4 text-right hidden md:table-cell font-mono">{reste > 0 ? <span className="text-red-500 font-bold">{format(reste)}</span> : <span className="text-emerald-500">0</span>}</td>
