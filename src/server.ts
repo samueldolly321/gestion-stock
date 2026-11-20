@@ -35,6 +35,7 @@ import { eventsRouter } from './server/routes/events.ts';
 import { aiRouter } from './server/routes/ai.ts';
 import { adminRouter } from './server/routes/admin.ts';
 import { serialsRouter } from './server/routes/serials.ts';
+import { licenseRouter, requireLicense } from './server/routes/license.ts';
 
 const app = express();
 // Derrière le proxy Render : permet à req.ip de refléter l'IP réelle du client
@@ -50,6 +51,11 @@ app.use((req, res, next) => {
   if (req.method === 'OPTIONS') return res.sendStatus(204);
   next();
 });
+
+// Licence de la version .exe (active seulement si LICENSE_REQUIRED=1) : routes publiques
+// + garde qui bloque le reste de l'API après l'essai si aucune clé n'est activée.
+app.use('/api/license', licenseRouter);
+app.use(requireLicense);
 
 // Routes d'authentification (register / login / me)
 app.use('/api/auth', authRouter);

@@ -1,7 +1,7 @@
 {
   "name": "react-example",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "main": "electron/main.cjs",
   "scripts": {
@@ -31,12 +31,14 @@
     "productName": "Vokatra-ko",
     "asar": false,
     "npmRebuild": false,
+    "electronDist": "node_modules/electron/dist",
     "directories": {
       "output": "release"
     },
     "files": [
       "**/*",
       "!release/**",
+      "!fichier exe/**",
       "!desktop/**",
       "!**/*.map",
       "!src/**",

@@ -30,6 +30,11 @@ export async function apiFetch<T = any>(path: string, options: RequestInit = {})
   const data = await res.json().catch(() => ({}));
 
   if (!res.ok) {
+    // Version .exe : essai terminé pendant l'utilisation → l'écran d'activation prend le relais.
+    if (res.status === 402 && (data as any)?.error === 'LICENSE_REQUIRED') {
+      window.dispatchEvent(new Event('vokatra:license-required'));
+      throw new Error('Licence requise : la période d’essai est terminée.');
+    }
     throw new Error((data as any)?.error || `Erreur ${res.status}`);
   }
   return data as T;

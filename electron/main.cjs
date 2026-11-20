@@ -7,11 +7,27 @@ const path = require('path');
 const fs = require('fs');
 const http = require('http');
 const crypto = require('crypto');
-const { fork } = require('child_process');
+const { fork, execFileSync } = require('child_process');
 
 // Nom stable de l'application : détermine le dossier de données utilisateur
 // (%APPDATA%/Vokatra-ko). Appelé avant tout app.getPath('userData').
 app.setName('Vokatra-ko');
+// Dossier de données alternatif (tests, installation de démonstration) : sans effet par défaut.
+if (process.env.VOKATRA_USER_DATA) app.setPath('userData', process.env.VOKATRA_USER_DATA);
+
+// Une seule instance : un 2e double-clic sur l'icône ramène la fenêtre déjà ouverte au
+// premier plan (au lieu d'une erreur « démarrage impossible », la base étant déjà utilisée).
+const gotSingleInstanceLock = app.requestSingleInstanceLock();
+if (!gotSingleInstanceLock) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    if (!mainWindow) return;
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.show();
+    mainWindow.focus();
+  });
+}
 
 // Port du serveur web local (différent des ports de dev pour ne pas gêner un `npm run dev`).
 const PORT = Number(process.env.DESKTOP_PORT) || 34519;
@@ -20,6 +36,7 @@ const PG_PORT = Number(process.env.DESKTOP_PG_PORT) || 54339;
 
 let serverProcess = null;
 let pgInstance = null;
+let pgDataDir = null;
 let mainWindow = null;
 
 // Chemin du bundle serveur : en dev il est à la racine du projet, en prod (packagé) dans resources/app.
@@ -67,6 +84,7 @@ function getOrCreateJwtSecret() {
 async function startEmbeddedPostgres() {
   const EmbeddedPostgres = (await import('embedded-postgres')).default;
   const dataDir = path.join(app.getPath('userData'), 'pgdata');
+  pgDataDir = dataDir;
   const firstRun = !fs.existsSync(dataDir);
 
   pgInstance = new EmbeddedPostgres({
@@ -117,6 +135,9 @@ function startServer(appRoot) {
     MIGRATIONS_DIR: path.join(appRoot, 'drizzle'),
     // Secret de session fort et stable (généré/persisté), sauf override via .env à côté de l'exe.
     JWT_SECRET: process.env.JWT_SECRET || getOrCreateJwtSecret(),
+    // Licence : 7 jours d'essai puis clé obligatoire (vérifiée hors ligne, liée à ce PC).
+    LICENSE_REQUIRED: '1',
+    LICENSE_DIR: app.getPath('userData'),
     // Clé IA optionnelle (résumé d'activité) : transmise si présente dans l'environnement / .env.
     ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY || '',
   };
@@ -199,13 +220,14 @@ function showStartupError(err) {
   dialog.showErrorBox(
     'Vokatra-ko — démarrage impossible',
     "L'application n'a pas pu démarrer.\n\n" +
-    "Détail technique : " + (err && err.message ? err.message : String(err)) + "\n\n" +
+    "Détail technique : " + (err && err.message ? err.message : (err ? String(err) : 'la base de données intégrée n\'a pas démarré (port ' + PG_PORT + ' déjà utilisé ?)')) + "\n\n" +
     "Astuce : ferme toute autre instance de Vokatra-ko puis relance. " +
     "Si le problème persiste, redémarre l'ordinateur (un ancien processus PostgreSQL peut rester bloqué)."
   );
 }
 
 app.whenReady().then(async () => {
+  if (!gotSingleInstanceLock) return; // une autre instance est déjà ouverte
   loadUserEnv();
   const appRoot = resolveAppRoot();
 
@@ -232,10 +254,34 @@ app.whenReady().then(async () => {
   }
 });
 
+// Arrêt PROPRE de PostgreSQL (pg_ctl stop -m fast) : termine les connexions, écrit les données
+// sur disque, libère le port. Sous Windows, embedded-postgres se contente sinon d'un
+// `taskkill /f` (arrêt brutal) qui peut laisser un processus enfant tenir le port 54339 —
+// d'où « démarrage impossible » au lancement suivant.
+function pgCtlStop() {
+  if (!pgDataDir) return false;
+  try {
+    if (process.platform !== 'win32') return false;
+    // Le paquet n'expose que son point d'entrée (dist/index.js) : les binaires sont à côté.
+    const entry = require.resolve('@embedded-postgres/windows-x64');
+    const bin = path.join(path.dirname(entry), '..', 'native', 'bin', 'pg_ctl.exe');
+    if (!fs.existsSync(bin)) return false;
+    execFileSync(bin, ['stop', '-D', pgDataDir, '-m', 'fast', '-w', '-t', '20'], { windowsHide: true, stdio: 'ignore' });
+    return true;
+  } catch (err) {
+    console.error('[pg] Arrêt propre impossible, arrêt forcé :', err && err.message);
+    return false;
+  }
+}
+
 async function stopAll() {
+  // 1) Serveur d'abord : il ferme ses connexions à la base.
   if (serverProcess) { try { serverProcess.kill(); } catch (_) {} serverProcess = null; }
+  // 2) PostgreSQL : arrêt propre, arrêt forcé seulement en secours.
   if (pgInstance) {
-    try { await pgInstance.stop(); } catch (_) {}
+    if (!pgCtlStop()) {
+      try { await pgInstance.stop(); } catch (_) {}
+    }
     pgInstance = null;
   }
 }
