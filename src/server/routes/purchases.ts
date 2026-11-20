@@ -4,7 +4,7 @@ import { db } from '../../db/index.ts';
 import { purchases, products, stockMovements, payments } from '../../db/schema.ts';
 import { requireAuth, requireWrite, requireAnyTab, type AuthedRequest } from '../auth-middleware.ts';
 import { generateId, writeAuditLog } from '../helpers.ts';
-import { adjustWarehouseStock, resolveWarehouseId } from '../stock.ts';
+import { adjustWarehouseStock, resolveWarehouseId, lockProducts } from '../stock.ts';
 
 export const purchasesRouter = Router();
 
@@ -105,6 +105,7 @@ purchasesRouter.post('/:id/receive', requireAuth, requireWrite('purchases'), asy
     const items = (purchase.items as any[]) || [];
 
     const updated = await db.transaction(async (tx) => {
+      await lockProducts(tx, items.map((it: any) => it?.productId)); // ordre fixe : pas d'interblocage avec une vente
       for (const item of items) {
         const [product] = await tx.select().from(products).where(eq(products.id, item.productId)).limit(1);
         if (!product) continue;

@@ -50,6 +50,28 @@ export async function resolveWarehouseId(
   return first?.id ?? null;
 }
 
+/**
+ * Verrouille d'avance plusieurs articles, toujours dans le même ordre (tri par id), au
+ * début d'une transaction qui en touche plusieurs (vente, réception, inventaire…).
+ * Sans cela, deux transactions verrouillant A puis B et B puis A pourraient s'attendre
+ * mutuellement (interblocage).
+ */
+export async function lockProducts(tx: Tx, productIds: (string | null | undefined)[]): Promise<void> {
+  const ids = [...new Set(productIds.filter(Boolean) as string[])].sort();
+  for (const id of ids) await tx.select({ id: products.id }).from(products).where(eq(products.id, id)).for('update');
+}
+
+/** Stock insuffisant au moment de valider (relu sous verrou dans la transaction). */
+export class StockError extends Error {
+  constructor(public productName: string, public available: number, public requested: number) {
+    super(
+      `Stock insuffisant pour « ${productName} » : il n'en reste que ${available.toLocaleString('fr-FR', { maximumFractionDigits: 3 })} ` +
+      `(demandé : ${requested.toLocaleString('fr-FR', { maximumFractionDigits: 3 })}). ` +
+      `Une autre caisse vient peut-être de le vendre — la vente n'a pas été enregistrée.`,
+    );
+  }
+}
+
 /** Quantité d'un produit dans un entrepôt (0 si aucune ligne). */
 export async function getWarehouseStock(tx: Tx, productId: string, warehouseId: string): Promise<number> {
   const [row] = await tx
@@ -87,16 +109,28 @@ export async function adjustWarehouseStock(
   productId: string,
   warehouseId: string,
   delta: number,
-  opts: { clampZero?: boolean } = {},
+  opts: { clampZero?: boolean; strict?: boolean } = {},
 ): Promise<{ warehouseQty: number; totalQty: number }> {
   const clampZero = opts.clampZero !== false;
+  // Plusieurs caisses en réseau : on VERROUILLE l'article jusqu'à la fin de la transaction.
+  // Deux ventes (ou vente + réception) simultanées du même article passent donc l'une
+  // après l'autre, et la seconde lit le stock déjà mis à jour par la première.
+  const [product] = await tx.select().from(products).where(eq(products.id, productId)).for('update');
   const [existing] = await tx
     .select()
     .from(productStock)
     .where(and(eq(productStock.productId, productId), eq(productStock.warehouseId, warehouseId)))
-    .limit(1);
+    .limit(1)
+    .for('update');
 
-  let newQty = (Number(existing?.quantity) || 0) + delta;
+  const available = Number(existing?.quantity) || 0;
+  // Vente : refus si le stock (relu sous verrou) ne suffit plus — ex. la dernière pièce
+  // vient d'être vendue par une autre caisse.
+  if (opts.strict && delta < 0 && round3(available + delta) < 0) {
+    throw new StockError(product?.name || productId, available, -delta);
+  }
+
+  let newQty = available + delta;
   if (clampZero && newQty < 0) newQty = 0;
   newQty = round3(newQty);
 

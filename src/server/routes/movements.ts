@@ -54,7 +54,8 @@ movementsRouter.post('/', requireAuth, requireWrite('products'), async (req: Aut
 
   try {
     const result = await db.transaction(async (tx) => {
-      const [product] = await tx.select().from(products).where(eq(products.id, b.productId)).limit(1);
+      // Verrou : le contrôle de stock du transfert ne peut pas être doublé par une vente simultanée.
+      const [product] = await tx.select().from(products).where(eq(products.id, b.productId)).limit(1).for('update');
       if (!product) throw new Error('PRODUCT_NOT_FOUND');
       // Appareils suivis par numéro : transfert / perte / sortie se font appareil par appareil.
       if (product.trackSerial && (type === 'transfer' || type === 'waste_loss' || type === 'exit_sale')) {

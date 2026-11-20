@@ -4,7 +4,7 @@ import { db } from '../../db/index.ts';
 import { sales, products, clients, stockMovements, payments } from '../../db/schema.ts';
 import { requireAuth, requireRole, requireAnyTab, type AuthedRequest } from '../auth-middleware.ts';
 import { generateId, computeProductStatus, writeAuditLog, nextDocNumber } from '../helpers.ts';
-import { adjustWarehouseStock, resolveWarehouseId } from '../stock.ts';
+import { adjustWarehouseStock, resolveWarehouseId, lockProducts, StockError } from '../stock.ts';
 import { SerialError, cleanSerials, sellSerials, returnSerials } from './serials.ts';
 
 export const salesRouter = Router();
@@ -98,6 +98,8 @@ salesRouter.post('/', requireAuth, requireRole(...CASHIER_ROLES), async (req: Au
     const paymentStatus = paidAmount >= totalAmount ? 'paid' : paidAmount > 0 ? 'partially_paid' : 'unpaid';
 
     const sale = await db.transaction(async (tx) => {
+      // Plusieurs caisses : verrouille les articles de la vente (ordre fixe, sans interblocage).
+      await lockProducts(tx, normalizedItems.map((it) => it.productId));
       // Numéro de facture légal (séquence continue) — factures uniquement.
       const invoiceNumber = saleType === 'invoice' ? await nextDocNumber(tx, 'invoice') : null;
 
@@ -160,7 +162,8 @@ salesRouter.post('/', requireAuth, requireRole(...CASHIER_ROLES), async (req: Au
         });
 
         if (whId) {
-          await adjustWarehouseStock(tx, product.id, whId, -qty);
+          // strict : refuse la vente si le stock relu sous verrou ne suffit plus
+          await adjustWarehouseStock(tx, product.id, whId, -qty, { strict: saleType !== 'return' });
         } else {
           // Aucun entrepôt (cas dégénéré) : repli sur le total global.
           const newQty = Math.max(0, product.quantity - qty);
@@ -220,6 +223,7 @@ salesRouter.post('/', requireAuth, requireRole(...CASHIER_ROLES), async (req: Au
     res.status(201).json(sale);
   } catch (err) {
     if (err instanceof SerialError) return res.status(400).json({ error: err.message });
+    if (err instanceof StockError) return res.status(409).json({ error: err.message });
     console.error('create sale error:', err);
     res.status(500).json({ error: 'Erreur lors de l\'encaissement de la vente.' });
   }
@@ -314,6 +318,7 @@ salesRouter.post('/:id/credit-note', requireAuth, requireRole(...CASHIER_ROLES),
     const invoiceGoodsHT = invoiceItems.reduce((a, it) => a + (Number(it.total) || 0), 0);
 
     const result = await db.transaction(async (tx) => {
+      await lockProducts(tx, requested.map((r: any) => r?.productId));
       // Quantités déjà avoirées par produit (avoirs antérieurs liés à cette facture).
       const priorCredits = await tx
         .select()

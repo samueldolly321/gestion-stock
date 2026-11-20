@@ -333,6 +333,36 @@ export default function App() {
     reloadSettings,
   ]);
 
+  // Rechargement des données modifiées sur un autre poste, regroupé (plusieurs événements
+  // rapprochés → un seul rechargement par type de données, 600 ms après le dernier).
+  const roleRef = React.useRef('');
+  roleRef.current = realRole || currentUser?.role || '';
+  const pendingModules = React.useRef(new Set<string>());
+  const remoteTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reloadForModules = (mods: Set<string>) => {
+    const has = (...m: string[]) => m.some((x) => mods.has(x));
+    if (has('Ventes', 'Avoirs', 'Règlements')) reloadAfterSale();
+    if (has('Achats')) { reloadAfterPurchase(); reloadExpenses(); }
+    if (has('Articles', 'Stocks', 'Catalogue', 'Entrepôts')) { reloadCatalog(); reloadProductStock(); }
+    if (has('Inventaires')) reloadAfterAudit();
+    if (has('Livraisons')) reloadDeliveries();
+    if (has('Partenaires')) { reloadPartners(); reloadSupplierProducts(); reloadClientPrices(); }
+    if (has('Dépenses')) reloadExpenses();
+    if (has('Paramètres', 'Configuration')) reloadSettings();
+    if (has('Utilisateurs')) reloadUsers();
+  };
+  const reloadForModulesRef = React.useRef(reloadForModules);
+  reloadForModulesRef.current = reloadForModules;
+  const remoteChangeRef = React.useRef((module: string) => {
+    pendingModules.current.add(module);
+    if (remoteTimer.current) clearTimeout(remoteTimer.current);
+    remoteTimer.current = setTimeout(() => {
+      const mods = new Set(pendingModules.current);
+      pendingModules.current.clear();
+      reloadForModulesRef.current(mods);
+    }, 600);
+  });
+
   // 3. Temps réel (SSE) : chaque nouvelle entrée du journal déclenche un toast + notification.
   useEffect(() => {
     if (!currentUser) return;
@@ -347,6 +377,14 @@ export default function App() {
       // immédiat côté client → via le SSE on n'affiche que l'activité des AUTRES
       // utilisateurs (veille collaborative), sans doublonner.
       if (log.userId && currentUser && log.userId === currentUser.uid) return;
+
+      // Plusieurs caisses en réseau : une vente / réception / ajustement fait sur un AUTRE
+      // poste recharge ici les données concernées (stock à jour sans F5).
+      if (log.module) remoteChangeRef.current(String(log.module));
+
+      // Toasts de l'activité des autres postes : réservés aux responsables (un caissier
+      // n'a pas à voir passer chaque vente de ses collègues).
+      if (!['Super Admin', 'Admin', 'Manager'].includes(roleRef.current)) return;
 
       // Détermine le style du toast selon l'action.
       const act = (log.action || '').toLowerCase();

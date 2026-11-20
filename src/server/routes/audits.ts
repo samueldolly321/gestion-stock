@@ -4,7 +4,7 @@ import { db } from '../../db/index.ts';
 import { inventoryAudits, products, stockMovements } from '../../db/schema.ts';
 import { requireAuth, requireWrite, type AuthedRequest } from '../auth-middleware.ts';
 import { generateId, computeProductStatus, writeAuditLog } from '../helpers.ts';
-import { setWarehouseStock, resolveWarehouseId } from '../stock.ts';
+import { setWarehouseStock, resolveWarehouseId, lockProducts } from '../stock.ts';
 
 export const auditsRouter = Router();
 
@@ -58,6 +58,7 @@ auditsRouter.post('/:id/validate', requireAuth, requireWrite('audits'), async (r
     const audit = await db.transaction(async (tx) => {
       const [current] = await tx.select().from(inventoryAudits).where(eq(inventoryAudits.id, req.params.id)).limit(1);
       if (!current) throw new Error('AUDIT_NOT_FOUND');
+      await lockProducts(tx, items.map((it: any) => it?.productId));
 
       for (const item of items) {
         const diff = Number(item.diff) || 0;

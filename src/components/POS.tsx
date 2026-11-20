@@ -541,6 +541,9 @@ export default function POS({
     } catch (err: any) {
       console.error(err);
       showAlert(err?.message || 'Erreur lors du traitement de la vente.', { variant: 'error' });
+      // Stock insuffisant (ex. vendu entre-temps par une autre caisse) : on recharge le stock
+      // pour que la caisse affiche les vraies quantités. Le panier est conservé.
+      if (/stock insuffisant/i.test(err?.message || '')) onRefresh();
     }
   };
 
