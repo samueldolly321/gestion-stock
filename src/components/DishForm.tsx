@@ -8,7 +8,7 @@
 import React, { useMemo, useState } from 'react';
 import { ChefHat, Search, Trash2, ImagePlus, AlertTriangle } from 'lucide-react';
 import type { Category, Product, ProductStock } from '../types';
-import { createProduct, updateProduct } from '../services/productsService';
+import { createProduct, updateProduct, declareDishLoss } from '../services/productsService';
 import { generateId } from '../services/ids';
 import { generateEan13 } from '../services/barcode';
 import { showAlert, showConfirm } from '../services/dialog';
@@ -341,6 +341,129 @@ export default function DishForm({
             <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800">Annuler</button>
             <button type="submit" disabled={busy} className="px-4 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-bold disabled:opacity-60">
               {busy ? 'Enregistrement…' : dish ? 'Enregistrer le plat' : 'Créer le plat'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+const LOSS_REASONS = ['Plat raté', 'Invendu jeté en fin de service', 'Renversé / tombé', 'Retourné par le client', 'Autre'];
+
+/**
+ * Perte d'un plat (raté, invendu jeté…) : retire du stock, en « Perte / Casse », les
+ * ingrédients de N portions. Aperçu des quantités et du coût avant validation.
+ */
+export function DishLossModal({
+  dish, products, productStock, warehouses, format, onClose, onDone,
+}: {
+  dish: Product;
+  products: Product[];
+  productStock: ProductStock[];
+  warehouses: { id: string; name: string }[];
+  format: (n: number) => string;
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const [portions, setPortions] = useState('1');
+  const [reason, setReason] = useState(LOSS_REASONS[0]);
+  const [detail, setDetail] = useState('');
+  const [warehouseId, setWarehouseId] = useState(warehouses[0]?.id || '');
+  const [busy, setBusy] = useState(false);
+  const n = parseDecimal(portions);
+  const byId = useMemo(() => new Map(products.map((p) => [p.id, p])), [products]);
+  const stockHere = (id: string) =>
+    productStock.filter((s) => s.productId === id && (!warehouseId || s.warehouseId === warehouseId)).reduce((a, s) => a + (Number(s.quantity) || 0), 0);
+  const lines = (dish.recipe || []).map((l) => {
+    const ing = byId.get(l.ingredientId);
+    const need = n > 0 ? Math.round(l.quantity * n * 1000) / 1000 : 0;
+    const available = stockHere(l.ingredientId);
+    return { ing, need, available, cost: ing ? Math.min(need, available) * ing.purchasePrice : 0 };
+  });
+  const total = lines.reduce((s, l) => s + l.cost, 0);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!(n > 0)) return showAlert('Indiquez le nombre de portions perdues.', { variant: 'warning' });
+    const motif = reason === 'Autre' ? (detail.trim() || 'Autre') : detail.trim() ? `${reason} — ${detail.trim()}` : reason;
+    setBusy(true);
+    try {
+      const r = await declareDishLoss(dish.id, { portions: n, reason: motif, warehouseId: warehouseId || undefined });
+      if (r.shortages.length) {
+        showAlert(
+          `Perte enregistrée (coût ${format(r.cost)}), mais le stock de certains ingrédients était déjà insuffisant :\n• ${r.shortages.map((s) => `${s.name} : il manquait ${fmtQty(s.missing)} ${s.unit}`).join('\n• ')}`,
+          { title: 'Perte enregistrée', variant: 'warning' },
+        );
+      } else {
+        showToast(`Perte de ${fmtQty(n)} « ${dish.name} » enregistrée — coût ${format(r.cost)}.`, { title: 'Stock' });
+      }
+      onDone();
+    } catch (err: any) {
+      showAlert(err?.message || "Erreur lors de l'enregistrement de la perte.", { variant: 'error' });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" role="dialog" aria-label="Déclarer une perte">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl animate-fade-in">
+        <div className="bg-slate-50 dark:bg-slate-950/40 p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
+          <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 text-amber-500" /> Déclarer une perte — {dish.name}
+          </h3>
+          <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-900 dark:hover:text-white text-sm" aria-label="Fermer">✕</button>
+        </div>
+        <form onSubmit={submit} className="p-5 space-y-4 text-xs">
+          <p className="text-slate-500">Les ingrédients de ces portions sont retirés du stock en « Perte / Casse » (visible dans l'Historique des flux).</p>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-slate-400 block mb-1">Portions perdues *</label>
+              <input required inputMode="decimal" value={portions} onChange={(e) => setPortions(e.target.value)} className={`${field} font-mono`} aria-label="Portions perdues" />
+            </div>
+            <div>
+              <label className="text-slate-400 block mb-1">Motif</label>
+              <select value={reason} onChange={(e) => setReason(e.target.value)} className={field} aria-label="Motif">
+                {LOSS_REASONS.map((r) => <option key={r} value={r}>{r}</option>)}
+              </select>
+            </div>
+            {warehouses.length > 1 && (
+              <div className="col-span-2">
+                <label className="text-slate-400 block mb-1">Entrepôt (cuisine)</label>
+                <select value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)} className={field}>
+                  {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+                </select>
+              </div>
+            )}
+            <div className="col-span-2">
+              <label className="text-slate-400 block mb-1">Précision {reason === 'Autre' ? '*' : '(facultatif)'}</label>
+              <input value={detail} onChange={(e) => setDetail(e.target.value)} required={reason === 'Autre'} className={field} placeholder="ex. trop cuit, commande annulée…" />
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-slate-200 dark:border-slate-800" data-testid="loss-preview">
+            <p className="px-3 py-2 border-b border-slate-200 dark:border-slate-800 font-bold text-slate-900 dark:text-white">Sera retiré du stock</p>
+            <ul className="p-3 space-y-1">
+              {lines.map((l, i) => (
+                <li key={i} className="flex justify-between gap-2">
+                  <span className="text-slate-700 dark:text-slate-200 truncate">{l.ing?.name || 'Ingrédient supprimé'}</span>
+                  <span className={`font-mono whitespace-nowrap ${l.need > l.available ? 'text-amber-500' : 'text-slate-500'}`} title={l.need > l.available ? `Il n'en reste que ${fmtQty(l.available)} ${l.ing?.unit || ''}` : undefined}>
+                    −{fmtQty(l.need)} {l.ing?.unit}{l.need > l.available ? ' (stock insuffisant)' : ''}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <div className="px-3 py-2 border-t border-slate-200 dark:border-slate-800 flex justify-between">
+              <span className="text-slate-400">Coût de la perte :</span>
+              <span className="font-mono font-bold text-red-500" data-testid="loss-cost">{format(Math.round(total))}</span>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2">
+            <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800">Annuler</button>
+            <button type="submit" disabled={busy || !(n > 0)} className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-white font-bold disabled:opacity-60">
+              {busy ? 'Enregistrement…' : 'Déclarer la perte'}
             </button>
           </div>
         </form>

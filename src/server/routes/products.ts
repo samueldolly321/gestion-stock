@@ -4,7 +4,7 @@ import { db } from '../../db/index.ts';
 import { products, productStock, stockMovements } from '../../db/schema.ts';
 import { requireAuth, requireWrite, type AuthedRequest } from '../auth-middleware.ts';
 import { generateId, computeProductStatus, writeAuditLog } from '../helpers.ts';
-import { setWarehouseStock, resolveWarehouseId, recomputeProductTotal, adjustWarehouseStock } from '../stock.ts';
+import { setWarehouseStock, resolveWarehouseId, recomputeProductTotal, adjustWarehouseStock, getWarehouseStock, lockProducts } from '../stock.ts';
 import { generateEan13 } from '../../services/barcode.ts';
 import { cleanList, cellKey, skuPart, variantName } from '../../services/variants.ts';
 import { normalizeRecipe } from '../../services/recipes.ts';
@@ -401,6 +401,73 @@ productsRouter.put('/:id', requireAuth, requireWrite('products'), async (req: Au
   } catch (err) {
     console.error('update product error:', err);
     res.status(500).json({ error: 'Erreur lors de la mise à jour du produit.' });
+  }
+});
+
+/**
+ * POST /api/products/:id/dish-loss — perte d'un PLAT (raté, invendu jeté, renversé…).
+ * Body : { portions, reason?, warehouseId? }. Chaque ingrédient de la recette est retiré
+ * du stock (portions × quantité par portion) avec un mouvement « Perte / Casse ».
+ * Ingrédient insuffisant : on retire ce qui reste (jamais de stock négatif) et on le signale.
+ */
+productsRouter.post('/:id/dish-loss', requireAuth, requireWrite('products'), async (req: AuthedRequest, res) => {
+  const b = req.body ?? {};
+  const portions = Math.round((Number(String(b.portions ?? '').replace(',', '.')) || 0) * 1000) / 1000;
+  if (!(portions > 0) || portions > 10000) return res.status(400).json({ error: 'Indiquez le nombre de portions perdues.' });
+  const reason = String(b.reason ?? '').trim().slice(0, 120) || 'Plat perdu';
+  try {
+    const [dish] = await db.select().from(products).where(eq(products.id, req.params.id)).limit(1);
+    if (!dish) return res.status(404).json({ error: 'Plat introuvable.' });
+    if (dish.kind !== 'dish') return res.status(400).json({ error: "Cet article n'est pas un plat : utilisez « Ajuster le stock »." });
+    const recipe = (dish.recipe || []) as RecipeItem[];
+    if (recipe.length === 0) return res.status(400).json({ error: "Ce plat n'a pas de recette : aucun ingrédient à retirer." });
+
+    const result = await db.transaction(async (tx) => {
+      await lockProducts(tx, recipe.map((l) => l.ingredientId));
+      const removed: { name: string; unit: string; quantity: number; cost: number }[] = [];
+      const shortages: { name: string; unit: string; missing: number }[] = [];
+      const ref = generateId('LOSS');
+      for (const line of recipe) {
+        const [ing] = await tx.select().from(products).where(eq(products.id, line.ingredientId)).limit(1);
+        if (!ing) continue;
+        const need = Math.round(line.quantity * portions * 1000) / 1000;
+        const whId = await resolveWarehouseId(tx, b.warehouseId || null, ing.id);
+        if (!whId || need <= 0) continue;
+        const available = Math.max(0, await getWarehouseStock(tx, ing.id, whId));
+        const taken = Math.round(Math.min(need, available) * 1000) / 1000;
+        if (taken < need) shortages.push({ name: ing.name, unit: ing.unit, missing: Math.round((need - taken) * 1000) / 1000 });
+        if (taken <= 0) continue;
+        await tx.insert(stockMovements).values({
+          id: generateId('MVT'),
+          type: 'waste_loss',
+          productId: ing.id,
+          productName: ing.name,
+          sku: ing.sku,
+          warehouseId: whId,
+          quantity: taken,
+          reason: `Perte « ${dish.name} » ×${portions} : ${reason}`,
+          performedBy: req.user?.name ?? 'Système',
+          referenceId: ref,
+          costPrice: ing.purchasePrice,
+          costTotal: ing.purchasePrice * taken,
+        });
+        await adjustWarehouseStock(tx, ing.id, whId, -taken);
+        removed.push({ name: ing.name, unit: ing.unit, quantity: taken, cost: Math.round(ing.purchasePrice * taken) });
+      }
+      return { reference: ref, removed, shortages, cost: removed.reduce((s, r) => s + r.cost, 0) };
+    });
+
+    await writeAuditLog({
+      userId: req.user?.sub,
+      userName: req.user?.name,
+      action: `Perte plat : ${dish.name} ×${portions} (${reason}) — coût ${result.cost}`,
+      module: 'Stocks',
+      entityId: dish.id,
+    });
+    res.status(201).json({ portions, reason, ...result });
+  } catch (err) {
+    console.error('dish loss error:', err);
+    res.status(500).json({ error: "Erreur lors de l'enregistrement de la perte." });
   }
 });
 

@@ -16,6 +16,20 @@ export function updateProduct(id: string, data: Partial<Product>): Promise<Produ
   return apiFetch<Product>(`/products/${id}`, { method: 'PUT', body: JSON.stringify(data) });
 }
 
+export interface DishLossResult {
+  portions: number;
+  reason: string;
+  reference: string;
+  cost: number;
+  removed: { name: string; unit: string; quantity: number; cost: number }[];
+  shortages: { name: string; unit: string; missing: number }[];
+}
+
+/** Restauration : déclare la perte de N portions d'un plat (retire ses ingrédients en « perte »). */
+export function declareDishLoss(id: string, data: { portions: number; reason?: string; warehouseId?: string }): Promise<DishLossResult> {
+  return apiFetch<DishLossResult>(`/products/${id}/dish-loss`, { method: 'POST', body: JSON.stringify(data) });
+}
+
 export function deleteProduct(id: string): Promise<{ ok: boolean }> {
   return apiFetch<{ ok: boolean }>(`/products/${id}`, { method: 'DELETE' });
 }

@@ -27,7 +27,7 @@ import {
   ShieldCheck,
   ChefHat
 } from 'lucide-react';
-import DishForm, { usedInDishes } from './DishForm';
+import DishForm, { usedInDishes, DishLossModal } from './DishForm';
 import TopScroll from './TopScroll';
 import { dishMargin, isDish, portionsPossible, recipeCost } from '../services/recipes';
 import { Product, Category, Brand, Supplier, User, Warehouse as WarehouseType, StockMovement, ProductStock } from '../types';
@@ -205,6 +205,7 @@ export default function Products({
   const [warrantyMonths, setWarrantyMonths] = useState<number>(0); // garantie client (mois)
   const [lookupOpen, setLookupOpen] = useState(false); // recherche « numéro de série / garantie »
   const [dishForm, setDishForm] = useState<{ dish: Product | null } | null>(null); // restauration : plat + recette
+  const [dishLoss, setDishLoss] = useState<Product | null>(null); // restauration : perte d'un plat
   // Restauration : onglet affiché (plats ou ingrédients). Arrivée depuis une alerte de stock → ingrédients.
   const [kindTab, setKindTab] = useState<'dish' | 'stock'>(initialStatus && initialStatus !== 'all' ? 'stock' : 'dish');
 
@@ -728,6 +729,14 @@ export default function Products({
                   <div className="flex justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
                     {canWrite && (
                       <>
+                        <button
+                          onClick={() => setDishLoss(p)}
+                          disabled={!(p.recipe || []).length}
+                          className="p-1.5 bg-slate-100 hover:bg-amber-500/10 text-slate-500 hover:text-amber-500 dark:bg-slate-800/60 dark:text-slate-400 rounded-md transition duration-150 disabled:opacity-40"
+                          title={(p.recipe || []).length ? 'Déclarer une perte (plat raté, invendu jeté…) : retire ses ingrédients du stock' : 'Pas de recette : aucun ingrédient à retirer'}
+                        >
+                          <AlertTriangle className="w-3.5 h-3.5" />
+                        </button>
                         <button onClick={() => openEditModal(p)} className="p-1.5 bg-slate-100 hover:bg-cyan-500/10 text-slate-500 hover:text-cyan-500 dark:bg-slate-800/60 dark:text-slate-400 dark:hover:text-cyan-400 rounded-md transition duration-150" title="Modifier le plat et sa recette">
                           <Edit2 className="w-3.5 h-3.5" />
                         </button>
@@ -806,7 +815,12 @@ export default function Products({
           </span>
         </div>
         {canWrite && (
-          <button onClick={() => setDishForm({ dish: vp })} className="mt-2 text-cyan-500 hover:underline">Modifier la recette</button>
+          <div className="mt-2 flex gap-3">
+            <button onClick={() => setDishForm({ dish: vp })} className="text-cyan-500 hover:underline">Modifier la recette</button>
+            {(vp.recipe || []).length > 0 && (
+              <button onClick={() => setDishLoss(vp)} className="text-amber-500 hover:underline">Déclarer une perte</button>
+            )}
+          </div>
         )}
       </div>
     ) : (() => {
@@ -2031,6 +2045,17 @@ export default function Products({
       )}
       {labelsGroup && <VariantLabels products={products} group={labelsGroup} onClose={() => setLabelsGroup(null)} />}
       {lookupOpen && <SerialLookupModal onClose={() => setLookupOpen(false)} />}
+      {dishLoss && (
+        <DishLossModal
+          dish={dishLoss}
+          products={products}
+          productStock={productStock}
+          warehouses={warehouses}
+          format={format}
+          onClose={() => setDishLoss(null)}
+          onDone={() => { setDishLoss(null); setHistoryKey((k) => k + 1); onRefresh(); }}
+        />
+      )}
       {dishForm && (
         <DishForm
           dish={dishForm.dish}
