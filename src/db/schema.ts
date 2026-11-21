@@ -60,7 +60,8 @@ export const clients = pgTable('clients', {
   email: text('email'),
   phone: text('phone'),
   address: text('address'),
-  taxNumber: text('tax_number'),
+  taxNumber: text('tax_number'), // NIF du client
+  statNumber: text('stat_number'), // STAT du client (factures aux entreprises)
   balance: doublePrecision('balance').default(0).notNull(),
   loyaltyPoints: integer('loyalty_points').default(0).notNull(),
   notes: text('notes'),

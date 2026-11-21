@@ -98,7 +98,8 @@ export interface Client {
   email: string;
   phone: string;
   address: string;
-  taxNumber?: string;
+  taxNumber?: string; // NIF
+  statNumber?: string | null; // STAT
   balance: number;
   loyaltyPoints: number;
   notes?: string;

@@ -80,6 +80,8 @@ export async function ensureSchema(): Promise<void> {
     );
   `);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS product_serials_product_idx ON product_serials (product_id, status);`);
+  // STAT du client (le NIF est dans tax_number) — imprimés sur les factures.
+  await db.execute(sql`ALTER TABLE clients ADD COLUMN IF NOT EXISTS stat_number text;`);
   // Restauration : plats composés d'ingrédients (kind = 'dish', sans stock propre).
   // recipe = [{ ingredientId, quantity }] — quantité par portion, dans l'unité de l'ingrédient.
   await db.execute(sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS kind text DEFAULT 'stock' NOT NULL;`);

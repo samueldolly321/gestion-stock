@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import {
   ShoppingCart, ChevronLeft, ChevronRight, Download, Eye, X, Printer,
 } from 'lucide-react';
-import { Sale, TransactionItem, User, CompanyInfo } from '../types';
+import { Sale, TransactionItem, User, CompanyInfo, Client } from '../types';
 import { useMoney } from '../services/CurrencyContext';
 import { exportPdf } from '../services/exportPdf';
 import { exportExcel } from '../services/exportExcel';
@@ -16,6 +16,7 @@ interface SalesProps {
   user: User;
   currencySymbol: string;
   company?: CompanyInfo;
+  clients?: Client[]; // NIF / STAT du client imprimés sur la facture
 }
 
 const PAY_META: Record<string, { label: string; cls: string }> = {
@@ -24,7 +25,7 @@ const PAY_META: Record<string, { label: string; cls: string }> = {
   paid: { label: 'Payé', cls: 'bg-emerald-500/10 text-emerald-500' },
 };
 
-export default function Sales({ sales, user, currencySymbol, company }: SalesProps) {
+export default function Sales({ sales, user, currencySymbol, company, clients }: SalesProps) {
   const { format } = useMoney();
   const [gran, setGran] = useState<Gran>('day');
   const [anchor, setAnchor] = useState<Date>(() => new Date());
@@ -271,7 +272,7 @@ export default function Sales({ sales, user, currencySymbol, company }: SalesPro
 
       {/* Reçu réimprimable (composant partagé avec la Caisse POS) */}
       {receipt && (
-        <ReceiptModal sale={receipt} company={company} onClose={() => setReceipt(null)} />
+        <ReceiptModal sale={receipt} company={company} client={clients?.find((c) => c.id === receipt.clientId)} onClose={() => setReceipt(null)} />
       )}
     </div>
   );

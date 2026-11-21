@@ -698,6 +698,7 @@ export default function App() {
               user={currentUser}
               currencySymbol={currencySymbol}
               company={companyInfo}
+              clients={clients}
             />
           )}
 

@@ -1146,7 +1146,7 @@ export default function POS({
 
       {/* Reçu / facture imprimable (composant partagé avec l'onglet Ventes) */}
       {showReceipt && (
-        <ReceiptModal sale={showReceipt} company={company} onClose={() => setShowReceipt(null)} />
+        <ReceiptModal sale={showReceipt} company={company} client={clients.find((c) => c.id === showReceipt.clientId)} onClose={() => setShowReceipt(null)} />
       )}
 
       {/* Choix des appareils (numéros de série / IMEI) */}

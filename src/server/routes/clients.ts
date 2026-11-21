@@ -16,6 +16,7 @@ function pickFields(b: any) {
     phone: b.phone ?? null,
     address: b.address ?? null,
     taxNumber: b.taxNumber ?? null,
+    statNumber: typeof b.statNumber === 'string' && b.statNumber.trim() ? b.statNumber.trim().slice(0, 40) : null,
     balance: Number(b.balance) || 0,
     loyaltyPoints: Number(b.loyaltyPoints) || 0,
     notes: b.notes ?? null,

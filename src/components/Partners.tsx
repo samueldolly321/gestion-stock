@@ -84,7 +84,8 @@ export default function Partners({
   const [notes, setNotes] = useState('');
 
   // Client-specific fields
-  const [taxNumber, setTaxNumber] = useState('');
+  const [taxNumber, setTaxNumber] = useState(''); // NIF
+  const [statNumber, setStatNumber] = useState(''); // STAT
   const [balance, setBalance] = useState(0);
 
   // Supplier Products (catalogue d'approvisionnement) Drawer State
@@ -344,6 +345,7 @@ export default function Partners({
     setContactPerson('');
     setNotes('');
     setTaxNumber('');
+    setStatNumber('');
     setBalance(0);
     setIsModalOpen(true);
   };
@@ -363,6 +365,7 @@ export default function Partners({
       setNotes(p.notes || '');
     } else {
       setTaxNumber(p.taxNumber || '');
+      setStatNumber(p.statNumber || '');
       setBalance(p.balance || 0);
     }
     setIsModalOpen(true);
@@ -397,6 +400,7 @@ export default function Partners({
         : {
             ...baseData,
             taxNumber,
+            statNumber,
             balance: Number(balance),
             loyaltyPoints: editingPartner ? editingPartner.loyaltyPoints : 0
           };
@@ -1314,11 +1318,22 @@ export default function Partners({
                 ) : (
                   <>
                     <div>
-                      <label className="text-slate-500 dark:text-slate-400 block mb-1">Numéro d'Identification Fiscale</label>
+                      <label className="text-slate-500 dark:text-slate-400 block mb-1">NIF (Numéro d'Identification Fiscale)</label>
                       <input
                         type="text"
                         value={taxNumber}
                         onChange={(e) => setTaxNumber(e.target.value)}
+                        placeholder="Imprimé sur les factures du client"
+                        className="w-full bg-white dark:bg-slate-950/20 p-2.5 text-xs rounded-lg border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-slate-500 dark:text-slate-400 block mb-1">STAT (numéro statistique)</label>
+                      <input
+                        type="text"
+                        value={statNumber}
+                        onChange={(e) => setStatNumber(e.target.value)}
+                        placeholder="Imprimé sur les factures du client"
                         className="w-full bg-white dark:bg-slate-950/20 p-2.5 text-xs rounded-lg border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500"
                       />
                     </div>

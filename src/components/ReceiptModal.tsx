@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { Printer, FileText, Receipt } from 'lucide-react';
-import { Sale, CompanyInfo } from '../types';
+import { Sale, CompanyInfo, Client } from '../types';
 import { useMoney } from '../services/CurrencyContext';
 
 interface ReceiptModalProps {
   sale: Sale;
   company?: CompanyInfo;
+  /** Client de la vente (NIF / STAT / adresse imprimés pour une entreprise) */
+  client?: Client | null;
   onClose: () => void;
 }
 
@@ -14,7 +16,7 @@ interface ReceiptModalProps {
  * et le Journal des Ventes (réimpression). Format ticket 80 mm ou facture A4 au choix.
  * (Le justificatif d'avoir des Créances est une variante distincte, non couverte ici.)
  */
-export default function ReceiptModal({ sale, company, onClose }: ReceiptModalProps) {
+export default function ReceiptModal({ sale, company, client, onClose }: ReceiptModalProps) {
   const { format } = useMoney();
   const [printFormat, setPrintFormat] = useState<'ticket' | 'a4'>('ticket');
   const reste = sale.totalAmount - sale.paidAmount;
@@ -32,8 +34,15 @@ export default function ReceiptModal({ sale, company, onClose }: ReceiptModalPro
           {company?.phone && <p className="text-[10px] text-slate-500">Tél: {company.phone}</p>}
           {company?.email && <p className="text-[10px] text-slate-500">{company.email}</p>}
           {(company?.taxId || company?.statNumber) && (
-            <p className="text-[10px] text-slate-500">
+            <p className="text-[10px] text-slate-500" data-testid="receipt-company-ids">
               {[company?.taxId && `NIF : ${company.taxId}`, company?.statNumber && `STAT : ${company.statNumber}`].filter(Boolean).join(' · ')}
+            </p>
+          )}
+          {/* Rappel à l'écran seulement (non imprimé) : NIF / STAT de la société manquants */}
+          {(!company?.taxId || !company?.statNumber) && (
+            <p className="no-print text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2 py-1 mt-1" data-testid="receipt-ids-missing">
+              {!company?.taxId && !company?.statNumber ? 'NIF et STAT' : !company?.taxId ? 'NIF' : 'STAT'} de votre société non renseigné{!company?.taxId && !company?.statNumber ? 's' : ''} :
+              ils n'apparaîtront pas sur la facture. À compléter dans Configuration ERP (fiche société).
             </p>
           )}
           <div className="border-b border-dashed border-slate-300 py-1"></div>
@@ -45,6 +54,13 @@ export default function ReceiptModal({ sale, company, onClose }: ReceiptModalPro
           <div className="flex justify-between"><span>Caissier :</span><span>{sale.cashierName}</span></div>
           {sale.warehouseName && <div className="flex justify-between"><span>Entrepôt :</span><span>{sale.warehouseName}</span></div>}
           <div className="flex justify-between"><span>Client :</span><span className="font-bold">{sale.clientName}</span></div>
+          {client && client.address && <div className="flex justify-between gap-3"><span>Adresse :</span><span className="text-right">{client.address}</span></div>}
+          {client && (client.taxNumber || client.statNumber) && (
+            <div className="flex justify-between gap-3" data-testid="receipt-client-ids">
+              <span>NIF / STAT client :</span>
+              <span className="text-right font-mono">{[client.taxNumber && `NIF ${client.taxNumber}`, client.statNumber && `STAT ${client.statNumber}`].filter(Boolean).join(' · ')}</span>
+            </div>
+          )}
           <div className="border-b border-dashed border-slate-300 py-1"></div>
         </div>
 

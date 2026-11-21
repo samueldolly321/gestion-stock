@@ -28,6 +28,7 @@ import {
   ChefHat
 } from 'lucide-react';
 import DishForm, { usedInDishes } from './DishForm';
+import TopScroll from './TopScroll';
 import { dishMargin, isDish, portionsPossible, recipeCost } from '../services/recipes';
 import { Product, Category, Brand, Supplier, User, Warehouse as WarehouseType, StockMovement, ProductStock } from '../types';
 import { generateId } from '../services/ids';
@@ -1075,7 +1076,8 @@ export default function Products({
         
         {/* Catalog List */}
         <div className="xl:col-span-3 bg-white dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800/80 rounded-2xl overflow-hidden shadow-sm">
-          <div className="overflow-x-auto">
+          {/* Défilement horizontal : barre en haut (celle du bas est masquée) */}
+          <TopScroll>
             {dishMode ? renderDishTable() : (
             <table className="w-full text-left border-collapse">
               <thead>
@@ -1255,7 +1257,7 @@ export default function Products({
               </tbody>
             </table>
             )}
-          </div>
+          </TopScroll>
           <Pagination
             page={productsPage.page}
             pageCount={productsPage.pageCount}

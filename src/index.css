@@ -63,6 +63,10 @@ html:not(.dark) .bg-slate-900 .text-slate-500 { color: #94a3b8; } /* garde un gr
 }
 
 /* Custom transitions and printing styles */
+/* Barre de défilement masquée (le défilement reste possible : molette, glisser, barre du haut). */
+.scrollbar-none { scrollbar-width: none; }
+.scrollbar-none::-webkit-scrollbar { display: none; }
+
 @media print {
   body {
     background: white;
