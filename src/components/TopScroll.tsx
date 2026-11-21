@@ -39,8 +39,9 @@ export default function TopScroll({ children, className = '' }: { children: Reac
       <div
         ref={top}
         onScroll={() => follow(top.current, body.current)}
-        className={`overflow-x-auto overflow-y-hidden ${overflow ? '' : 'hidden'}`}
-        style={{ height: 14 }}
+        // Collée en haut de la zone qui défile : reste à portée de main au milieu d'une longue liste.
+        className={`sticky top-0 z-20 overflow-x-auto overflow-y-hidden bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800/60 ${overflow ? '' : 'hidden'}`}
+        style={{ height: 16 }}
         data-testid="top-scrollbar"
         aria-hidden="true"
       >

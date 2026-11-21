@@ -53,6 +53,11 @@ import { variantLabel, compareSizes } from '../services/variants';
 import { featuresFor, sizePresetsFor, productDefaultsFor } from '../services/sectors';
 import { SerialPanel, SerialLookupModal } from './SerialsUI';
 
+// Colonne « Actions » collée à droite du tableau : modifier / supprimer restent visibles
+// sans faire défiler horizontalement (fond opaque pour masquer les colonnes qui passent dessous).
+const STICKY_ACTIONS_TH = 'py-3 px-4 text-right sticky right-0 z-10 bg-slate-50 dark:bg-slate-900 shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.25)]';
+const STICKY_ACTIONS_TD = 'py-3.5 px-4 text-right sticky right-0 z-10 bg-white dark:bg-slate-900 shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.25)]';
+
 // Unités de mesure proposées dans le formulaire produit (+ « Autre… » pour saisie libre).
 // Unité de BASE (le détail) dans laquelle le stock est compté. Le regroupement « Carton / Pack »
 // est géré par la section Conditionnement — d'où l'absence de « Cartons/Packs » ici (évite la confusion).
@@ -670,7 +675,7 @@ export default function Products({
           <th className="py-3 px-4 text-right">Marge</th>
           <th className="py-3 px-4 text-right" title="Part du coût des ingrédients dans le prix de vente — on vise souvent 25 à 35 %">Coût matière</th>
           <th className="py-3 px-4 text-center" title="Portions réalisables avec le stock actuel des ingrédients">Portions possibles</th>
-          <th className="py-3 px-4 text-right">Actions</th>
+          <th className={STICKY_ACTIONS_TH}>Actions</th>
         </tr>
       </thead>
       <tbody className="divide-y divide-slate-200 dark:divide-slate-800/40 text-xs">
@@ -719,7 +724,7 @@ export default function Products({
                   {portions == null ? <span className="text-slate-400 font-sans font-normal">—</span>
                     : <span className={portions === 0 ? 'text-red-500' : portions < 5 ? 'text-amber-500' : 'text-slate-900 dark:text-emerald-400'}>{portions}</span>}
                 </td>
-                <td className="py-3.5 px-4 text-right">
+                <td className={STICKY_ACTIONS_TD}>
                   <div className="flex justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
                     {canWrite && (
                       <>
@@ -1075,7 +1080,8 @@ export default function Products({
       <div className="grid grid-cols-1 xl:grid-cols-4 gap-6 items-start">
         
         {/* Catalog List */}
-        <div className="xl:col-span-3 bg-white dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800/80 rounded-2xl overflow-hidden shadow-sm">
+        {/* overflow-clip (et non hidden) : coins arrondis conservés, la barre de défilement du haut peut rester collée */}
+        <div className="xl:col-span-3 bg-white dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800/80 rounded-2xl overflow-clip shadow-sm">
           {/* Défilement horizontal : barre en haut (celle du bas est masquée) */}
           <TopScroll>
             {dishMode ? renderDishTable() : (
@@ -1090,7 +1096,7 @@ export default function Products({
                   <th className="py-3 px-4 text-right">Prix Vente</th>
                   <th className="py-3 px-4 text-center">Quantité</th>
                   <th className="py-3 px-4">Entrepôt(s)</th>
-                  <th className="py-3 px-4 text-right">Actions</th>
+                  <th className={STICKY_ACTIONS_TH}>Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200 dark:divide-slate-800/60 text-xs">
@@ -1204,7 +1210,7 @@ export default function Products({
                           );
                         })()}
                       </td>
-                      <td className="py-3.5 px-4 text-right">
+                      <td className={STICKY_ACTIONS_TD}>
                         <div
                           className="flex justify-end gap-1.5"
                           onClick={(e) => e.stopPropagation()} // Stop click row view trigger
