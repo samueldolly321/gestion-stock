@@ -660,6 +660,53 @@ export default function Products({
   };
 
   // Fiche article réutilisée : en sidebar sur desktop, en ligne sous le produit sur mobile.
+  // Restauration : recette d'un plat, ou plats qui utilisent cet ingrédient.
+  // Commun aux deux fiches (panneau de droite sur grand écran, fiche sous la ligne sinon).
+  const renderRestaurantBlock = (vp: Product) =>
+    isDish(vp) ? (
+      <div className="mb-4 rounded-xl border border-cyan-500/30 bg-cyan-500/5 p-3 text-xs" data-testid="fiche-recipe">
+        <p className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5 mb-2"><ChefHat className="w-3.5 h-3.5 text-cyan-500" /> Recette — 1 portion</p>
+        {(vp.recipe || []).length === 0 ? (
+          <p className="text-slate-400 italic">Pas encore de recette : la vente de ce plat ne retire aucun ingrédient.</p>
+        ) : (
+          <ul className="space-y-1">
+            {(vp.recipe || []).map((l) => {
+              const ing = productsById.get(l.ingredientId);
+              return (
+                <li key={l.ingredientId} className="flex justify-between gap-2">
+                  <span className="text-slate-700 dark:text-slate-200 truncate">{ing?.name || 'Ingrédient supprimé'}</span>
+                  <span className="font-mono text-slate-500 whitespace-nowrap">{fmtQty(l.quantity)} {ing?.unit}</span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        <div className="flex justify-between border-t border-cyan-500/20 mt-2 pt-2">
+          <span className="text-slate-400">Coût de revient / marge :</span>
+          <span className="font-mono text-slate-900 dark:text-slate-100">
+            {format(recipeCost(vp.recipe, productsById))} / {format(vp.salePrice - recipeCost(vp.recipe, productsById))}
+          </span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-slate-400">Portions possibles :</span>
+          <span className="font-mono text-slate-900 dark:text-slate-100">
+            {portionsPossible(vp.recipe, (id) => productsById.get(id)?.quantity || 0) ?? '—'}
+          </span>
+        </div>
+        {canWrite && (
+          <button onClick={() => setDishForm({ dish: vp })} className="mt-2 text-cyan-500 hover:underline">Modifier la recette</button>
+        )}
+      </div>
+    ) : (() => {
+      const dishes = usedInDishes(vp.id, products);
+      return dishes.length ? (
+        <div className="mb-4 rounded-xl border border-slate-200 dark:border-slate-800 p-3 text-xs" data-testid="fiche-used-in">
+          <p className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5 mb-1"><ChefHat className="w-3.5 h-3.5 text-cyan-500" /> Ingrédient de {dishes.length} plat{dishes.length > 1 ? 's' : ''}</p>
+          <p className="text-slate-500">{dishes.map((d) => `${d.name} (${fmtQty((d.recipe || []).find((l) => l.ingredientId === vp.id)?.quantity)} ${vp.unit})`).join(' · ')}</p>
+        </div>
+      ) : null;
+    })();
+
   const renderFiche = (vp: Product) => (
     <div className="bg-white dark:bg-slate-900/40 p-5 rounded-2xl border border-slate-200 dark:border-slate-800/80 shadow-sm relative animate-fade-in">
       <button
@@ -685,44 +732,7 @@ export default function Products({
 
       <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed mb-4">{vp.description || 'Aucune description disponible.'}</p>
 
-      {/* Restauration : recette du plat, ou plats qui utilisent cet ingrédient */}
-      {isDish(vp) ? (
-        <div className="mb-4 rounded-xl border border-cyan-500/30 bg-cyan-500/5 p-3 text-xs" data-testid="fiche-recipe">
-          <p className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5 mb-2"><ChefHat className="w-3.5 h-3.5 text-cyan-500" /> Recette — 1 portion</p>
-          {(vp.recipe || []).length === 0 ? (
-            <p className="text-slate-400 italic">Pas encore de recette : la vente de ce plat ne retire aucun ingrédient.</p>
-          ) : (
-            <ul className="space-y-1">
-              {(vp.recipe || []).map((l) => {
-                const ing = productsById.get(l.ingredientId);
-                return (
-                  <li key={l.ingredientId} className="flex justify-between gap-2">
-                    <span className="text-slate-700 dark:text-slate-200 truncate">{ing?.name || 'Ingrédient supprimé'}</span>
-                    <span className="font-mono text-slate-500 whitespace-nowrap">{fmtQty(l.quantity)} {ing?.unit}</span>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-          <div className="flex justify-between border-t border-cyan-500/20 mt-2 pt-2">
-            <span className="text-slate-400">Coût de revient / marge :</span>
-            <span className="font-mono text-slate-900 dark:text-slate-100">
-              {format(recipeCost(vp.recipe, productsById))} / {format(vp.salePrice - recipeCost(vp.recipe, productsById))}
-            </span>
-          </div>
-          {canWrite && (
-            <button onClick={() => setDishForm({ dish: vp })} className="mt-2 text-cyan-500 hover:underline">Modifier la recette</button>
-          )}
-        </div>
-      ) : (() => {
-        const dishes = usedInDishes(vp.id, products);
-        return dishes.length ? (
-          <div className="mb-4 rounded-xl border border-slate-200 dark:border-slate-800 p-3 text-xs" data-testid="fiche-used-in">
-            <p className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5 mb-1"><ChefHat className="w-3.5 h-3.5 text-cyan-500" /> Ingrédient de {dishes.length} plat{dishes.length > 1 ? 's' : ''}</p>
-            <p className="text-slate-500">{dishes.map((d) => `${d.name} (${fmtQty((d.recipe || []).find((l) => l.ingredientId === vp.id)?.quantity)} ${vp.unit})`).join(' · ')}</p>
-          </div>
-        ) : null;
-      })()}
+      {renderRestaurantBlock(vp)}
 
       <div className="space-y-2 border-t border-slate-200 dark:border-slate-800/60 pt-3.5 text-xs">
         <div className="flex justify-between">
@@ -733,6 +743,12 @@ export default function Products({
           <span className="text-slate-400">Catégorie :</span>
           <span className="text-slate-900 dark:text-slate-200">{vp.categoryName}</span>
         </div>
+        {isDish(vp) ? (
+          <div className="flex justify-between">
+            <span className="text-slate-400">Prix de vente :</span>
+            <span className="font-mono text-slate-900 dark:text-slate-200">{format(vp.salePrice)}</span>
+          </div>
+        ) : (<>
         <div className="flex justify-between">
           <span className="text-slate-400">Localisation :</span>
           <span className="font-semibold text-slate-900 dark:text-slate-200">
@@ -747,6 +763,7 @@ export default function Products({
           <span className="text-slate-400">Seuils Alerte :</span>
           <span className="font-mono text-slate-900 dark:text-slate-200">Min: {vp.minStock} / Max: {vp.maxStock}</span>
         </div>
+        </>)}
         {vp.expirationDate && (
           <div className="flex justify-between">
             <span className="text-slate-400">Péremption :</span>
@@ -1139,6 +1156,8 @@ export default function Products({
 
               <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed mb-4">{viewProduct.description || 'Aucune description disponible.'}</p>
 
+              {renderRestaurantBlock(viewProduct)}
+
               {viewProduct.trackSerial && (
                 <div className="mb-4">
                   <SerialPanel product={viewProduct} warehouses={warehouses} productStock={productStock} canWrite={canWrite} onChanged={onRefresh} />
@@ -1178,6 +1197,12 @@ export default function Products({
                   <span className="text-slate-400">Catégorie :</span>
                   <span className="text-slate-900 dark:text-slate-200">{viewProduct.categoryName}</span>
                 </div>
+                {isDish(viewProduct) ? (
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Prix de vente :</span>
+                    <span className="font-mono text-slate-900 dark:text-slate-200">{format(viewProduct.salePrice)}</span>
+                  </div>
+                ) : (<>
                 <div className="flex justify-between">
                   <span className="text-slate-400">Localisation :</span>
                   <span className="font-semibold text-slate-900 dark:text-slate-200">
@@ -1192,6 +1217,7 @@ export default function Products({
                   <span className="text-slate-400">Seuils Alerte :</span>
                   <span className="font-mono text-slate-900 dark:text-slate-200">Min: {viewProduct.minStock} / Max: {viewProduct.maxStock}</span>
                 </div>
+                </>)}
                 {viewProduct.expirationDate && (
                   <div className="flex justify-between">
                     <span className="text-slate-400">Péremption :</span>
