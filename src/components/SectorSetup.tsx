@@ -16,6 +16,7 @@ const FEATURE_TEXT: Record<string, string> = {
   packs: 'Vente en gros (carton, caisse, sac…) et au détail',
   expiry: 'Dates de péremption et lots',
   serials: 'Numéros de série / IMEI et garantie',
+  recipes: 'Plats avec recette : chaque vente retire les ingrédients du stock',
 };
 
 export default function SectorSetup({

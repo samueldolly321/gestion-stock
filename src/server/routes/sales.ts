@@ -1,10 +1,22 @@
 import { Router } from 'express';
-import { and, desc, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import { db } from '../../db/index.ts';
 import { sales, products, clients, stockMovements, payments } from '../../db/schema.ts';
 import { requireAuth, requireRole, requireAnyTab, type AuthedRequest } from '../auth-middleware.ts';
 import { generateId, computeProductStatus, writeAuditLog, nextDocNumber } from '../helpers.ts';
-import { adjustWarehouseStock, resolveWarehouseId, lockProducts, StockError } from '../stock.ts';
+import { adjustWarehouseStock, resolveWarehouseId, lockProducts, StockError, getWarehouseStock } from '../stock.ts';
+import { recipeCost } from '../../services/recipes.ts';
+import type { RecipeItem } from '../../types.ts';
+
+const round3 = (n: number) => Math.round(n * 1000) / 1000;
+
+/** Ingrédients (articles stockés) d'une liste de recettes, indexés par id. */
+async function loadIngredients(recipes: (RecipeItem[] | null | undefined)[]) {
+  const ids = [...new Set(recipes.flatMap((r) => (r || []).map((l) => l.ingredientId)))];
+  if (ids.length === 0) return new Map<string, typeof products.$inferSelect>();
+  const rows = await db.select().from(products).where(inArray(products.id, ids));
+  return new Map(rows.map((r) => [r.id, r]));
+}
 import { SerialError, cleanSerials, sellSerials, returnSerials } from './serials.ts';
 
 export const salesRouter = Router();
@@ -57,9 +69,25 @@ salesRouter.post('/', requireAuth, requireRole(...CASHIER_ROLES), async (req: Au
       if (product?.trackSerial && !Number.isInteger(quantity)) {
         return res.status(400).json({ error: `« ${product.name} » se vend à l'unité (quantité entière).` });
       }
-      if (product && saleType !== 'return' && unitPrice < product.purchasePrice) {
+      // Plat (restauration) : le coût de revient vient de la recette (Σ ingrédients).
+      let dish: { cost: number; recipe: { ingredientId: string; name: string; unit: string; perPortion: number }[] } | null = null;
+      if (product?.kind === 'dish') {
+        const recipe = (product.recipe || []) as RecipeItem[];
+        const ingredients = await loadIngredients([recipe]);
+        dish = {
+          cost: recipeCost(recipe, ingredients),
+          recipe: recipe.filter((l) => ingredients.has(l.ingredientId)).map((l) => {
+            const ing = ingredients.get(l.ingredientId)!;
+            return { ingredientId: l.ingredientId, name: ing.name, unit: ing.unit, perPortion: l.quantity };
+          }),
+        };
+      }
+      const costFloor = dish ? dish.cost : product?.purchasePrice ?? 0;
+      if (product && saleType !== 'return' && unitPrice < costFloor) {
         return res.status(400).json({
-          error: `Vente à perte refusée pour « ${product.name} » : prix de vente (${unitPrice}) inférieur au prix d'achat (${product.purchasePrice}).`,
+          error: dish
+            ? `Vente à perte refusée pour « ${product.name} » : prix de vente (${unitPrice}) inférieur au coût de revient de la recette (${Math.round(costFloor)}).`
+            : `Vente à perte refusée pour « ${product.name} » : prix de vente (${unitPrice}) inférieur au prix d'achat (${product.purchasePrice}).`,
         });
       }
       const lineHT = quantity * unitPrice;
@@ -81,6 +109,11 @@ salesRouter.post('/', requireAuth, requireRole(...CASHIER_ROLES), async (req: Au
         // Articles suivis à l'unité : numéros vendus (vérifiés dans la transaction).
         serials: product?.trackSerial ? cleanSerials(it.serials) : undefined,
         warrantyUntil: null as string | null,
+        // Plat : recette figée au moment de la vente + coût de revient + manques éventuels.
+        kind: dish ? 'dish' : undefined,
+        cost: dish ? dish.cost : undefined,
+        recipe: dish ? dish.recipe : undefined,
+        shortages: undefined as { ingredientId: string; name: string; unit: string; missing: number }[] | undefined,
       });
     }
     const discountAmount = subtotal * (discountPercent / 100);
@@ -99,7 +132,11 @@ salesRouter.post('/', requireAuth, requireRole(...CASHIER_ROLES), async (req: Au
 
     const sale = await db.transaction(async (tx) => {
       // Plusieurs caisses : verrouille les articles de la vente (ordre fixe, sans interblocage).
-      await lockProducts(tx, normalizedItems.map((it) => it.productId));
+      // (Plats : on verrouille aussi leurs ingrédients, dans le même ordre global.)
+      await lockProducts(tx, [
+        ...normalizedItems.map((it) => it.productId),
+        ...normalizedItems.flatMap((it) => (it.recipe || []).map((l: any) => l.ingredientId)),
+      ]);
       // Numéro de facture légal (séquence continue) — factures uniquement.
       const invoiceNumber = saleType === 'invoice' ? await nextDocNumber(tx, 'invoice') : null;
 
@@ -135,6 +172,45 @@ salesRouter.post('/', requireAuth, requireRole(...CASHIER_ROLES), async (req: Au
         const [product] = await tx.select().from(products).where(eq(products.id, item.productId)).limit(1);
         if (!product) continue; // article introuvable : on ignore
         const qty = Number(item.quantity) || 0;
+
+        // Plat : pas de stock propre — on retire chaque ingrédient de la recette.
+        // Un plat servi ne redevient pas un ingrédient : un retour ne remet rien en stock.
+        // Ingrédient insuffisant : la vente passe quand même (le service ne doit pas être
+        // bloqué par un stock mal saisi) ; le stock reste à 0 et le manque est noté sur la ligne.
+        if (product.kind === 'dish') {
+          if (saleType === 'return') continue;
+          const shortages: { ingredientId: string; name: string; unit: string; missing: number }[] = [];
+          for (const line of item.recipe || []) {
+            const [ing] = await tx.select().from(products).where(eq(products.id, line.ingredientId)).limit(1);
+            if (!ing) continue;
+            const need = round3(line.perPortion * qty);
+            if (need <= 0) continue;
+            const ingWh = await resolveWarehouseId(tx, b.warehouseId, ing.id);
+            if (!ingWh) continue;
+            const available = Math.max(0, await getWarehouseStock(tx, ing.id, ingWh));
+            const taken = round3(Math.min(need, available));
+            if (taken < need) shortages.push({ ingredientId: ing.id, name: ing.name, unit: ing.unit, missing: round3(need - taken) });
+            if (taken <= 0) continue;
+            await tx.insert(stockMovements).values({
+              id: generateId('MVT'),
+              type: 'exit_sale',
+              productId: ing.id,
+              productName: ing.name,
+              sku: ing.sku,
+              warehouseId: ingWh,
+              quantity: taken,
+              reason: `Vente « ${product.name} » ×${qty} Réf: ${saleId}`,
+              performedBy: req.user?.name ?? 'POS',
+              referenceId: saleId,
+              costPrice: ing.purchasePrice,
+              costTotal: ing.purchasePrice * taken,
+            });
+            await adjustWarehouseStock(tx, ing.id, ingWh, -taken);
+          }
+          if (shortages.length) item.shortages = shortages;
+          continue;
+        }
+
         const whId = await resolveWarehouseId(tx, b.warehouseId, product.id);
 
         // Numéros de série / IMEI : chaque pièce vendue doit être identifiée (garantie client).
@@ -204,8 +280,8 @@ salesRouter.post('/', requireAuth, requireRole(...CASHIER_ROLES), async (req: Au
           .where(eq(clients.id, b.clientId));
       }
 
-      // Lignes enrichies (fin de garantie des articles suivis) → reçu.
-      if (normalizedItems.some((it) => it.serials?.length)) {
+      // Lignes enrichies (fin de garantie des articles suivis, manques d'ingrédients) → reçu.
+      if (normalizedItems.some((it) => it.serials?.length || it.shortages?.length)) {
         const [withWarranty] = await tx.update(sales).set({ items: normalizedItems }).where(eq(sales.id, saleId)).returning();
         return withWarranty;
       }
@@ -403,7 +479,8 @@ salesRouter.post('/:id/credit-note', requireAuth, requireRole(...CASHIER_ROLES),
         for (const it of creditItems) {
           const returnedQty = Math.abs(Number(it.quantity) || 0);
           const [product] = await tx.select().from(products).where(eq(products.id, it.productId)).limit(1);
-          if (!product) continue;
+          // Plat : un plat servi ne redevient pas un ingrédient → rien à remettre en stock.
+          if (!product || product.kind === 'dish') continue;
           const whId = await resolveWarehouseId(tx, invoice.warehouseId, product.id);
           await tx.insert(stockMovements).values({
             id: generateId('MVT'),

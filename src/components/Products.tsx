@@ -24,8 +24,11 @@ import {
   Printer,
   ShoppingBag,
   Shirt,
-  ShieldCheck
+  ShieldCheck,
+  ChefHat
 } from 'lucide-react';
+import DishForm, { usedInDishes } from './DishForm';
+import { isDish, portionsPossible, recipeCost } from '../services/recipes';
 import { Product, Category, Brand, Supplier, User, Warehouse as WarehouseType, StockMovement, ProductStock } from '../types';
 import { generateId } from '../services/ids';
 import { useMoney } from '../services/CurrencyContext';
@@ -52,7 +55,7 @@ import { SerialPanel, SerialLookupModal } from './SerialsUI';
 // Unités de mesure proposées dans le formulaire produit (+ « Autre… » pour saisie libre).
 // Unité de BASE (le détail) dans laquelle le stock est compté. Le regroupement « Carton / Pack »
 // est géré par la section Conditionnement — d'où l'absence de « Cartons/Packs » ici (évite la confusion).
-const UNIT_OPTIONS = ['Pièces', 'Unités', 'Paires', 'Litre', 'cl', 'Kg', 'mg', 'Mètres', 'm²', 'Bouteilles', 'Pots', 'Sacs'];
+const UNIT_OPTIONS = ['Pièces', 'Unités', 'Paires', 'Litre', 'cl', 'Kg', 'g', 'mg', 'Mètres', 'm²', 'Bouteilles', 'Pots', 'Sacs', 'Portions'];
 
 interface ProductsProps {
   products: Product[];
@@ -124,6 +127,9 @@ export default function Products({
     return m;
   }, [productStock, warehouses]);
 
+  // Restauration : accès rapide aux ingrédients (coût de revient, portions possibles des plats).
+  const productsById = useMemo(() => new Map(products.map((p) => [p.id, p])), [products]);
+
   // Search & Filters state
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
@@ -190,6 +196,7 @@ export default function Products({
   const [trackSerial, setTrackSerial] = useState(false); // suivi par numéro de série / IMEI
   const [warrantyMonths, setWarrantyMonths] = useState<number>(0); // garantie client (mois)
   const [lookupOpen, setLookupOpen] = useState(false); // recherche « numéro de série / garantie »
+  const [dishForm, setDishForm] = useState<{ dish: Product | null } | null>(null); // restauration : plat + recette
 
   // Quick Adjustment State
   const [adjustingProduct, setAdjustingProduct] = useState<Product | null>(null);
@@ -261,6 +268,8 @@ export default function Products({
 
   // Handle open modal for edit
   const openEditModal = (p: Product) => {
+    // Un plat se modifie dans sa propre fenêtre (recette, coût, marge).
+    if (isDish(p)) { setDishForm({ dish: p }); return; }
     setEditingProduct(p);
     setName(p.name);
     setSku(p.sku);
@@ -668,6 +677,45 @@ export default function Products({
 
       <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed mb-4">{vp.description || 'Aucune description disponible.'}</p>
 
+      {/* Restauration : recette du plat, ou plats qui utilisent cet ingrédient */}
+      {isDish(vp) ? (
+        <div className="mb-4 rounded-xl border border-cyan-500/30 bg-cyan-500/5 p-3 text-xs" data-testid="fiche-recipe">
+          <p className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5 mb-2"><ChefHat className="w-3.5 h-3.5 text-cyan-500" /> Recette — 1 portion</p>
+          {(vp.recipe || []).length === 0 ? (
+            <p className="text-slate-400 italic">Pas encore de recette : la vente de ce plat ne retire aucun ingrédient.</p>
+          ) : (
+            <ul className="space-y-1">
+              {(vp.recipe || []).map((l) => {
+                const ing = productsById.get(l.ingredientId);
+                return (
+                  <li key={l.ingredientId} className="flex justify-between gap-2">
+                    <span className="text-slate-700 dark:text-slate-200 truncate">{ing?.name || 'Ingrédient supprimé'}</span>
+                    <span className="font-mono text-slate-500 whitespace-nowrap">{fmtQty(l.quantity)} {ing?.unit}</span>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          <div className="flex justify-between border-t border-cyan-500/20 mt-2 pt-2">
+            <span className="text-slate-400">Coût de revient / marge :</span>
+            <span className="font-mono text-slate-900 dark:text-slate-100">
+              {format(recipeCost(vp.recipe, productsById))} / {format(vp.salePrice - recipeCost(vp.recipe, productsById))}
+            </span>
+          </div>
+          {canWrite && (
+            <button onClick={() => setDishForm({ dish: vp })} className="mt-2 text-cyan-500 hover:underline">Modifier la recette</button>
+          )}
+        </div>
+      ) : (() => {
+        const dishes = usedInDishes(vp.id, products);
+        return dishes.length ? (
+          <div className="mb-4 rounded-xl border border-slate-200 dark:border-slate-800 p-3 text-xs" data-testid="fiche-used-in">
+            <p className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5 mb-1"><ChefHat className="w-3.5 h-3.5 text-cyan-500" /> Ingrédient de {dishes.length} plat{dishes.length > 1 ? 's' : ''}</p>
+            <p className="text-slate-500">{dishes.map((d) => `${d.name} (${fmtQty((d.recipe || []).find((l) => l.ingredientId === vp.id)?.quantity)} ${vp.unit})`).join(' · ')}</p>
+          </div>
+        ) : null;
+      })()}
+
       <div className="space-y-2 border-t border-slate-200 dark:border-slate-800/60 pt-3.5 text-xs">
         <div className="flex justify-between">
           <span className="text-slate-400">Code-barres :</span>
@@ -789,6 +837,16 @@ export default function Products({
               Nouveau modèle (tailles / couleurs)
             </button>
           )}
+          {canWrite && (features.recipes || products.some(isDish)) && (
+            <button
+              onClick={() => setDishForm({ dish: null })}
+              title="Restauration : un plat composé d'ingrédients — chaque vente retire les ingrédients du stock"
+              className="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 text-white text-xs font-semibold rounded-lg cursor-pointer flex items-center gap-1.5 transition duration-150"
+            >
+              <ChefHat className="w-4 h-4 shrink-0 text-cyan-400" />
+              Nouveau plat (recette)
+            </button>
+          )}
         </div>
       </div>
 
@@ -897,7 +955,12 @@ export default function Products({
                         />
                         <div className="min-w-0">
                           <span className="font-semibold text-slate-900 dark:text-white block truncate">{p.name}</span>
-                          {p.variantGroup ? (
+                          {isDish(p) ? (
+                            <span className="text-[10px] text-slate-400 block">
+                              <span className="inline-block px-1.5 rounded bg-cyan-500/10 text-cyan-500 font-semibold mr-1">Plat</span>
+                              {(p.recipe || []).length ? `${(p.recipe || []).length} ingrédient${(p.recipe || []).length > 1 ? 's' : ''}` : 'sans recette'}
+                            </span>
+                          ) : p.variantGroup ? (
                             <span className="text-[10px] text-slate-400 block truncate">
                               <span className="inline-block px-1.5 rounded bg-cyan-500/10 text-cyan-500 font-semibold mr-1">{variantLabel(p) || 'Variante'}</span>
                               modèle {p.modelName}
@@ -922,13 +985,19 @@ export default function Products({
                       <td className="py-3.5 px-4 text-slate-600 dark:text-slate-300">
                         {p.categoryName || 'Inconnu'}
                       </td>
-                      <td className="py-3.5 px-4 text-right font-mono font-medium text-slate-900 dark:text-gray-300">
-                        {format(p.purchasePrice)}
+                      <td className="py-3.5 px-4 text-right font-mono font-medium text-slate-900 dark:text-gray-300" title={isDish(p) ? 'Coût de revient de la recette (prix d\'achat actuels des ingrédients)' : undefined}>
+                        {format(isDish(p) ? recipeCost(p.recipe, productsById) : p.purchasePrice)}
                       </td>
                       <td className="py-3.5 px-4 text-right font-mono font-medium text-cyan-400">
                         {format(p.salePrice)}
                       </td>
                       <td className="py-3.5 px-4 text-center font-mono font-semibold">
+                        {isDish(p) ? (() => {
+                          const n = portionsPossible(p.recipe, (id) => productsById.get(id)?.quantity || 0);
+                          return n == null
+                            ? <span className="text-slate-400 font-sans font-normal">sans recette</span>
+                            : <span className={n === 0 ? 'text-red-500' : 'text-slate-900 dark:text-emerald-400'} title="Portions réalisables avec le stock actuel des ingrédients">{n} portion{n > 1 ? 's' : ''}</span>;
+                        })() : (<>
                         <span
                           className={
                             p.quantity === 0
@@ -943,6 +1012,7 @@ export default function Products({
                         {hasPack(p.packSize) && (
                           <span className="block text-[9px] text-slate-400 font-mono mt-0.5">{packBreakdown(p.quantity, p.packSize, p.packLabel, ['Pièces', 'Unités'].includes(p.unit) ? null : p.unit)}</span>
                         )}
+                        </>)}
                       </td>
                       <td className="py-3.5 px-4 text-[11px] text-slate-500 dark:text-slate-300 min-w-[120px]">
                         {(() => {
@@ -965,7 +1035,7 @@ export default function Products({
                           className="flex justify-end gap-1.5"
                           onClick={(e) => e.stopPropagation()} // Stop click row view trigger
                         >
-                          {canWrite && (
+                          {canWrite && !isDish(p) && (
                             <button
                               onClick={() => {
                                 setAdjustingProduct(p);
@@ -1761,6 +1831,17 @@ export default function Products({
       )}
       {labelsGroup && <VariantLabels products={products} group={labelsGroup} onClose={() => setLabelsGroup(null)} />}
       {lookupOpen && <SerialLookupModal onClose={() => setLookupOpen(false)} />}
+      {dishForm && (
+        <DishForm
+          dish={dishForm.dish}
+          products={products}
+          categories={categories}
+          productStock={productStock}
+          format={format}
+          onClose={() => setDishForm(null)}
+          onSaved={() => { setDishForm(null); onRefresh(); }}
+        />
+      )}
 
       {/* ÉTIQUETTE CODE-BARRES À IMPRIMER */}
       {labelProduct && (

@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { isDish } from './services/recipes';
 import { fetchMe, logout as authLogout } from './services/authService';
 import { CurrencyProvider } from './services/CurrencyContext';
 import { listCategories } from './services/categoriesService';
@@ -101,6 +102,8 @@ export default function App() {
 
   // Données chargées depuis l'API PostgreSQL
   const [products, setProducts] = useState<Product[]>([]);
+  // Écrans « stock » (tableau de bord, achats, inventaires…) : sans les plats, qui n'ont pas de stock propre.
+  const stockProducts = useMemo(() => products.filter((p) => !isDish(p)), [products]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [productStock, setProductStock] = useState<ProductStock[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -601,7 +604,7 @@ export default function App() {
           {/* Route views mapping */}
           {activeTab === 'dashboard' && (
             <Dashboard
-              products={products}
+              products={stockProducts}
               movements={movements}
               sales={sales}
               purchases={purchases}
@@ -663,7 +666,7 @@ export default function App() {
             <Partners
               suppliers={suppliers}
               clients={clients}
-              products={products}
+              products={stockProducts}
               supplierProducts={supplierProducts}
               clientPrices={clientPrices}
               user={currentUser}
@@ -680,7 +683,7 @@ export default function App() {
             <Purchases
               purchases={purchases}
               suppliers={suppliers}
-              products={products}
+              products={stockProducts}
               supplierProducts={supplierProducts}
               warehouses={warehouses}
               user={currentUser}
@@ -700,7 +703,7 @@ export default function App() {
 
           {activeTab === 'reorder' && (
             <Reorder
-              products={products}
+              products={stockProducts}
               suppliers={suppliers}
               purchases={purchases}
               user={currentUser}
@@ -735,7 +738,7 @@ export default function App() {
 
           {activeTab === 'audits' && (
             <Audits
-              products={products}
+              products={stockProducts}
               warehouses={warehouses}
               audits={audits}
               user={currentUser}
@@ -748,7 +751,7 @@ export default function App() {
           {activeTab === 'movements' && (
             <Movements
               movements={movements}
-              products={products}
+              products={stockProducts}
               warehouses={warehouses}
               onRefresh={() => {}}
               currencySymbol={currencySymbol}
@@ -758,7 +761,7 @@ export default function App() {
           {activeTab === 'warehouses' && (
             <Warehouses
               warehouses={warehouses}
-              products={products}
+              products={stockProducts}
               productStock={productStock}
               user={currentUser}
               onRefresh={reloadCatalog}
@@ -772,7 +775,7 @@ export default function App() {
               purchases={purchases}
               sales={sales}
               suppliers={suppliers}
-              products={products}
+              products={stockProducts}
               supplierProducts={supplierProducts}
               clients={clients}
               user={currentUser}

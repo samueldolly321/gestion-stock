@@ -7,7 +7,7 @@
  */
 import { SIZE_PRESETS } from './variants';
 
-export type SectorId = 'alimentation' | 'poissonnerie' | 'grossiste' | 'vetements' | 'chaussures' | 'hightech' | 'quincaillerie' | 'general';
+export type SectorId = 'alimentation' | 'restauration' | 'poissonnerie' | 'grossiste' | 'vetements' | 'chaussures' | 'hightech' | 'quincaillerie' | 'general';
 
 export interface Features {
   /** Variantes taille × couleur (bouton « Nouveau modèle ») */
@@ -18,6 +18,8 @@ export interface Features {
   expiry: boolean;
   /** Numéros de série / IMEI + garantie (à venir) */
   serials: boolean;
+  /** Plats avec recette : la vente d'un plat retire ses ingrédients du stock (restauration) */
+  recipes: boolean;
 }
 
 export interface CategoryTemplate {
@@ -46,6 +48,23 @@ export const SECTORS: Sector[] = [
       { name: 'Boissons', children: ['Eaux', 'Sodas et jus', 'Café et thé'] },
       { name: 'Produits frais', children: ['Produits laitiers', 'Viandes et poissons', 'Fruits et légumes'] },
       { name: 'Hygiène et entretien', children: ['Savons et soins', 'Lessive et ménage'] },
+    ],
+  },
+  {
+    id: 'restauration',
+    label: 'Restauration, gargote, snack',
+    examples: 'Restaurant, gargote (hotely), snack, traiteur, pâtisserie',
+    // Plats avec recette (la vente retire les ingrédients) ; ingrédients au poids/volume,
+    // achetés au sac ou au carton ; péremption des produits frais.
+    features: { recipes: true, expiry: true, packs: true },
+    productDefaults: { unit: 'Kg', packLabel: 'Sac' },
+    categories: [
+      { name: 'Entrées' },
+      { name: 'Plats', children: ['Soupes', 'Riz et accompagnements', 'Viandes', 'Poissons et fruits de mer'] },
+      { name: 'Desserts' },
+      { name: 'Boissons', children: ['Boissons fraîches', 'Boissons chaudes'] },
+      { name: 'Ingrédients', children: ['Viandes et poissons', 'Fruits et légumes', 'Épicerie sèche', 'Produits laitiers et œufs', 'Huiles et condiments'] },
+      { name: 'Emballages', children: ['Barquettes et boîtes', 'Sacs'] },
     ],
   },
   {
@@ -148,9 +167,9 @@ export function cleanSectors(value: unknown): SectorId[] {
  */
 export function featuresFor(sectors: string[] | null | undefined): Features {
   const chosen = SECTORS.filter((s) => sectors?.includes(s.id));
-  if (!sectors || chosen.length === 0) return { variants: true, packs: true, expiry: true, serials: false };
+  if (!sectors || chosen.length === 0) return { variants: true, packs: true, expiry: true, serials: false, recipes: false };
   const has = (k: keyof Features) => chosen.some((s) => s.features[k]);
-  return { variants: has('variants'), packs: has('packs'), expiry: has('expiry'), serials: has('serials') };
+  return { variants: has('variants'), packs: has('packs'), expiry: has('expiry'), serials: has('serials'), recipes: has('recipes') };
 }
 
 /** Grilles de tailles dans l'ordre le plus utile pour ces secteurs (chaussures d'abord pour un chausseur). */
@@ -194,5 +213,7 @@ export function priceUnitSuffix(unit?: string | null): string {
   if (u === 'mètres' || u === 'm') return '/m';
   if (u === 'm²') return '/m²';
   if (u === 'paires') return '/paire';
+  if (u === 'portions' || u === 'portion') return '/portion';
+  if (u === 'g') return '/g';
   return '/pce';
 }

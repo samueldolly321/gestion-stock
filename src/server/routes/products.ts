@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { and, desc, eq, ne } from 'drizzle-orm';
+import { and, desc, eq, inArray, ne, sql } from 'drizzle-orm';
 import { db } from '../../db/index.ts';
 import { products, productStock, stockMovements } from '../../db/schema.ts';
 import { requireAuth, requireWrite, type AuthedRequest } from '../auth-middleware.ts';
@@ -7,6 +7,8 @@ import { generateId, computeProductStatus, writeAuditLog } from '../helpers.ts';
 import { setWarehouseStock, resolveWarehouseId, recomputeProductTotal, adjustWarehouseStock } from '../stock.ts';
 import { generateEan13 } from '../../services/barcode.ts';
 import { cleanList, cellKey, skuPart, variantName } from '../../services/variants.ts';
+import { normalizeRecipe } from '../../services/recipes.ts';
+import type { RecipeItem } from '../../types.ts';
 
 export const productsRouter = Router();
 
@@ -51,7 +53,39 @@ function pickProductFields(body: any) {
     // Absents de la requête → inchangés (undefined est ignoré par l'UPDATE, défaut à l'INSERT).
     trackSerial: body.trackSerial === undefined ? undefined : body.trackSerial === true,
     warrantyMonths: body.warrantyMonths === undefined ? undefined : Math.max(0, Math.min(120, Math.floor(Number(body.warrantyMonths) || 0))),
+    // Restauration : recette (absente de la requête → inchangée).
+    recipe: body.recipe === undefined ? undefined : normalizeRecipe(body.recipe),
   };
+}
+
+/** Un plat n'a ni stock, ni seuils, ni numéros de série : on neutralise ces champs. */
+function asDishFields<T extends Record<string, any>>(f: T): T {
+  return { ...f, quantity: 0, minStock: 0, maxStock: 0, trackSerial: false, packSize: 1, packLabel: null, packPurchasePrice: null, packSalePrice: null };
+}
+
+/**
+ * Vérifie une recette de plat : chaque ingrédient doit exister et être un article stocké
+ * (pas un autre plat, pas le plat lui-même). Retourne un message d'erreur, sinon null.
+ */
+async function recipeError(recipe: RecipeItem[], dishId?: string): Promise<string | null> {
+  if (recipe.length === 0) return null;
+  const ids = recipe.map((r) => r.ingredientId);
+  if (dishId && ids.includes(dishId)) return "Un plat ne peut pas être un ingrédient de sa propre recette.";
+  const rows = await db.select({ id: products.id, name: products.name, kind: products.kind }).from(products).where(inArray(products.id, ids));
+  const found = new Map(rows.map((r) => [r.id, r]));
+  const missing = ids.filter((id) => !found.has(id));
+  if (missing.length) return `Ingrédient introuvable dans la recette (${missing.length}). Rechargez la page et réessayez.`;
+  const dish = rows.find((r) => r.kind === 'dish');
+  if (dish) return `« ${dish.name} » est un plat : il ne peut pas servir d'ingrédient.`;
+  return null;
+}
+
+/** Plats dont la recette utilise cet ingrédient. */
+async function dishesUsing(ingredientId: string) {
+  return db
+    .select({ id: products.id, name: products.name })
+    .from(products)
+    .where(sql`${products.kind} = 'dish' AND ${products.recipe} @> ${JSON.stringify([{ ingredientId }])}::jsonb`);
 }
 
 /** Article qui utilise déjà ce code-barres (hors `exceptId`), sinon null. */
@@ -259,23 +293,34 @@ productsRouter.get('/', requireAuth, async (_req, res) => {
 /** POST /api/products — crée un produit. */
 productsRouter.post('/', requireAuth, requireWrite('products'), async (req: AuthedRequest, res) => {
   try {
-    const f = pickProductFields(req.body ?? {});
+    const kind = req.body?.kind === 'dish' ? 'dish' : 'stock';
+    let f = pickProductFields(req.body ?? {});
     if (!f.name || !f.sku) {
       return res.status(400).json({ error: 'Le nom et le SKU sont requis.' });
     }
     if (f.purchasePrice < 0 || f.salePrice < 0) {
       return res.status(400).json({ error: 'Les prix ne peuvent pas être négatifs.' });
     }
+    if (kind === 'dish') {
+      f = asDishFields({ ...f, recipe: f.recipe ?? [] });
+      const err = await recipeError(f.recipe!);
+      if (err) return res.status(400).json({ error: err });
+    } else {
+      f = { ...f, recipe: null as any };
+    }
     const owner = await barcodeOwner(f.barcode);
     if (owner) return res.status(409).json({ error: barcodeTakenMessage(f.barcode!, owner) });
 
     const id = generateId('PRD');
-    const status = computeProductStatus(f.quantity, f.minStock, f.expirationDate);
+    const status = kind === 'dish' ? 'in_stock' : computeProductStatus(f.quantity, f.minStock, f.expirationDate);
     const created = await db.transaction(async (tx) => {
-      const [row] = await tx.insert(products).values({ id, ...f, status }).returning();
+      const [row] = await tx.insert(products).values({ id, ...f, kind, status }).returning();
       // Alimente le stock par entrepôt : la quantité initiale entre dans la localisation choisie.
-      const whId = await resolveWarehouseId(tx, f.locationId, id);
-      if (whId) await setWarehouseStock(tx, id, whId, f.quantity);
+      // (Un plat n'a pas de stock propre.)
+      if (kind !== 'dish') {
+        const whId = await resolveWarehouseId(tx, f.locationId, id);
+        if (whId) await setWarehouseStock(tx, id, whId, f.quantity);
+      }
       return row;
     });
 
@@ -297,9 +342,22 @@ productsRouter.post('/', requireAuth, requireWrite('products'), async (req: Auth
 /** PUT /api/products/:id — met à jour un produit. */
 productsRouter.put('/:id', requireAuth, requireWrite('products'), async (req: AuthedRequest, res) => {
   try {
-    const f = pickProductFields(req.body ?? {});
+    let f = pickProductFields(req.body ?? {});
     if (!f.name || !f.sku) {
       return res.status(400).json({ error: 'Le nom et le SKU sont requis.' });
+    }
+    // Le type (article stocké / plat) est fixé à la création.
+    const [current] = await db.select({ kind: products.kind }).from(products).where(eq(products.id, req.params.id)).limit(1);
+    if (!current) return res.status(404).json({ error: 'Produit introuvable.' });
+    const dish = current.kind === 'dish';
+    if (dish) {
+      f = asDishFields(f);
+      if (f.recipe) {
+        const err = await recipeError(f.recipe, req.params.id);
+        if (err) return res.status(400).json({ error: err });
+      }
+    } else {
+      f = { ...f, recipe: undefined };
     }
     const owner = await barcodeOwner(f.barcode, req.params.id);
     if (owner) return res.status(409).json({ error: barcodeTakenMessage(f.barcode!, owner) });
@@ -315,9 +373,10 @@ productsRouter.put('/:id', requireAuth, requireWrite('products'), async (req: Au
 
       // Ajustement de stock à l'édition : autorisé seulement si le produit tient dans UN
       // seul entrepôt (sinon la répartition est ambiguë → passer par ajustement/transfert).
+      // Un plat n'a pas de stock propre : rien à ajuster.
       const stockRows = await tx.select().from(productStock).where(eq(productStock.productId, row.id));
       const currentTotal = stockRows.reduce((s: number, r: any) => s + (Number(r.quantity) || 0), 0);
-      if (Math.abs(submittedQty - currentTotal) > 0.0001 && stockRows.length <= 1) {
+      if (!dish && Math.abs(submittedQty - currentTotal) > 0.0001 && stockRows.length <= 1) {
         const whId = stockRows[0]?.warehouseId ?? await resolveWarehouseId(tx, rest.locationId, row.id);
         if (whId) await setWarehouseStock(tx, row.id, whId, submittedQty);
         else await recomputeProductTotal(tx, row.id);
@@ -348,6 +407,12 @@ productsRouter.put('/:id', requireAuth, requireWrite('products'), async (req: Au
 /** DELETE /api/products/:id */
 productsRouter.delete('/:id', requireAuth, requireWrite('products'), async (req: AuthedRequest, res) => {
   try {
+    // Un ingrédient utilisé dans une recette ne peut pas disparaître (les plats ne pourraient plus être déduits).
+    const usedBy = await dishesUsing(req.params.id);
+    if (usedBy.length) {
+      const names = usedBy.slice(0, 3).map((d) => `« ${d.name} »`).join(', ') + (usedBy.length > 3 ? ` et ${usedBy.length - 3} autre(s)` : '');
+      return res.status(409).json({ error: `Cet article est un ingrédient de ${names}. Retirez-le de ces recettes avant de le supprimer.` });
+    }
     const [deleted] = await db.delete(products).where(eq(products.id, req.params.id)).returning();
     if (!deleted) return res.status(404).json({ error: 'Produit introuvable.' });
 

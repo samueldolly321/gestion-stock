@@ -80,6 +80,10 @@ export async function ensureSchema(): Promise<void> {
     );
   `);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS product_serials_product_idx ON product_serials (product_id, status);`);
+  // Restauration : plats composés d'ingrédients (kind = 'dish', sans stock propre).
+  // recipe = [{ ingredientId, quantity }] — quantité par portion, dans l'unité de l'ingrédient.
+  await db.execute(sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS kind text DEFAULT 'stock' NOT NULL;`);
+  await db.execute(sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS recipe jsonb;`);
   // Variantes taille × couleur (vêtements, chaussures…).
   await db.execute(sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS variant_group text;`);
   await db.execute(sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS model_name text;`);

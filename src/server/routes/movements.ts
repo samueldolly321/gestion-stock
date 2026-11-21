@@ -57,6 +57,8 @@ movementsRouter.post('/', requireAuth, requireWrite('products'), async (req: Aut
       // Verrou : le contrôle de stock du transfert ne peut pas être doublé par une vente simultanée.
       const [product] = await tx.select().from(products).where(eq(products.id, b.productId)).limit(1).for('update');
       if (!product) throw new Error('PRODUCT_NOT_FOUND');
+      // Un plat n'a pas de stock propre : on mouvemente ses ingrédients, pas le plat.
+      if (product.kind === 'dish') throw new Error('DISH_NO_STOCK');
       // Appareils suivis par numéro : transfert / perte / sortie se font appareil par appareil.
       if (product.trackSerial && (type === 'transfer' || type === 'waste_loss' || type === 'exit_sale')) {
         throw new Error('SERIAL_TRACKED');
@@ -125,6 +127,9 @@ movementsRouter.post('/', requireAuth, requireWrite('products'), async (req: Aut
 
     res.status(201).json(result);
   } catch (err: any) {
+    if (err?.message === 'DISH_NO_STOCK') {
+      return res.status(400).json({ error: "Un plat n'a pas de stock propre : faites l'entrée, la perte ou le transfert sur ses ingrédients." });
+    }
     if (err?.message === 'SERIAL_TRACKED') {
       return res.status(400).json({ error: "Cet article est suivi par numéro de série : transférez ou retirez chaque appareil depuis sa fiche (panneau « Numéros de série »)." });
     }

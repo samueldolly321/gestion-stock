@@ -257,6 +257,7 @@ export default function Settings({
               sectorFeatures.packs && 'gros (carton, caisse…) et détail',
               sectorFeatures.expiry && 'péremption et lots',
               sectorFeatures.serials && 'numéros de série / IMEI',
+              sectorFeatures.recipes && 'plats avec recette',
             ].filter(Boolean).join(', ') || 'gestion standard'}
           </p>
         </div>

@@ -65,7 +65,7 @@ auditsRouter.post('/:id/validate', requireAuth, requireWrite('audits'), async (r
         if (diff === 0) continue;
 
         const [product] = await tx.select().from(products).where(eq(products.id, item.productId)).limit(1);
-        if (!product) continue;
+        if (!product || product.kind === 'dish') continue; // un plat ne se compte pas (pas de stock propre)
 
         const counted = Number(item.actualQuantity) || 0;
         const whId = await resolveWarehouseId(tx, current.warehouseId, product.id);

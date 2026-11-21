@@ -342,6 +342,14 @@ export interface DeliveryItem {
   unit?: string | null;
 }
 
+export type ProductKind = 'stock' | 'dish';
+
+/** Ligne de recette : quantité d'un ingrédient pour UNE portion, dans l'unité de l'ingrédient. */
+export interface RecipeItem {
+  ingredientId: string;
+  quantity: number;
+}
+
 export interface Product {
   id: string;
   sku: string;
@@ -385,6 +393,9 @@ export interface Product {
   // Suivi à l'unité (high-tech) : numéro de série / IMEI par pièce + garantie client
   trackSerial?: boolean;
   warrantyMonths?: number;
+  // Restauration : un plat ('dish') n'a pas de stock propre ; chaque vente retire ses ingrédients.
+  kind?: ProductKind;
+  recipe?: RecipeItem[] | null;
   status: 'in_stock' | 'low_stock' | 'out_of_stock' | 'expired';
   createdAt: string;
   updatedAt: string;

@@ -127,6 +127,10 @@ export const products = pgTable('products', {
   // Suivi à l'unité (high-tech) : chaque pièce a un numéro de série / IMEI (table product_serials).
   trackSerial: boolean('track_serial').default(false).notNull(),
   warrantyMonths: integer('warranty_months').default(0).notNull(), // garantie client en mois (0 = aucune)
+  // Restauration : 'dish' = plat composé d'ingrédients, sans stock propre ; 'stock' = article normal.
+  kind: text('kind').default('stock').notNull(),
+  // Recette d'un plat : quantité de chaque ingrédient par portion (unité de l'ingrédient).
+  recipe: jsonb('recipe').$type<{ ingredientId: string; quantity: number }[] | null>(),
   status: text('status').default('in_stock').notNull(), // in_stock | low_stock | out_of_stock | expired
   createdAt,
   updatedAt,

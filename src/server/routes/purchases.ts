@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { desc, eq } from 'drizzle-orm';
+import { and, desc, eq, inArray } from 'drizzle-orm';
 import { db } from '../../db/index.ts';
 import { purchases, products, stockMovements, payments } from '../../db/schema.ts';
 import { requireAuth, requireWrite, requireAnyTab, type AuthedRequest } from '../auth-middleware.ts';
@@ -47,6 +47,14 @@ purchasesRouter.post('/', requireAuth, requireWrite('purchases'), async (req: Au
     const items = pickItems(b.items);
     if (!b.supplierId) return res.status(400).json({ error: 'Le fournisseur est requis.' });
     if (items.length === 0) return res.status(400).json({ error: 'Ajoutez au moins un article.' });
+    // On achète des ingrédients, pas des plats (un plat n'a pas de stock propre).
+    const dishRows = await db
+      .select({ name: products.name })
+      .from(products)
+      .where(and(inArray(products.id, items.map((it) => it.productId).filter(Boolean)), eq(products.kind, 'dish')));
+    if (dishRows.length) {
+      return res.status(400).json({ error: `« ${dishRows[0].name} » est un plat : commandez plutôt ses ingrédients au fournisseur.` });
+    }
 
     const subtotal = items.reduce((a, it) => a + it.total, 0);
     const vatAmount = items.reduce((a, it) => a + it.total * (it.tax / 100), 0);

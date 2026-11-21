@@ -27,6 +27,10 @@ import ReceiptModal from './ReceiptModal';
 import BarcodeScannerModal from './BarcodeScannerModal';
 import { VariantPicker, groupForPos, modelVariants } from './VariantsUI';
 import { priceUnitSuffix } from '../services/sectors';
+import { isDish, portionsPossible } from '../services/recipes';
+
+/** Un plat n'a pas de limite de stock en caisse (ses ingrédients sont retirés à la vente). */
+const DISH_NO_LIMIT = 9999;
 import { showAlert } from '../services/dialog';
 import { showToast } from '../services/toast';
 import { useMoney } from '../services/CurrencyContext';
@@ -118,10 +122,23 @@ export default function POS({
     for (const s of productStock) m.set(`${s.productId}::${s.warehouseId}`, Number(s.quantity) || 0);
     return m;
   }, [productStock]);
-  const availOf = React.useCallback((product: Product): number => {
-    if (!activeWarehouseId) return product.quantity;
-    return stockMap.get(`${product.id}::${activeWarehouseId}`) || 0;
+  // Stock d'un article stocké dans l'entrepôt actif.
+  const stockHere = React.useCallback((productId: string, total: number): number => {
+    if (!activeWarehouseId) return total;
+    return stockMap.get(`${productId}::${activeWarehouseId}`) || 0;
   }, [stockMap, activeWarehouseId]);
+  const productsById = useMemo(() => new Map(products.map((p) => [p.id, p])), [products]);
+  // Restauration : portions d'un plat réalisables ici avec le stock des ingrédients
+  // (null = plat sans recette, donc sans suivi des ingrédients).
+  const portionsOf = React.useCallback((dish: Product): number | null =>
+    portionsPossible(dish.recipe, (id) => stockHere(id, productsById.get(id)?.quantity || 0)),
+  [stockHere, productsById]);
+  const availOf = React.useCallback((product: Product): number => {
+    // Un plat n'est jamais bloqué par le stock : la vente retire ses ingrédients, et un
+    // manque est signalé (sans empêcher le service).
+    if (isDish(product)) return DISH_NO_LIMIT;
+    return stockHere(product.id, product.quantity);
+  }, [stockHere]);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [scannerOpen, setScannerOpen] = useState(false);
@@ -222,6 +239,12 @@ export default function POS({
   const addToCart = (product: Product) => {
     if (product.trackSerial) { setSerialPickFor(product); return; } // choix des appareils (IMEI)
     const cartItem = cart.find((item) => item.productId === product.id);
+    if (isDish(product)) {
+      const n = portionsOf(product);
+      if (n != null && (cartItem?.quantity || 0) + 1 > n) {
+        showToast(`Ingrédients insuffisants pour « ${product.name} » (${n} portion${n > 1 ? 's' : ''} possible${n > 1 ? 's' : ''} ici). La vente reste possible — pensez à vérifier le stock.`, { title: 'Cuisine', type: 'warning', duration: 4000 });
+      }
+    }
     if (cartItem) {
       const step = stepFor(cartItem);
       if (cartItem.quantity + step > availOf(product)) {
@@ -530,6 +553,11 @@ export default function POS({
       });
 
       setShowReceipt(created);
+      // Restauration : ingrédients qui manquaient pour les plats vendus (vente quand même enregistrée).
+      const shortages = ((created.items || []) as any[]).flatMap((it) => (it.shortages || []).map((s: any) => `${s.name} : il manquait ${fmtQty(s.missing)} ${s.unit} (${it.productName})`));
+      if (shortages.length) {
+        showAlert(`Vente enregistrée, mais le stock de certains ingrédients ne suffisait pas :\n• ${shortages.join('\n• ')}\n\nLeur stock est maintenant à 0 : vérifiez-le (réception oubliée ? inventaire à faire ?).`, { title: 'Ingrédients insuffisants', variant: 'warning' });
+      }
       if (cart.some((i) => i.serials?.length)) reloadSerials(); // appareils vendus
       clearCart();
       setNotes('');
@@ -708,10 +736,23 @@ export default function POS({
                     </div>
 
                     <div className="mt-3 w-full">
+                      {isDish(p) ? (() => {
+                        const n = portionsOf(p);
+                        const left = n == null ? null : Math.max(0, n - quantityInCart);
+                        return (
+                          <div className="flex justify-between text-[10px] text-slate-400" data-testid="pos-dish-portions">
+                            <span>Portions possibles :</span>
+                            <span className={`font-mono font-semibold ${left === 0 ? 'text-amber-500' : 'text-slate-900 dark:text-slate-300'}`}>
+                              {left == null ? 'plat' : left === 0 ? '0 — ingrédients bas' : left}
+                            </span>
+                          </div>
+                        );
+                      })() : (
                       <div className="flex justify-between text-[10px] text-slate-400">
                         <span>Disponible :</span>
                         <span className="font-mono font-semibold text-slate-900 dark:text-slate-300">{fmtQty(round3(availOf(p) - quantityInCart))}</span>
                       </div>
+                      )}
                       <div className="flex justify-between items-end mt-1.5 pt-1.5 border-t border-slate-200 dark:border-slate-800/50">
                         <span className="text-xs font-bold font-mono text-cyan-400">
                           {format(p.salePrice)}

@@ -90,7 +90,8 @@ export async function recomputeProductTotal(tx: Tx, productId: string): Promise<
   const rows = await tx.select().from(productStock).where(eq(productStock.productId, productId));
   const total = round3(rows.reduce((s: number, r: any) => s + (Number(r.quantity) || 0), 0));
   const [product] = await tx.select().from(products).where(eq(products.id, productId)).limit(1);
-  const status = product ? computeProductStatus(total, product.minStock, product.expirationDate) : 'in_stock';
+  // Un plat (restauration) n'a pas de stock propre : jamais « en rupture » ni « stock bas ».
+  const status = !product || product.kind === 'dish' ? 'in_stock' : computeProductStatus(total, product.minStock, product.expirationDate);
   await tx
     .update(products)
     .set({ quantity: total, status, updatedAt: new Date().toISOString() })
