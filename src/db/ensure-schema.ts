@@ -88,6 +88,8 @@ export async function ensureSchema(): Promise<void> {
   await db.execute(sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS recipe jsonb;`);
   // Suppléments proposés sur un plat : [{ id, label, price, ingredientId, quantity }].
   await db.execute(sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS options jsonb;`);
+  // Tailles de portion d'un plat : [{ id, label, price, factor }] (factor × quantités de la recette).
+  await db.execute(sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS sizes jsonb;`);
   // Variantes taille × couleur (vêtements, chaussures…).
   await db.execute(sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS variant_group text;`);
   await db.execute(sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS model_name text;`);

@@ -48,6 +48,7 @@ export default function ReceiptModal({ sale, company, client, onClose }: Receipt
             <div key={i}>
               <p className="text-lg font-black leading-tight">
                 <span className="font-mono">{Number(it.quantity) || 0} ×</span> {String(it.productName || '').toUpperCase()}
+                {it.size?.label && <span className="ml-1.5 px-1.5 border-2 border-slate-950 rounded" data-testid="kitchen-size">{String(it.size.label).toUpperCase()}</span>}
               </p>
               {(it.options || []).map((o: any, j: number) => (
                 <p key={j} className="text-base font-bold pl-6">{String(o.label).startsWith('+') ? '' : '+ '}{o.label}</p>
@@ -114,7 +115,7 @@ export default function ReceiptModal({ sale, company, client, onClose }: Receipt
           {sale.items.map((item, idx) => (
             <div key={`${item.productId}-${idx}`} className="flex justify-between items-start">
               <div>
-                <span>{item.productName}</span>
+                <span>{item.productName}{(item as any).size?.label ? ` (${(item as any).size.label})` : ''}</span>
                 {Array.isArray((item as any).options) && (item as any).options.length > 0 && (
                   <span className="text-[9px] text-slate-600 block" data-testid="receipt-options">
                     {(item as any).options.map((o: any) => `${String(o.label).startsWith('+') ? '' : '+ '}${o.label} (${format(o.price)})`).join(' · ')}

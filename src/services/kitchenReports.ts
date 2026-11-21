@@ -50,7 +50,11 @@ export function dishMargins(sales: Sale[], movements: StockMovement[], products:
     for (const it of (s.items || []) as any[]) {
       const isDishLine = it.kind === 'dish' || dishIds.has(it.productId);
       if (!isDishLine) continue;
-      const r = row(it.productId, it.productName || byId.get(it.productId)?.name || 'Plat');
+      // Une ligne de rapport par plat ET par taille (« Soupe chinoise (Grande) »).
+      const baseName = it.productName || byId.get(it.productId)?.name || 'Plat';
+      const r = it.size
+        ? row(`${it.productId}@${it.size.id}`, `${baseName} (${it.size.label})`)
+        : row(it.productId, baseName);
       const qty = Number(it.quantity) || 0;
       r.portions += qty;
       r.revenue += Number(it.total ?? qty * (Number(it.unitPrice) || 0)) || 0;
@@ -68,8 +72,16 @@ export function dishMargins(sales: Sale[], movements: StockMovement[], products:
     if (m.type !== 'waste_loss' || !inPeriod(m.createdAt, period)) continue;
     const match = /^Perte « (.+) » ×([\d.]+)/.exec(m.reason || '');
     if (!match) continue;
-    const dish = products.find((p) => isDish(p) && p.name === match[1]);
-    const id = dish?.id || `name:${match[1]}`;
+    // « Nom » ou « Nom (Taille) »
+    let id = `name:${match[1]}`;
+    const exact = products.find((p) => isDish(p) && p.name === match[1]);
+    if (exact) id = exact.id;
+    else {
+      for (const p of products.filter(isDish)) {
+        const s = (p.sizes || []).find((sz) => `${p.name} (${sz.label})` === match[1]);
+        if (s) { id = `${p.id}@${s.id}`; break; }
+      }
+    }
     const r = row(id, match[1]);
     r.lossCost += Number(m.costTotal) || 0;
     const ref = m.referenceId || m.id;

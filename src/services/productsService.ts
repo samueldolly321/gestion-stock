@@ -26,7 +26,7 @@ export interface DishLossResult {
 }
 
 /** Restauration : déclare la perte de N portions d'un plat (retire ses ingrédients en « perte »). */
-export function declareDishLoss(id: string, data: { portions: number; reason?: string; warehouseId?: string }): Promise<DishLossResult> {
+export function declareDishLoss(id: string, data: { portions: number; reason?: string; warehouseId?: string; sizeId?: string }): Promise<DishLossResult> {
   return apiFetch<DishLossResult>(`/products/${id}/dish-loss`, { method: 'POST', body: JSON.stringify(data) });
 }
 

@@ -81,6 +81,9 @@ interface CartLine extends TransactionItem {
   /** Plat avec suppléments : clé « plat|suppléments » (une ligne par combinaison) */
   lineKey?: string;
   options?: { id: string; label: string; price: number }[];
+  /** Plat avec tailles : taille choisie (le serveur applique son prix et son coefficient) */
+  sizeId?: string;
+  sizeLabel?: string;
 }
 
 /** Clé d'une ligne de panier : l'id de l'article, ou « plat|suppléments ». */
@@ -250,9 +253,10 @@ export default function POS({
   const stepFor = (item: CartLine) => (item.saleUnit === 'pack' ? item.packSize : 1);
 
   // Restauration : un plat avec suppléments → une ligne par combinaison (plat + suppléments).
-  const addDishWithOptions = (product: Product, optionIds: string[]) => {
+  const addDishWithOptions = (product: Product, optionIds: string[], sizeId?: string) => {
     const chosen = (product.options || []).filter((o) => optionIds.includes(o.id));
-    const key = optionsKey(product.id, chosen.map((o) => o.id));
+    const size = (product.sizes || []).find((s) => s.id === sizeId) || null;
+    const key = optionsKey(product.id, chosen.map((o) => o.id), size?.id);
     const n = portionsOf(product);
     const already = cart.filter((i) => i.productId === product.id).reduce((s, i) => s + i.quantity, 0);
     if (n != null && already + 1 > n) {
@@ -263,7 +267,7 @@ export default function POS({
       setCart(cart.map((i) => (keyOf(i) === key ? { ...i, quantity: i.quantity + 1, total: (i.quantity + 1) * i.unitPrice * (1 - i.discount / 100) } : i)));
       return;
     }
-    const price = priceForClient(product) + chosen.reduce((s, o) => s + o.price, 0);
+    const price = (size ? size.price : priceForClient(product)) + chosen.reduce((s, o) => s + o.price, 0);
     setCart([...cart, {
       productId: product.id,
       productName: product.name,
@@ -278,13 +282,15 @@ export default function POS({
       packLabel: null,
       lineKey: key,
       options: chosen.map((o) => ({ id: o.id, label: o.label, price: o.price })),
+      sizeId: size?.id,
+      sizeLabel: size?.label,
     }]);
   };
 
   // Add product to cart
   const addToCart = (product: Product) => {
     if (product.trackSerial) { setSerialPickFor(product); return; } // choix des appareils (IMEI)
-    if (isDish(product) && (product.options || []).length) { setOptionsPickFor(product); return; } // choix des suppléments
+    if (isDish(product) && ((product.options || []).length || (product.sizes || []).length)) { setOptionsPickFor(product); return; } // taille / suppléments
     const cartItem = cart.find((item) => keyOf(item) === product.id);
     if (isDish(product)) {
       const n = portionsOf(product);
@@ -857,7 +863,10 @@ export default function POS({
                   className="p-3 bg-white dark:bg-slate-950/20 border border-slate-200 dark:border-slate-800/40 rounded-xl flex items-center justify-between gap-3"
                 >
                   <div className="min-w-0 flex-1">
-                    <span className="text-xs font-bold text-slate-900 dark:text-white block truncate">{item.productName}</span>
+                    <span className="text-xs font-bold text-slate-900 dark:text-white block truncate">
+                      {item.productName}
+                      {item.sizeLabel && <span className="ml-1.5 px-1.5 py-px rounded bg-amber-500/15 text-amber-600 dark:text-amber-400 text-[10px] font-bold align-middle" data-testid="cart-line-size">{item.sizeLabel}</span>}
+                    </span>
                     {item.options && item.options.length > 0 && (
                       <span className="text-[10px] text-cyan-500 block truncate" data-testid="cart-line-options">
                         {item.options.map((o) => `${o.label.startsWith('+') ? '' : '+ '}${o.label}`).join(' · ')}
@@ -1209,7 +1218,7 @@ export default function POS({
           basePrice={priceForClient(optionsPickFor)}
           format={format}
           onCancel={() => setOptionsPickFor(null)}
-          onConfirm={(ids) => { addDishWithOptions(optionsPickFor, ids); setOptionsPickFor(null); }}
+          onConfirm={(ids, sizeId) => { addDishWithOptions(optionsPickFor, ids, sizeId); setOptionsPickFor(null); }}
         />
       )}
 

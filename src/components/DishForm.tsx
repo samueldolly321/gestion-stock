@@ -14,7 +14,7 @@ import { generateEan13 } from '../services/barcode';
 import { showAlert, showConfirm } from '../services/dialog';
 import { showToast } from '../services/toast';
 import { fmtQty, parseDecimal } from '../services/pack';
-import { dishMargin, isDish, normalizeRecipe, normalizeOptions, portionsPossible, recipeCost } from '../services/recipes';
+import { dishMargin, isDish, normalizeRecipe, normalizeOptions, normalizeSizes, portionsPossible, recipeCost, roundPrice } from '../services/recipes';
 
 const field =
   'w-full bg-white dark:bg-slate-950/20 p-2.5 text-xs rounded-lg border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500';
@@ -73,6 +73,10 @@ export default function DishForm({
   );
   const [search, setSearch] = useState('');
   const [busy, setBusy] = useState(false);
+  // Tailles de portion (« Petite », « Grande ») : prix propre + coefficient sur la recette.
+  const [sizeLines, setSizeLines] = useState<{ id?: string; label: string; factor: string; price: string }[]>(
+    (dish?.sizes || []).map((s) => ({ id: s.id, label: s.label, factor: String(s.factor).replace('.', ','), price: String(s.price) })),
+  );
   // Suppléments proposés en caisse (« + œuf ») : libellé, ingrédient, quantité, prix.
   const [optLines, setOptLines] = useState<{ id?: string; label: string; ingredientId: string; quantity: string; price: string }[]>(
     (dish?.options || []).map((o) => ({ id: o.id, label: o.label, ingredientId: o.ingredientId, quantity: String(o.quantity).replace('.', ','), price: String(o.price) })),
@@ -127,6 +131,10 @@ export default function DishForm({
     ))) return;
     const badOpt = optLines.find((o) => !o.label.trim() || !o.ingredientId || !(parseDecimal(o.quantity) > 0) || !(parseDecimal(o.price) >= 0) || o.price.trim() === '');
     if (badOpt) return showAlert('Complétez chaque supplément : nom, ingrédient, quantité et prix (ou supprimez la ligne).', { variant: 'warning' });
+    const badSize = sizeLines.find((s) => !s.label.trim() || !(parseDecimal(s.price) > 0) || !(parseDecimal(s.factor) >= 0.1 && parseDecimal(s.factor) <= 5));
+    if (badSize) return showAlert('Complétez chaque taille : nom, coefficient (entre 0,1 et 5) et prix (ou supprimez la ligne).', { variant: 'warning' });
+    const sizeBelowCost = sizeLines.find((s) => parseDecimal(s.price) < cost * parseDecimal(s.factor));
+    if (sizeBelowCost) return showAlert(`La taille « ${sizeBelowCost.label} » est vendue sous son coût de revient (${format(cost * parseDecimal(sizeBelowCost.factor))}) : la caisse refuserait la vente.`, { variant: 'warning' });
     if (price < cost) {
       return showAlert(`Le prix de vente (${format(price)}) est inférieur au coût de revient (${format(cost)}) : la caisse refuserait la vente. Augmentez le prix ou revoyez la recette.`, { variant: 'warning' });
     }
@@ -138,6 +146,7 @@ export default function DishForm({
       kind: 'dish' as const,
       recipe,
       options: normalizeOptions(optLines.map((o) => ({ ...o, quantity: o.quantity, price: o.price }))),
+      sizes: normalizeSizes(sizeLines),
       name: name.trim(),
       sku: dish?.sku || 'PLAT-' + generateId().slice(0, 6).toUpperCase(),
       barcode: dish?.barcode || generateEan13(products.map((p) => p.barcode)),
@@ -313,6 +322,68 @@ export default function DishForm({
             </div>
           </div>
 
+          {/* Tailles de portion */}
+          <div className="rounded-xl border border-slate-200 dark:border-slate-800" data-testid="dish-sizes">
+            <div className="px-3.5 py-2.5 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/40 flex items-center justify-between gap-2">
+              <div>
+                <p className="font-bold text-slate-900 dark:text-white">Tailles <span className="font-normal text-slate-400">(facultatif)</span></p>
+                <p className="text-[11px] text-slate-500 mt-0.5">La recette ci-dessus est la portion <b>normale</b> (×1). Une grande portion ×1,5 retire 1,5 fois chaque ingrédient. Avec des tailles, la caisse demande la taille.</p>
+              </div>
+              <div className="shrink-0 flex flex-col items-end gap-1">
+                {sizeLines.length === 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setSizeLines([
+                      { label: 'Petite', factor: '0,7', price: String(roundPrice(price * 0.75)) },
+                      { label: 'Normale', factor: '1', price: String(price) },
+                      { label: 'Grande', factor: '1,5', price: String(roundPrice(price * 1.4)) },
+                    ])}
+                    className="text-[11px] text-cyan-500 hover:underline"
+                    disabled={!(price > 0)}
+                    title={price > 0 ? 'Préremplit Petite (×0,7), Normale (×1) et Grande (×1,5) avec des prix proposés' : "Indiquez d'abord le prix de vente"}
+                  >
+                    Petite / Normale / Grande
+                  </button>
+                )}
+                <button type="button" onClick={() => setSizeLines((ls) => [...ls, { label: '', factor: '1', price: price > 0 ? String(price) : '' }])} className="text-[11px] text-cyan-500 hover:underline">
+                  + Ajouter une taille
+                </button>
+              </div>
+            </div>
+            {sizeLines.length === 0 ? (
+              <p className="p-3.5 text-slate-400 italic">Une seule taille (prix de vente ci-dessus).</p>
+            ) : (
+              <div className="p-3.5 space-y-2">
+                <div className="grid grid-cols-[1.2fr_0.8fr_0.9fr_1.6fr_auto] gap-2 text-[10px] uppercase text-slate-400">
+                  <span>Taille</span><span>Coefficient</span><span>Prix</span><span>Coût / marge</span><span />
+                </div>
+                {sizeLines.map((s, i) => {
+                  const f = parseDecimal(s.factor);
+                  const p = parseDecimal(s.price) || 0;
+                  const sCost = f > 0 ? cost * f : 0;
+                  const ratio = p > 0 ? Math.round((sCost / p) * 1000) / 10 : null;
+                  const set = (patch: Partial<typeof s>) => setSizeLines((ls) => ls.map((x, j) => (j === i ? { ...x, ...patch } : x)));
+                  return (
+                    <div key={i} className="grid grid-cols-[1.2fr_0.8fr_0.9fr_1.6fr_auto] gap-2 items-center" data-testid="size-line">
+                      <input value={s.label} onChange={(e) => set({ label: e.target.value })} className={field} placeholder="Grande" aria-label="Nom de la taille" />
+                      <div className="flex items-center gap-1">
+                        <span className="text-slate-400">×</span>
+                        <input inputMode="decimal" value={s.factor} onChange={(e) => set({ factor: e.target.value })} className={`${field} text-right font-mono`} aria-label="Coefficient de la taille" />
+                      </div>
+                      <input inputMode="decimal" value={s.price} onChange={(e) => set({ price: e.target.value })} className={`${field} text-right font-mono`} aria-label="Prix de la taille" />
+                      <span className={`text-[11px] font-mono ${p > 0 && p < sCost ? 'text-red-500' : ratio != null && ratio > 40 ? 'text-amber-500' : 'text-slate-500'}`}>
+                        {f > 0 ? `${format(sCost)} · ${format(p - sCost)}${ratio != null ? ` · ${String(ratio).replace('.', ',')} %` : ''}` : '—'}
+                      </span>
+                      <button type="button" onClick={() => setSizeLines((ls) => ls.filter((_, j) => j !== i))} className="p-1.5 text-slate-400 hover:text-red-500" aria-label="Supprimer la taille">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
           {/* Suppléments proposés en caisse */}
           <div className="rounded-xl border border-slate-200 dark:border-slate-800" data-testid="dish-options">
             <div className="px-3.5 py-2.5 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/40 flex items-center justify-between gap-2">
@@ -430,11 +501,15 @@ export function DishOptionsPicker({
   basePrice: number;
   format: (n: number) => string;
   onCancel: () => void;
-  onConfirm: (optionIds: string[]) => void;
+  onConfirm: (optionIds: string[], sizeId?: string) => void;
 }) {
   const [picked, setPicked] = useState<string[]>([]);
   const options = dish.options || [];
-  const total = basePrice + options.filter((o) => picked.includes(o.id)).reduce((s, o) => s + o.price, 0);
+  const sizes = dish.sizes || [];
+  // Taille présélectionnée : la normale (×1) si elle existe, sinon la première.
+  const [sizeId, setSizeId] = useState<string | undefined>((sizes.find((s) => s.factor === 1) || sizes[0])?.id);
+  const size = sizes.find((s) => s.id === sizeId);
+  const total = (size ? size.price : basePrice) + options.filter((o) => picked.includes(o.id)).reduce((s, o) => s + o.price, 0);
   const toggle = (id: string) => setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" role="dialog" aria-label="Suppléments">
@@ -443,11 +518,28 @@ export function DishOptionsPicker({
           {dish.image ? <img src={dish.image} alt="" className="w-12 h-12 rounded-lg object-cover" /> : <ChefHat className="w-8 h-8 text-cyan-500" />}
           <div className="min-w-0 flex-1">
             <p className="font-bold text-slate-900 dark:text-white truncate">{dish.name}</p>
-            <p className="text-[11px] text-slate-400">Suppléments ? (facultatif)</p>
+            <p className="text-[11px] text-slate-400">{sizes.length ? 'Taille' : ''}{sizes.length && options.length ? ' et suppléments' : options.length ? 'Suppléments ? (facultatif)' : ''}</p>
           </div>
           <button type="button" onClick={onCancel} className="text-slate-400 hover:text-slate-900 dark:hover:text-white text-sm" aria-label="Fermer">✕</button>
         </div>
         <div className="p-3 space-y-1.5 max-h-[50vh] overflow-y-auto">
+          {sizes.length > 0 && (
+            <div className="grid gap-1.5 pb-2 mb-1 border-b border-slate-200 dark:border-slate-800" style={{ gridTemplateColumns: `repeat(${Math.min(sizes.length, 3)}, minmax(0, 1fr))` }} role="radiogroup" aria-label="Taille">
+              {sizes.map((s) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={sizeId === s.id}
+                  onClick={() => setSizeId(s.id)}
+                  className={`p-2.5 rounded-xl border text-center ${sizeId === s.id ? 'border-cyan-500 bg-cyan-500/10' : 'border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/40'}`}
+                >
+                  <span className="block text-sm font-bold text-slate-900 dark:text-white">{s.label}</span>
+                  <span className="block text-xs font-mono text-cyan-600 dark:text-cyan-400">{format(s.price)}</span>
+                </button>
+              ))}
+            </div>
+          )}
           {options.map((o) => (
             <label key={o.id} className={`flex items-center gap-3 p-2.5 rounded-xl border cursor-pointer text-sm ${picked.includes(o.id) ? 'border-cyan-500 bg-cyan-500/10' : 'border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/40'}`}>
               <input type="checkbox" checked={picked.includes(o.id)} onChange={() => toggle(o.id)} className="w-4 h-4 accent-cyan-600" aria-label={o.label} />
@@ -458,8 +550,10 @@ export function DishOptionsPicker({
         </div>
         <div className="p-4 border-t border-slate-200 dark:border-slate-800 flex items-center gap-2">
           <span className="text-xs text-slate-400 mr-auto">Total : <b className="font-mono text-slate-900 dark:text-white" data-testid="options-total">{format(total)}</b></span>
-          <button type="button" onClick={() => onConfirm([])} className="px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800">Sans supplément</button>
-          <button type="button" onClick={() => onConfirm(picked)} className="px-3 py-2 text-xs rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-bold">Ajouter au panier</button>
+          {options.length > 0 && (
+            <button type="button" onClick={() => onConfirm([], sizeId)} className="px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800">Sans supplément</button>
+          )}
+          <button type="button" onClick={() => onConfirm(picked, sizeId)} className="px-3 py-2 text-xs rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-bold">Ajouter au panier</button>
         </div>
       </div>
     </div>
@@ -489,12 +583,15 @@ export function DishLossModal({
   const [warehouseId, setWarehouseId] = useState(warehouses[0]?.id || '');
   const [busy, setBusy] = useState(false);
   const n = parseDecimal(portions);
+  const lossSizes = dish.sizes || [];
+  const [lossSizeId, setLossSizeId] = useState<string>((lossSizes.find((s) => s.factor === 1) || lossSizes[0])?.id || '');
+  const lossFactor = lossSizes.find((s) => s.id === lossSizeId)?.factor ?? 1;
   const byId = useMemo(() => new Map(products.map((p) => [p.id, p])), [products]);
   const stockHere = (id: string) =>
     productStock.filter((s) => s.productId === id && (!warehouseId || s.warehouseId === warehouseId)).reduce((a, s) => a + (Number(s.quantity) || 0), 0);
   const lines = (dish.recipe || []).map((l) => {
     const ing = byId.get(l.ingredientId);
-    const need = n > 0 ? Math.round(l.quantity * n * 1000) / 1000 : 0;
+    const need = n > 0 ? Math.round(l.quantity * lossFactor * n * 1000) / 1000 : 0;
     const available = stockHere(l.ingredientId);
     return { ing, need, available, cost: ing ? Math.min(need, available) * ing.purchasePrice : 0 };
   });
@@ -506,7 +603,7 @@ export function DishLossModal({
     const motif = reason === 'Autre' ? (detail.trim() || 'Autre') : detail.trim() ? `${reason} — ${detail.trim()}` : reason;
     setBusy(true);
     try {
-      const r = await declareDishLoss(dish.id, { portions: n, reason: motif, warehouseId: warehouseId || undefined });
+      const r = await declareDishLoss(dish.id, { portions: n, reason: motif, warehouseId: warehouseId || undefined, sizeId: lossSizeId || undefined });
       if (r.shortages.length) {
         showAlert(
           `Perte enregistrée (coût ${format(r.cost)}), mais le stock de certains ingrédients était déjà insuffisant :\n• ${r.shortages.map((s) => `${s.name} : il manquait ${fmtQty(s.missing)} ${s.unit}`).join('\n• ')}`,
@@ -534,6 +631,14 @@ export function DishLossModal({
         </div>
         <form onSubmit={submit} className="p-5 space-y-4 text-xs">
           <p className="text-slate-500">Les ingrédients de ces portions sont retirés du stock en « Perte / Casse » (visible dans l'Historique des flux).</p>
+          {lossSizes.length > 0 && (
+            <div>
+              <label className="text-slate-400 block mb-1">Taille</label>
+              <select value={lossSizeId} onChange={(e) => setLossSizeId(e.target.value)} className={field} aria-label="Taille perdue">
+                {lossSizes.map((s) => <option key={s.id} value={s.id}>{s.label} (×{String(s.factor).replace('.', ',')})</option>)}
+              </select>
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-slate-400 block mb-1">Portions perdues *</label>

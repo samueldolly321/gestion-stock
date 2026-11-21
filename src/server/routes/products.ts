@@ -7,7 +7,7 @@ import { generateId, computeProductStatus, writeAuditLog } from '../helpers.ts';
 import { setWarehouseStock, resolveWarehouseId, recomputeProductTotal, adjustWarehouseStock, getWarehouseStock, lockProducts } from '../stock.ts';
 import { generateEan13 } from '../../services/barcode.ts';
 import { cleanList, cellKey, skuPart, variantName } from '../../services/variants.ts';
-import { normalizeRecipe, normalizeOptions } from '../../services/recipes.ts';
+import { normalizeRecipe, normalizeOptions, normalizeSizes } from '../../services/recipes.ts';
 import type { RecipeItem } from '../../types.ts';
 
 export const productsRouter = Router();
@@ -56,6 +56,7 @@ function pickProductFields(body: any) {
     // Restauration : recette et suppléments (absents de la requête → inchangés).
     recipe: body.recipe === undefined ? undefined : normalizeRecipe(body.recipe),
     options: body.options === undefined ? undefined : normalizeOptions(body.options),
+    sizes: body.sizes === undefined ? undefined : normalizeSizes(body.sizes),
   };
 }
 
@@ -303,11 +304,11 @@ productsRouter.post('/', requireAuth, requireWrite('products'), async (req: Auth
       return res.status(400).json({ error: 'Les prix ne peuvent pas être négatifs.' });
     }
     if (kind === 'dish') {
-      f = asDishFields({ ...f, recipe: f.recipe ?? [], options: f.options ?? [] });
+      f = asDishFields({ ...f, recipe: f.recipe ?? [], options: f.options ?? [], sizes: f.sizes ?? [] });
       const err = (await recipeError(f.recipe!)) || (await recipeError(f.options!.map((o) => ({ ingredientId: o.ingredientId, quantity: o.quantity }))));
       if (err) return res.status(400).json({ error: err });
     } else {
-      f = { ...f, recipe: null as any, options: null as any };
+      f = { ...f, recipe: null as any, options: null as any, sizes: null as any };
     }
     const owner = await barcodeOwner(f.barcode);
     if (owner) return res.status(409).json({ error: barcodeTakenMessage(f.barcode!, owner) });
@@ -362,7 +363,7 @@ productsRouter.put('/:id', requireAuth, requireWrite('products'), async (req: Au
         if (err) return res.status(400).json({ error: `Supplément : ${err}` });
       }
     } else {
-      f = { ...f, recipe: undefined, options: undefined };
+      f = { ...f, recipe: undefined, options: undefined, sizes: undefined };
     }
     const owner = await barcodeOwner(f.barcode, req.params.id);
     if (owner) return res.status(409).json({ error: barcodeTakenMessage(f.barcode!, owner) });
@@ -426,6 +427,11 @@ productsRouter.post('/:id/dish-loss', requireAuth, requireWrite('products'), asy
     if (dish.kind !== 'dish') return res.status(400).json({ error: "Cet article n'est pas un plat : utilisez « Ajuster le stock »." });
     const recipe = (dish.recipe || []) as RecipeItem[];
     if (recipe.length === 0) return res.status(400).json({ error: "Ce plat n'a pas de recette : aucun ingrédient à retirer." });
+    // Taille éventuelle : coefficient sur les quantités de la recette.
+    const size = b.sizeId ? ((dish.sizes || []) as any[]).find((s) => s.id === b.sizeId) : null;
+    if (b.sizeId && !size) return res.status(400).json({ error: 'Taille inconnue pour ce plat.' });
+    const factor = size ? Number(size.factor) || 1 : 1;
+    const dishLabel = size ? `${dish.name} (${size.label})` : dish.name;
 
     const result = await db.transaction(async (tx) => {
       await lockProducts(tx, recipe.map((l) => l.ingredientId));
@@ -435,7 +441,7 @@ productsRouter.post('/:id/dish-loss', requireAuth, requireWrite('products'), asy
       for (const line of recipe) {
         const [ing] = await tx.select().from(products).where(eq(products.id, line.ingredientId)).limit(1);
         if (!ing) continue;
-        const need = Math.round(line.quantity * portions * 1000) / 1000;
+        const need = Math.round(line.quantity * factor * portions * 1000) / 1000;
         const whId = await resolveWarehouseId(tx, b.warehouseId || null, ing.id);
         if (!whId || need <= 0) continue;
         const available = Math.max(0, await getWarehouseStock(tx, ing.id, whId));
@@ -450,7 +456,7 @@ productsRouter.post('/:id/dish-loss', requireAuth, requireWrite('products'), asy
           sku: ing.sku,
           warehouseId: whId,
           quantity: taken,
-          reason: `Perte « ${dish.name} » ×${portions} : ${reason}`,
+          reason: `Perte « ${dishLabel} » ×${portions} : ${reason}`,
           performedBy: req.user?.name ?? 'Système',
           referenceId: ref,
           costPrice: ing.purchasePrice,
@@ -465,7 +471,7 @@ productsRouter.post('/:id/dish-loss', requireAuth, requireWrite('products'), asy
     await writeAuditLog({
       userId: req.user?.sub,
       userName: req.user?.name,
-      action: `Perte plat : ${dish.name} ×${portions} (${reason}) — coût ${result.cost}`,
+      action: `Perte plat : ${dishLabel} ×${portions} (${reason}) — coût ${result.cost}`,
       module: 'Stocks',
       entityId: dish.id,
     });

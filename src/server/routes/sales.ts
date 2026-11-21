@@ -6,7 +6,7 @@ import { requireAuth, requireRole, requireAnyTab, type AuthedRequest } from '../
 import { generateId, computeProductStatus, writeAuditLog, nextDocNumber } from '../helpers.ts';
 import { adjustWarehouseStock, resolveWarehouseId, lockProducts, StockError, getWarehouseStock } from '../stock.ts';
 import { recipeCost, optionCost } from '../../services/recipes.ts';
-import type { RecipeItem, DishOption } from '../../types.ts';
+import type { RecipeItem, DishOption, DishSize } from '../../types.ts';
 
 const round3 = (n: number) => Math.round(n * 1000) / 1000;
 
@@ -74,6 +74,7 @@ salesRouter.post('/', requireAuth, requireRole(...CASHIER_ROLES), async (req: Au
         cost: number;
         recipe: { ingredientId: string; name: string; unit: string; perPortion: number }[];
         options: { id: string; label: string; price: number; ingredientId: string; name: string; unit: string; quantity: number; cost: number }[];
+        size: { id: string; label: string; factor: number; price: number } | null;
       } | null = null;
       if (product?.kind === 'dish') {
         const recipe = (product.recipe || []) as RecipeItem[];
@@ -85,18 +86,32 @@ salesRouter.post('/', requireAuth, requireRole(...CASHIER_ROLES), async (req: Au
           return res.status(400).json({ error: `Supplément inconnu pour « ${product.name} » (la carte a peut-être changé) : rechargez la caisse.` });
         }
         const chosen = available.filter((o) => askedIds.includes(o.id));
+        // Taille de portion : coefficient appliqué aux quantités de la recette (pas aux suppléments).
+        const sizes = (product.sizes || []) as DishSize[];
+        let size: DishSize | null = null;
+        if (sizes.length) {
+          if (it.sizeId) {
+            size = sizes.find((s) => s.id === it.sizeId) || null;
+            if (!size) return res.status(400).json({ error: `Taille inconnue pour « ${product.name} » (la carte a peut-être changé) : rechargez la caisse.` });
+          } else {
+            size = sizes.find((s) => s.factor === 1) || null; // caisse ancienne : portion normale (×1) par défaut
+          }
+        }
+        const factor = size?.factor ?? 1;
         const ingredients = await loadIngredients([recipe, chosen.map((o) => ({ ingredientId: o.ingredientId, quantity: o.quantity }))]);
         const options = chosen.filter((o) => ingredients.has(o.ingredientId)).map((o) => {
           const ing = ingredients.get(o.ingredientId)!;
           return { id: o.id, label: o.label, price: o.price, ingredientId: o.ingredientId, name: ing.name, unit: ing.unit, quantity: o.quantity, cost: optionCost(o, ingredients) };
         });
         dish = {
-          cost: Math.round((recipeCost(recipe, ingredients) + options.reduce((s, o) => s + o.cost, 0)) * 100) / 100,
+          cost: Math.round((recipeCost(recipe, ingredients) * factor + options.reduce((s, o) => s + o.cost, 0)) * 100) / 100,
+          // Quantités par portion déjà multipliées par le coefficient de la taille.
           recipe: recipe.filter((l) => ingredients.has(l.ingredientId)).map((l) => {
             const ing = ingredients.get(l.ingredientId)!;
-            return { ingredientId: l.ingredientId, name: ing.name, unit: ing.unit, perPortion: l.quantity };
+            return { ingredientId: l.ingredientId, name: ing.name, unit: ing.unit, perPortion: round3(l.quantity * factor) };
           }),
           options,
+          size: size ? { id: size.id, label: size.label, factor: size.factor, price: size.price } : null,
         };
       }
       const costFloor = dish ? dish.cost : product?.purchasePrice ?? 0;
@@ -131,6 +146,7 @@ salesRouter.post('/', requireAuth, requireRole(...CASHIER_ROLES), async (req: Au
         cost: dish ? dish.cost : undefined,
         recipe: dish ? dish.recipe : undefined,
         options: dish && dish.options.length ? dish.options : undefined,
+        size: dish?.size || undefined,
         shortages: undefined as { ingredientId: string; name: string; unit: string; missing: number }[] | undefined,
       });
     }
@@ -203,7 +219,8 @@ salesRouter.post('/', requireAuth, requireRole(...CASHIER_ROLES), async (req: Au
           const perPortion = new Map<string, number>();
           for (const l of item.recipe || []) perPortion.set(l.ingredientId, (perPortion.get(l.ingredientId) || 0) + l.perPortion);
           for (const o of item.options || []) perPortion.set(o.ingredientId, (perPortion.get(o.ingredientId) || 0) + o.quantity);
-          const label = (item.options || []).length ? `${product.name} + ${item.options.map((o: any) => o.label.replace(/^\+\s*/, '')).join(' + ')}` : product.name;
+          const sized = item.size ? `${product.name} (${item.size.label})` : product.name;
+          const label = (item.options || []).length ? `${sized} + ${item.options.map((o: any) => o.label.replace(/^\+\s*/, '')).join(' + ')}` : sized;
           for (const [ingredientId, portionQty] of perPortion) {
             const [ing] = await tx.select().from(products).where(eq(products.id, ingredientId)).limit(1);
             if (!ing) continue;

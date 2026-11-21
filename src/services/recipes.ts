@@ -5,7 +5,7 @@
  * portion, la quantité de chaque ingrédient (dans l'unité de l'ingrédient : 0,12 kg,
  * 0,3 L…). Vendre N portions retire N × quantité de chaque ingrédient du stock.
  */
-import type { DishOption, Product, RecipeItem } from '../types';
+import type { DishOption, DishSize, Product, RecipeItem } from '../types';
 
 export const MAX_RECIPE_LINES = 60;
 export const MAX_DISH_OPTIONS = 20;
@@ -33,6 +33,34 @@ export function normalizeOptions(raw: unknown): DishOption[] {
   return out;
 }
 
+export const MAX_DISH_SIZES = 6;
+
+/**
+ * Nettoie les tailles d'un plat : libellé, prix > 0, coefficient entre 0,1 et 5 (appliqué aux
+ * quantités de la recette). Identifiant stable conservé (ou créé).
+ */
+export function normalizeSizes(raw: unknown): DishSize[] {
+  if (!Array.isArray(raw)) return [];
+  const out: DishSize[] = [];
+  const seen = new Set<string>();
+  for (const s of raw) {
+    const label = String(s?.label ?? '').trim().replace(/\s+/g, ' ').slice(0, 30);
+    const price = Number(String(s?.price ?? '').replace(',', '.'));
+    const factor = Number(String(s?.factor ?? '').replace(',', '.'));
+    if (!label || !Number.isFinite(price) || price <= 0 || !Number.isFinite(factor) || factor < 0.1 || factor > 5) continue;
+    if (out.some((x) => x.label.toLowerCase() === label.toLowerCase())) continue;
+    let id = typeof s?.id === 'string' && /^[A-Za-z0-9_-]{1,40}$/.test(s.id) ? s.id : '';
+    if (!id || seen.has(id)) id = 'SZ-' + Math.random().toString(36).slice(2, 10).toUpperCase();
+    seen.add(id);
+    out.push({ id, label, price: Math.round(price * 100) / 100, factor: Math.round(factor * 100) / 100 });
+    if (out.length >= MAX_DISH_SIZES) break;
+  }
+  return out;
+}
+
+/** Prix arrondi à 500 Ar le plus proche (propositions de prix des tailles). */
+export const roundPrice = (n: number) => Math.max(500, Math.round(n / 500) * 500);
+
 /** Coût d'un supplément = quantité × prix d'achat de son ingrédient. */
 export function optionCost(o: Pick<DishOption, 'ingredientId' | 'quantity'>, productsById: Map<string, Pick<Product, 'purchasePrice'>>): number {
   return Math.round(o.quantity * (Number(productsById.get(o.ingredientId)?.purchasePrice) || 0) * 100) / 100;
@@ -55,8 +83,10 @@ export function mergeByProduct<T extends { productId: string; quantity: number }
 }
 
 /** Clé d'une combinaison plat + suppléments (ordre indifférent) — une ligne de panier par combinaison. */
-export const optionsKey = (productId: string, optionIds: string[]) =>
-  optionIds.length ? `${productId}|${[...optionIds].sort().join(',')}` : productId;
+export const optionsKey = (productId: string, optionIds: string[], sizeId?: string | null) => {
+  const base = sizeId ? `${productId}@${sizeId}` : productId;
+  return optionIds.length ? `${base}|${[...optionIds].sort().join(',')}` : base;
+};
 
 const round3 = (n: number) => Math.round(n * 1000) / 1000;
 

@@ -134,6 +134,8 @@ export const products = pgTable('products', {
   recipe: jsonb('recipe').$type<{ ingredientId: string; quantity: number }[] | null>(),
   // Suppléments d'un plat (« + œuf ») : prix ajouté + ingrédient retiré à la vente.
   options: jsonb('options').$type<{ id: string; label: string; price: number; ingredientId: string; quantity: number }[] | null>(),
+  // Tailles de portion (« Petite », « Grande ») : prix propre + coefficient sur la recette.
+  sizes: jsonb('sizes').$type<{ id: string; label: string; price: number; factor: number }[] | null>(),
   status: text('status').default('in_stock').notNull(), // in_stock | low_stock | out_of_stock | expired
   createdAt,
   updatedAt,

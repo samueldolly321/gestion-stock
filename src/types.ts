@@ -363,6 +363,17 @@ export interface DishOption {
   quantity: number;
 }
 
+/**
+ * Taille de portion d'un plat (« Petite », « Grande ») : prix propre et coefficient appliqué
+ * aux quantités de la recette (recette = portion normale, coefficient 1).
+ */
+export interface DishSize {
+  id: string;
+  label: string;
+  price: number;
+  factor: number;
+}
+
 export interface Product {
   id: string;
   sku: string;
@@ -410,6 +421,7 @@ export interface Product {
   kind?: ProductKind;
   recipe?: RecipeItem[] | null;
   options?: DishOption[] | null; // suppléments proposés en caisse (plats)
+  sizes?: DishSize[] | null; // tailles de portion (plats) ; vide = une seule taille
   status: 'in_stock' | 'low_stock' | 'out_of_stock' | 'expired';
   createdAt: string;
   updatedAt: string;

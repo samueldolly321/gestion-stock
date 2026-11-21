@@ -180,6 +180,12 @@ Dans **Articles & Stocks → onglet « Ingrédients & articles » → Nouveau Pr
 - [ ] **Caisse** : on vend les plats comme n'importe quel article ; la carte affiche les
       **portions possibles**. Si un ingrédient manque, **la vente passe quand même** (le
       service n'est jamais bloqué) et une alerte liste ce qui manquait → vérifiez le stock.
+- [ ] **Tailles de portion** (facultatif) : dans la fiche du plat, section **Tailles**, bouton
+      **« Petite / Normale / Grande »** (préremplit ×0,7 / ×1 / ×1,5 avec des prix proposés,
+      modifiables). La recette saisie est la portion **normale** ; une Grande ×1,5 retire 1,5 fois
+      chaque ingrédient. À la caisse, le choix de la taille s'affiche (Normale présélectionnée) ;
+      la taille apparaît sur le ticket, le bon de cuisine, les rapports (une ligne par taille) et
+      la déclaration de perte.
 - [ ] **Bon de cuisine** : après l'encaissement, bouton orange **« Imprimer le bon de cuisine »**
       (ticket 80 mm, gros caractères, sans prix) : numéro de commande, heure, plats et
       suppléments, et la **note** de la commande (ex. « table 4, sans piment »). Les boissons n'y
