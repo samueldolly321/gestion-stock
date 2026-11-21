@@ -12,6 +12,7 @@ import { sql } from 'drizzle-orm';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { db } from './db/index.ts';
 import { ensureSchema } from './db/ensure-schema.ts';
+import { repairStockWithoutWarehouse, DEFAULT_WAREHOUSE_NAME } from './server/stock.ts';
 import { authRouter } from './server/routes/auth.ts';
 import { categoriesRouter } from './server/routes/categories.ts';
 import { productsRouter } from './server/routes/products.ts';
@@ -161,6 +162,14 @@ async function boot(): Promise<void> {
     console.log('✓ Schéma vérifié (ensureSchema).');
   } catch (err) {
     console.error('ensureSchema a échoué (démarrage poursuivi) :', err);
+  }
+  // Au moins un entrepôt (sinon le stock initial des articles serait perdu) + réparation.
+  try {
+    const r = await db.transaction((tx) => repairStockWithoutWarehouse(tx));
+    if (r.created) console.log(`✓ Entrepôt « ${DEFAULT_WAREHOUSE_NAME} » créé.`);
+    if (r.repaired.length) console.log(`✓ Stock rangé dans l'entrepôt principal pour : ${r.repaired.join(', ')}.`);
+  } catch (err) {
+    console.error("Vérification de l'entrepôt par défaut échouée (démarrage poursuivi) :", err);
   }
   app.listen(PORT, () => {
     console.log(`🚀 API Vokatra-ko démarrée sur le port ${PORT}`);

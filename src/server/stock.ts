@@ -47,7 +47,43 @@ export async function resolveWarehouseId(
     if (w) return product.locationId;
   }
   const [first] = await tx.select().from(warehouses).orderBy(asc(warehouses.createdAt)).limit(1);
-  return first?.id ?? null;
+  // Aucun entrepôt (1er démarrage, ou tous supprimés) : on en crée un plutôt que de perdre le stock.
+  return first?.id ?? (await ensureDefaultWarehouse(tx));
+}
+
+// Même entrepôt par défaut que la migration « stock par entrepôt » d'ensure-schema.ts.
+export const DEFAULT_WAREHOUSE_NAME = 'Entrepôt Central';
+
+/** Garantit qu'au moins un entrepôt existe ; retourne l'id du premier (créé si besoin). */
+export async function ensureDefaultWarehouse(tx: Tx): Promise<string> {
+  const [first] = await tx.select().from(warehouses).orderBy(asc(warehouses.createdAt)).limit(1);
+  if (first) return first.id;
+  await tx.insert(warehouses)
+    .values({ id: 'WH-CENTRAL', name: DEFAULT_WAREHOUSE_NAME, code: 'CENTRAL', location: null, capacity: 0 })
+    .onConflictDoNothing();
+  const [created] = await tx.select().from(warehouses).orderBy(asc(warehouses.createdAt)).limit(1);
+  return created.id;
+}
+
+/**
+ * Au démarrage : crée l'entrepôt principal s'il n'en existe aucun, puis « répare » les articles
+ * dont la quantité n'a été rangée dans aucun entrepôt (créés avant qu'un entrepôt n'existe) :
+ * leur quantité est rangée dans l'entrepôt principal. Idempotent.
+ * Retourne le nombre d'articles réparés.
+ */
+export async function repairStockWithoutWarehouse(tx: Tx): Promise<{ created: boolean; repaired: string[] }> {
+  const [before] = await tx.select({ id: warehouses.id }).from(warehouses).limit(1);
+  const whId = await ensureDefaultWarehouse(tx);
+  const all = await tx.select().from(products);
+  const stocked = new Set((await tx.select({ productId: productStock.productId }).from(productStock)).map((r: any) => r.productId));
+  const repaired: string[] = [];
+  for (const p of all) {
+    if (p.kind === 'dish' || stocked.has(p.id) || !(Number(p.quantity) > 0)) continue;
+    await tx.insert(productStock).values({ id: generateId('PS'), productId: p.id, warehouseId: whId, quantity: round3(Number(p.quantity)) });
+    await recomputeProductTotal(tx, p.id);
+    repaired.push(p.name);
+  }
+  return { created: !before, repaired };
 }
 
 /**
