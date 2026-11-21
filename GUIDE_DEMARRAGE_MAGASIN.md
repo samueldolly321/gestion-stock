@@ -180,6 +180,10 @@ Dans **Articles & Stocks → onglet « Ingrédients & articles » → Nouveau Pr
 - [ ] **Caisse** : on vend les plats comme n'importe quel article ; la carte affiche les
       **portions possibles**. Si un ingrédient manque, **la vente passe quand même** (le
       service n'est jamais bloqué) et une alerte liste ce qui manquait → vérifiez le stock.
+- [ ] **Bon de cuisine** : après l'encaissement, bouton orange **« Imprimer le bon de cuisine »**
+      (ticket 80 mm, gros caractères, sans prix) : numéro de commande, heure, plats et
+      suppléments, et la **note** de la commande (ex. « table 4, sans piment »). Les boissons n'y
+      figurent pas. Réimpression possible depuis **Ventes → Réimprimer le reçu**.
 - [ ] **Plat raté, invendu jeté, renversé** : onglet **Plats** → icône ⚠ **« Déclarer une
       perte »** → nombre de portions + motif. Les ingrédients sortent du stock en « Perte ».
 - [ ] **Réceptions** : les achats et entrées se font sur les **ingrédients** (pas sur les

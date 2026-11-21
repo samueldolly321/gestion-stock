@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Printer, FileText, Receipt } from 'lucide-react';
+import { Printer, FileText, Receipt, ChefHat } from 'lucide-react';
 import { Sale, CompanyInfo, Client } from '../types';
 import { useMoney } from '../services/CurrencyContext';
 
@@ -18,14 +18,59 @@ interface ReceiptModalProps {
  */
 export default function ReceiptModal({ sale, company, client, onClose }: ReceiptModalProps) {
   const { format } = useMoney();
-  const [printFormat, setPrintFormat] = useState<'ticket' | 'a4'>('ticket');
+  const [printFormat, setPrintFormat] = useState<'ticket' | 'a4' | 'kitchen'>('ticket');
   const reste = sale.totalAmount - sale.paidAmount;
+
+  // Restauration : lignes à préparer en cuisine (plats), sans les boissons ni les emballages.
+  const kitchenLines = (sale.items || []).filter((it: any) => it.kind === 'dish' || Array.isArray(it.recipe));
+  const portions = kitchenLines.reduce((s, it) => s + (Number(it.quantity) || 0), 0);
+  // Impression directe du bon de cuisine (le format change, puis l'impression est lancée).
+  const printKitchen = () => {
+    setPrintFormat('kitchen');
+    setTimeout(() => window.print(), 80);
+  };
+
+  const renderKitchen = () => {
+    const d = new Date(sale.createdAt);
+    return (
+      <div className="space-y-3 text-slate-950" data-testid="kitchen-ticket">
+        <div className="text-center border-b-2 border-slate-950 pb-2">
+          <p className="text-xl font-black tracking-wide">BON DE CUISINE</p>
+          <p className="text-3xl font-black font-mono mt-1">{(sale.invoiceNumber || sale.id).replace(/^FAC-0*/, 'N° ')}</p>
+          <p className="text-sm font-bold mt-1">{d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} · {d.toLocaleDateString('fr-FR')}</p>
+        </div>
+        <div className="text-xs space-y-0.5">
+          <div className="flex justify-between"><span>Client :</span><span className="font-bold">{sale.clientName || 'Client de passage'}</span></div>
+          {sale.cashierName && <div className="flex justify-between"><span>Caisse :</span><span>{sale.cashierName}</span></div>}
+        </div>
+        <div className="border-t border-dashed border-slate-400 pt-2 space-y-2.5">
+          {kitchenLines.map((it: any, i) => (
+            <div key={i}>
+              <p className="text-lg font-black leading-tight">
+                <span className="font-mono">{Number(it.quantity) || 0} ×</span> {String(it.productName || '').toUpperCase()}
+              </p>
+              {(it.options || []).map((o: any, j: number) => (
+                <p key={j} className="text-base font-bold pl-6">{String(o.label).startsWith('+') ? '' : '+ '}{o.label}</p>
+              ))}
+            </div>
+          ))}
+        </div>
+        {sale.notes && (
+          <div className="border-2 border-slate-950 rounded p-2 text-sm font-bold">NOTE : {sale.notes}</div>
+        )}
+        <p className="text-center text-xs border-t border-dashed border-slate-400 pt-2">
+          {portions} plat{portions > 1 ? 's' : ''} à préparer
+        </p>
+      </div>
+    );
+  };
 
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      {/* Taille de page dynamique selon le format choisi (ticket 80mm ou A4) */}
+      {/* Taille de page dynamique selon le format choisi (ticket / bon de cuisine 80mm, ou A4) */}
       <style>{`@media print { @page { size: ${printFormat === 'a4' ? 'A4' : '80mm auto'}; margin: ${printFormat === 'a4' ? '15mm' : '4mm'}; } }`}</style>
       <div className={`bg-white text-slate-950 rounded-2xl w-full ${printFormat === 'a4' ? 'max-w-md print-a4-card' : 'max-w-sm'} overflow-hidden shadow-2xl p-6 space-y-4 print-card animate-scale-up`}>
+        {printFormat === 'kitchen' ? renderKitchen() : (<>
 
         <div className="text-center space-y-1">
           {company?.logo && <img src={company.logo} alt="" className="mx-auto max-h-14 max-w-[160px] object-contain" />}
@@ -117,11 +162,23 @@ export default function ReceiptModal({ sale, company, client, onClose }: Receipt
           <p className="font-bold mt-2">Merci de votre visite !</p>
         </div>
 
+        </>)}
+
         <div className="pt-3 space-y-2.5 no-print">
+          {/* Restauration : bon de cuisine en un clic */}
+          {kitchenLines.length > 0 && (
+            <button
+              type="button"
+              onClick={printKitchen}
+              className="w-full py-2 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-lg text-xs cursor-pointer flex items-center justify-center gap-1.5"
+            >
+              <ChefHat className="w-4 h-4" /> Imprimer le bon de cuisine ({portions} plat{portions > 1 ? 's' : ''})
+            </button>
+          )}
           {/* Sélecteur de format d'impression */}
           <div>
             <span className="text-[10px] font-mono uppercase text-slate-500 block mb-1.5">Format d'impression</span>
-            <div className="grid grid-cols-2 gap-2">
+            <div className={`grid gap-2 ${kitchenLines.length ? 'grid-cols-3' : 'grid-cols-2'}`}>
               <button
                 type="button"
                 onClick={() => setPrintFormat('ticket')}
@@ -140,6 +197,17 @@ export default function ReceiptModal({ sale, company, client, onClose }: Receipt
               >
                 <FileText className="w-3.5 h-3.5" /> Facture A4
               </button>
+              {kitchenLines.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setPrintFormat('kitchen')}
+                  className={`py-2 px-2 rounded-lg border text-[11px] font-bold flex items-center justify-center gap-1.5 transition cursor-pointer ${
+                    printFormat === 'kitchen' ? 'bg-slate-950 text-white border-slate-950' : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                  }`}
+                >
+                  <ChefHat className="w-3.5 h-3.5" /> Bon de cuisine
+                </button>
+              )}
             </div>
           </div>
 
@@ -148,7 +216,7 @@ export default function ReceiptModal({ sale, company, client, onClose }: Receipt
               onClick={() => window.print()}
               className="flex-1 py-2 bg-cyan-500 hover:bg-cyan-600 text-white font-bold rounded-lg text-xs cursor-pointer text-center flex items-center justify-center gap-1.5"
             >
-              <Printer className="w-4 h-4" /> Imprimer ({printFormat === 'a4' ? 'A4' : 'Ticket'})
+              <Printer className="w-4 h-4" /> Imprimer ({printFormat === 'a4' ? 'A4' : printFormat === 'kitchen' ? 'Bon de cuisine' : 'Ticket'})
             </button>
             <button
               onClick={onClose}
