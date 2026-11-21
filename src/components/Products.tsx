@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 import DishForm, { usedInDishes, DishLossModal } from './DishForm';
 import TopScroll from './TopScroll';
+import KitchenReports from './KitchenReports';
 import { dishMargin, isDish, portionsPossible, recipeCost } from '../services/recipes';
 import { Product, Category, Brand, Supplier, User, Warehouse as WarehouseType, StockMovement, ProductStock } from '../types';
 import { generateId } from '../services/ids';
@@ -207,7 +208,7 @@ export default function Products({
   const [dishForm, setDishForm] = useState<{ dish: Product | null } | null>(null); // restauration : plat + recette
   const [dishLoss, setDishLoss] = useState<Product | null>(null); // restauration : perte d'un plat
   // Restauration : onglet affiché (plats ou ingrédients). Arrivée depuis une alerte de stock → ingrédients.
-  const [kindTab, setKindTab] = useState<'dish' | 'stock'>(initialStatus && initialStatus !== 'all' ? 'stock' : 'dish');
+  const [kindTab, setKindTab] = useState<'dish' | 'stock' | 'reports'>(initialStatus && initialStatus !== 'all' ? 'stock' : 'dish');
 
   // Quick Adjustment State
   const [adjustingProduct, setAdjustingProduct] = useState<Product | null>(null);
@@ -1007,6 +1008,7 @@ export default function Products({
           {([
             ['dish', `Plats (${dishCount})`],
             ['stock', `Ingrédients & articles (${products.length - dishCount})`],
+            ['reports', 'Rapports cuisine'],
           ] as const).map(([k, label]) => (
             <button
               key={k}
@@ -1019,12 +1021,17 @@ export default function Products({
                   : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
               }`}
             >
-              {k === 'dish' ? <ChefHat className="w-4 h-4 text-cyan-500" /> : <Archive className="w-4 h-4 text-cyan-500" />}
+              {k === 'dish' ? <ChefHat className="w-4 h-4 text-cyan-500" /> : k === 'reports' ? <TrendingDown className="w-4 h-4 text-cyan-500 rotate-180" /> : <Archive className="w-4 h-4 text-cyan-500" />}
               {label}
             </button>
           ))}
         </div>
       )}
+
+      {/* Restauration : rapports cuisine (marge par plat, consommation, écarts) */}
+      {kindTab === 'reports' ? (
+        <KitchenReports products={products} format={format} />
+      ) : (<>
 
       {/* Advanced Filter Panel */}
       <div className="bg-white dark:bg-slate-900/40 p-4 rounded-xl border border-slate-200 dark:border-slate-800/80 shadow-sm flex flex-col md:flex-row gap-3">
@@ -1534,6 +1541,7 @@ export default function Products({
         </div>
 
       </div>
+      </>)}
 
       {/* MODAL: CREATE / EDIT PRODUCT */}
       {isModalOpen && (
