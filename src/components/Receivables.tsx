@@ -3,6 +3,7 @@ import { HandCoins, Wallet, History, X, Download, CheckCircle2, FileMinus2, Prin
 import { Sale, Client, User, Payment } from '../types';
 import { useMoney } from '../services/CurrencyContext';
 import { paySale, createCreditNote } from '../services/salesService';
+import { mergeByProduct } from '../services/recipes';
 import { listPayments } from '../services/paymentsService';
 import { getExportCompany } from '../services/exportContext';
 import { showAlert } from '../services/dialog';
@@ -60,7 +61,7 @@ export default function Receivables({ sales, clients, user, onRefresh }: Receiva
   // Total encore retournable d'une facture (0 = entièrement avoirée).
   const returnableQty = (s: Sale) => {
     const ret = returnedByInvoice[s.id] || {};
-    return (s.items || []).reduce((a, it) => a + Math.max(0, (Number(it.quantity) || 0) - (ret[it.productId] || 0)), 0);
+    return mergeByProduct<(typeof s.items)[number]>(s.items || []).reduce((a, it) => a + Math.max(0, (Number(it.quantity) || 0) - (ret[it.productId] || 0)), 0);
   };
 
   const rows = useMemo(() => {
@@ -356,7 +357,7 @@ export default function Receivables({ sales, clients, user, onRefresh }: Receiva
             </div>
             <form onSubmit={handleCreditNote} className="p-5 space-y-3 overflow-y-auto">
               <div className="space-y-2">
-                {(cnTarget.items || []).map((it) => {
+                {mergeByProduct<(typeof cnTarget.items)[number]>(cnTarget.items || []).map((it) => {
                   const max = lineReturnable(cnTarget, it.productId, Number(it.quantity) || 0);
                   const already = (returnedByInvoice[cnTarget.id] || {})[it.productId] || 0;
                   return (

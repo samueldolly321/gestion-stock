@@ -351,6 +351,18 @@ export interface RecipeItem {
   quantity: number;
 }
 
+/**
+ * Supplément proposé sur un plat (« + œuf », « + crevettes ») : prix ajouté à la portion et
+ * ingrédient retiré du stock (quantité par portion, dans l'unité de l'ingrédient).
+ */
+export interface DishOption {
+  id: string;
+  label: string;
+  price: number;
+  ingredientId: string;
+  quantity: number;
+}
+
 export interface Product {
   id: string;
   sku: string;
@@ -397,6 +409,7 @@ export interface Product {
   // Restauration : un plat ('dish') n'a pas de stock propre ; chaque vente retire ses ingrédients.
   kind?: ProductKind;
   recipe?: RecipeItem[] | null;
+  options?: DishOption[] | null; // suppléments proposés en caisse (plats)
   status: 'in_stock' | 'low_stock' | 'out_of_stock' | 'expired';
   createdAt: string;
   updatedAt: string;

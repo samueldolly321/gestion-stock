@@ -86,6 +86,8 @@ export async function ensureSchema(): Promise<void> {
   // recipe = [{ ingredientId, quantity }] — quantité par portion, dans l'unité de l'ingrédient.
   await db.execute(sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS kind text DEFAULT 'stock' NOT NULL;`);
   await db.execute(sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS recipe jsonb;`);
+  // Suppléments proposés sur un plat : [{ id, label, price, ingredientId, quantity }].
+  await db.execute(sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS options jsonb;`);
   // Variantes taille × couleur (vêtements, chaussures…).
   await db.execute(sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS variant_group text;`);
   await db.execute(sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS model_name text;`);

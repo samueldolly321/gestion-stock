@@ -5,9 +5,58 @@
  * portion, la quantité de chaque ingrédient (dans l'unité de l'ingrédient : 0,12 kg,
  * 0,3 L…). Vendre N portions retire N × quantité de chaque ingrédient du stock.
  */
-import type { Product, RecipeItem } from '../types';
+import type { DishOption, Product, RecipeItem } from '../types';
 
 export const MAX_RECIPE_LINES = 60;
+export const MAX_DISH_OPTIONS = 20;
+
+/**
+ * Nettoie les suppléments d'un plat : libellé obligatoire, prix ≥ 0, ingrédient et quantité > 0.
+ * Un identifiant stable est conservé (ou créé) pour chaque supplément.
+ */
+export function normalizeOptions(raw: unknown): DishOption[] {
+  if (!Array.isArray(raw)) return [];
+  const out: DishOption[] = [];
+  const seen = new Set<string>();
+  for (const o of raw) {
+    const label = String(o?.label ?? '').trim().replace(/\s+/g, ' ').slice(0, 60);
+    const ingredientId = typeof o?.ingredientId === 'string' ? o.ingredientId.trim() : '';
+    const quantity = Number(String(o?.quantity ?? '').replace(',', '.'));
+    const price = Number(String(o?.price ?? '').replace(',', '.'));
+    if (!label || !ingredientId || !Number.isFinite(quantity) || quantity <= 0 || !Number.isFinite(price) || price < 0) continue;
+    let id = typeof o?.id === 'string' && /^[A-Za-z0-9_-]{1,40}$/.test(o.id) ? o.id : '';
+    if (!id || seen.has(id)) id = 'OPT-' + Math.random().toString(36).slice(2, 10).toUpperCase();
+    seen.add(id);
+    out.push({ id, label, price: Math.round(price * 100) / 100, ingredientId, quantity: round3(quantity) });
+    if (out.length >= MAX_DISH_OPTIONS) break;
+  }
+  return out;
+}
+
+/** Coût d'un supplément = quantité × prix d'achat de son ingrédient. */
+export function optionCost(o: Pick<DishOption, 'ingredientId' | 'quantity'>, productsById: Map<string, Pick<Product, 'purchasePrice'>>): number {
+  return Math.round(o.quantity * (Number(productsById.get(o.ingredientId)?.purchasePrice) || 0) * 100) / 100;
+}
+
+/**
+ * Lignes de facture regroupées par article (un même plat peut figurer sur plusieurs lignes
+ * avec des suppléments différents) : quantités et montants cumulés. Sert aux avoirs.
+ */
+export function mergeByProduct<T extends { productId: string; quantity: number }>(items: T[]): T[] {
+  const acc = new Map<string, any>();
+  for (const it of items as any[]) {
+    const cur = acc.get(it.productId);
+    if (!cur) { acc.set(it.productId, { ...it }); continue; }
+    cur.quantity = (Number(cur.quantity) || 0) + (Number(it.quantity) || 0);
+    cur.total = (Number(cur.total) || 0) + (Number(it.total) || 0);
+    if (Array.isArray(it.serials)) cur.serials = [...(cur.serials || []), ...it.serials];
+  }
+  return [...acc.values()];
+}
+
+/** Clé d'une combinaison plat + suppléments (ordre indifférent) — une ligne de panier par combinaison. */
+export const optionsKey = (productId: string, optionIds: string[]) =>
+  optionIds.length ? `${productId}|${[...optionIds].sort().join(',')}` : productId;
 
 const round3 = (n: number) => Math.round(n * 1000) / 1000;
 

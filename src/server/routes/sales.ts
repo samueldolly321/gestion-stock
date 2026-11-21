@@ -5,8 +5,8 @@ import { sales, products, clients, stockMovements, payments } from '../../db/sch
 import { requireAuth, requireRole, requireAnyTab, type AuthedRequest } from '../auth-middleware.ts';
 import { generateId, computeProductStatus, writeAuditLog, nextDocNumber } from '../helpers.ts';
 import { adjustWarehouseStock, resolveWarehouseId, lockProducts, StockError, getWarehouseStock } from '../stock.ts';
-import { recipeCost } from '../../services/recipes.ts';
-import type { RecipeItem } from '../../types.ts';
+import { recipeCost, optionCost } from '../../services/recipes.ts';
+import type { RecipeItem, DishOption } from '../../types.ts';
 
 const round3 = (n: number) => Math.round(n * 1000) / 1000;
 
@@ -69,17 +69,34 @@ salesRouter.post('/', requireAuth, requireRole(...CASHIER_ROLES), async (req: Au
       if (product?.trackSerial && !Number.isInteger(quantity)) {
         return res.status(400).json({ error: `« ${product.name} » se vend à l'unité (quantité entière).` });
       }
-      // Plat (restauration) : le coût de revient vient de la recette (Σ ingrédients).
-      let dish: { cost: number; recipe: { ingredientId: string; name: string; unit: string; perPortion: number }[] } | null = null;
+      // Plat (restauration) : le coût de revient vient de la recette (Σ ingrédients) + suppléments choisis.
+      let dish: {
+        cost: number;
+        recipe: { ingredientId: string; name: string; unit: string; perPortion: number }[];
+        options: { id: string; label: string; price: number; ingredientId: string; name: string; unit: string; quantity: number; cost: number }[];
+      } | null = null;
       if (product?.kind === 'dish') {
         const recipe = (product.recipe || []) as RecipeItem[];
-        const ingredients = await loadIngredients([recipe]);
+        const available = (product.options || []) as DishOption[];
+        // Suppléments demandés : seuls ceux définis sur la fiche du plat (prix et ingrédient relus en base).
+        const askedIds = [...new Set((Array.isArray(it.options) ? it.options : []).map((o: any) => (typeof o === 'string' ? o : o?.id)).filter(Boolean))] as string[];
+        const unknown = askedIds.filter((id) => !available.some((o) => o.id === id));
+        if (unknown.length) {
+          return res.status(400).json({ error: `Supplément inconnu pour « ${product.name} » (la carte a peut-être changé) : rechargez la caisse.` });
+        }
+        const chosen = available.filter((o) => askedIds.includes(o.id));
+        const ingredients = await loadIngredients([recipe, chosen.map((o) => ({ ingredientId: o.ingredientId, quantity: o.quantity }))]);
+        const options = chosen.filter((o) => ingredients.has(o.ingredientId)).map((o) => {
+          const ing = ingredients.get(o.ingredientId)!;
+          return { id: o.id, label: o.label, price: o.price, ingredientId: o.ingredientId, name: ing.name, unit: ing.unit, quantity: o.quantity, cost: optionCost(o, ingredients) };
+        });
         dish = {
-          cost: recipeCost(recipe, ingredients),
+          cost: Math.round((recipeCost(recipe, ingredients) + options.reduce((s, o) => s + o.cost, 0)) * 100) / 100,
           recipe: recipe.filter((l) => ingredients.has(l.ingredientId)).map((l) => {
             const ing = ingredients.get(l.ingredientId)!;
             return { ingredientId: l.ingredientId, name: ing.name, unit: ing.unit, perPortion: l.quantity };
           }),
+          options,
         };
       }
       const costFloor = dish ? dish.cost : product?.purchasePrice ?? 0;
@@ -113,6 +130,7 @@ salesRouter.post('/', requireAuth, requireRole(...CASHIER_ROLES), async (req: Au
         kind: dish ? 'dish' : undefined,
         cost: dish ? dish.cost : undefined,
         recipe: dish ? dish.recipe : undefined,
+        options: dish && dish.options.length ? dish.options : undefined,
         shortages: undefined as { ingredientId: string; name: string; unit: string; missing: number }[] | undefined,
       });
     }
@@ -136,6 +154,7 @@ salesRouter.post('/', requireAuth, requireRole(...CASHIER_ROLES), async (req: Au
       await lockProducts(tx, [
         ...normalizedItems.map((it) => it.productId),
         ...normalizedItems.flatMap((it) => (it.recipe || []).map((l: any) => l.ingredientId)),
+        ...normalizedItems.flatMap((it) => (it.options || []).map((o: any) => o.ingredientId)),
       ]);
       // Numéro de facture légal (séquence continue) — factures uniquement.
       const invoiceNumber = saleType === 'invoice' ? await nextDocNumber(tx, 'invoice') : null;
@@ -180,10 +199,15 @@ salesRouter.post('/', requireAuth, requireRole(...CASHIER_ROLES), async (req: Au
         if (product.kind === 'dish') {
           if (saleType === 'return') continue;
           const shortages: { ingredientId: string; name: string; unit: string; missing: number }[] = [];
-          for (const line of item.recipe || []) {
-            const [ing] = await tx.select().from(products).where(eq(products.id, line.ingredientId)).limit(1);
+          // Besoins par portion, cumulés par ingrédient : recette + suppléments choisis.
+          const perPortion = new Map<string, number>();
+          for (const l of item.recipe || []) perPortion.set(l.ingredientId, (perPortion.get(l.ingredientId) || 0) + l.perPortion);
+          for (const o of item.options || []) perPortion.set(o.ingredientId, (perPortion.get(o.ingredientId) || 0) + o.quantity);
+          const label = (item.options || []).length ? `${product.name} + ${item.options.map((o: any) => o.label.replace(/^\+\s*/, '')).join(' + ')}` : product.name;
+          for (const [ingredientId, portionQty] of perPortion) {
+            const [ing] = await tx.select().from(products).where(eq(products.id, ingredientId)).limit(1);
             if (!ing) continue;
-            const need = round3(line.perPortion * qty);
+            const need = round3(portionQty * qty);
             if (need <= 0) continue;
             const ingWh = await resolveWarehouseId(tx, b.warehouseId, ing.id);
             if (!ingWh) continue;
@@ -199,7 +223,7 @@ salesRouter.post('/', requireAuth, requireRole(...CASHIER_ROLES), async (req: Au
               sku: ing.sku,
               warehouseId: ingWh,
               quantity: taken,
-              reason: `Vente « ${product.name} » ×${qty} Réf: ${saleId}`,
+              reason: `Vente « ${label} » ×${qty} Réf: ${saleId}`,
               performedBy: req.user?.name ?? 'POS',
               referenceId: saleId,
               costPrice: ing.purchasePrice,
@@ -390,8 +414,20 @@ salesRouter.post('/:id/credit-note', requireAuth, requireRole(...CASHIER_ROLES),
       return res.status(400).json({ error: 'Un avoir ne peut être établi que sur une facture.' });
     }
 
-    const invoiceItems = (invoice.items as any[]) || [];
-    const invoiceGoodsHT = invoiceItems.reduce((a, it) => a + (Number(it.total) || 0), 0);
+    const rawItems = (invoice.items as any[]) || [];
+    const invoiceGoodsHT = rawItems.reduce((a, it) => a + (Number(it.total) || 0), 0);
+    // Un même plat peut figurer sur plusieurs lignes (suppléments différents) : pour l'avoir,
+    // on raisonne par article (quantités et montants cumulés).
+    const invoiceItems = Object.values(rawItems.reduce((acc: Record<string, any>, it) => {
+      const cur = acc[it.productId];
+      if (!cur) acc[it.productId] = { ...it };
+      else {
+        cur.quantity = (Number(cur.quantity) || 0) + (Number(it.quantity) || 0);
+        cur.total = (Number(cur.total) || 0) + (Number(it.total) || 0);
+        if (Array.isArray(it.serials)) cur.serials = [...(cur.serials || []), ...it.serials];
+      }
+      return acc;
+    }, {})) as any[];
 
     const result = await db.transaction(async (tx) => {
       await lockProducts(tx, requested.map((r: any) => r?.productId));

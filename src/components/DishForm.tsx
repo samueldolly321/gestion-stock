@@ -14,7 +14,7 @@ import { generateEan13 } from '../services/barcode';
 import { showAlert, showConfirm } from '../services/dialog';
 import { showToast } from '../services/toast';
 import { fmtQty, parseDecimal } from '../services/pack';
-import { dishMargin, isDish, normalizeRecipe, portionsPossible, recipeCost } from '../services/recipes';
+import { dishMargin, isDish, normalizeRecipe, normalizeOptions, portionsPossible, recipeCost } from '../services/recipes';
 
 const field =
   'w-full bg-white dark:bg-slate-950/20 p-2.5 text-xs rounded-lg border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500';
@@ -73,6 +73,10 @@ export default function DishForm({
   );
   const [search, setSearch] = useState('');
   const [busy, setBusy] = useState(false);
+  // Suppléments proposés en caisse (« + œuf ») : libellé, ingrédient, quantité, prix.
+  const [optLines, setOptLines] = useState<{ id?: string; label: string; ingredientId: string; quantity: string; price: string }[]>(
+    (dish?.options || []).map((o) => ({ id: o.id, label: o.label, ingredientId: o.ingredientId, quantity: String(o.quantity).replace('.', ','), price: String(o.price) })),
+  );
 
   // Ingrédients possibles : tous les articles stockés (pas les autres plats).
   const ingredients = useMemo(() => products.filter((p) => !isDish(p)), [products]);
@@ -121,6 +125,8 @@ export default function DishForm({
       "Ce plat n'a pas encore de recette : il sera vendu sans retirer d'ingrédients du stock. Continuer ?",
       { title: 'Plat sans recette', confirmText: 'Enregistrer quand même' },
     ))) return;
+    const badOpt = optLines.find((o) => !o.label.trim() || !o.ingredientId || !(parseDecimal(o.quantity) > 0) || !(parseDecimal(o.price) >= 0) || o.price.trim() === '');
+    if (badOpt) return showAlert('Complétez chaque supplément : nom, ingrédient, quantité et prix (ou supprimez la ligne).', { variant: 'warning' });
     if (price < cost) {
       return showAlert(`Le prix de vente (${format(price)}) est inférieur au coût de revient (${format(cost)}) : la caisse refuserait la vente. Augmentez le prix ou revoyez la recette.`, { variant: 'warning' });
     }
@@ -131,6 +137,7 @@ export default function DishForm({
     const data = {
       kind: 'dish' as const,
       recipe,
+      options: normalizeOptions(optLines.map((o) => ({ ...o, quantity: o.quantity, price: o.price }))),
       name: name.trim(),
       sku: dish?.sku || 'PLAT-' + generateId().slice(0, 6).toUpperCase(),
       barcode: dish?.barcode || generateEan13(products.map((p) => p.barcode)),
@@ -306,6 +313,70 @@ export default function DishForm({
             </div>
           </div>
 
+          {/* Suppléments proposés en caisse */}
+          <div className="rounded-xl border border-slate-200 dark:border-slate-800" data-testid="dish-options">
+            <div className="px-3.5 py-2.5 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/40 flex items-center justify-between gap-2">
+              <div>
+                <p className="font-bold text-slate-900 dark:text-white">Suppléments <span className="font-normal text-slate-400">(facultatif)</span></p>
+                <p className="text-[11px] text-slate-500 mt-0.5">Proposés à la caisse quand on ajoute ce plat (ex. « + œuf » : 1 œuf, 1 500 Ar). L'ingrédient est retiré du stock à la vente.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setOptLines((ls) => [...ls, { label: '', ingredientId: '', quantity: '', price: '' }])}
+                className="shrink-0 text-[11px] text-cyan-500 hover:underline"
+              >
+                + Ajouter un supplément
+              </button>
+            </div>
+            {optLines.length === 0 ? (
+              <p className="p-3.5 text-slate-400 italic">Aucun supplément.</p>
+            ) : (
+              <div className="p-3.5 space-y-2">
+                <div className="grid grid-cols-[1.3fr_1.3fr_0.7fr_0.8fr_auto] gap-2 text-[10px] uppercase text-slate-400">
+                  <span>Nom affiché</span><span>Ingrédient retiré</span><span>Quantité</span><span>Prix</span><span />
+                </div>
+                {optLines.map((o, i) => {
+                  const ing = byId.get(o.ingredientId);
+                  const oCost = ing && parseDecimal(o.quantity) > 0 ? parseDecimal(o.quantity) * ing.purchasePrice : 0;
+                  const oPrice = parseDecimal(o.price) || 0;
+                  const set = (patch: Partial<typeof o>) => setOptLines((ls) => ls.map((x, j) => (j === i ? { ...x, ...patch } : x)));
+                  return (
+                    <div key={i} data-testid="option-line">
+                      <div className="grid grid-cols-[1.3fr_1.3fr_0.7fr_0.8fr_auto] gap-2 items-center">
+                        <input value={o.label} onChange={(e) => set({ label: e.target.value })} className={field} placeholder="+ œuf" aria-label="Nom du supplément" />
+                        <select
+                          value={o.ingredientId}
+                          onChange={(e) => {
+                            const picked = byId.get(e.target.value);
+                            set({ ingredientId: e.target.value, label: o.label || (picked ? `+ ${picked.name}` : '') });
+                          }}
+                          className={field}
+                          aria-label="Ingrédient du supplément"
+                        >
+                          <option value="">— Choisir —</option>
+                          {ingredients.map((p) => <option key={p.id} value={p.id}>{p.name} ({p.unit})</option>)}
+                        </select>
+                        <div className="flex items-center gap-1">
+                          <input inputMode="decimal" value={o.quantity} onChange={(e) => set({ quantity: e.target.value })} className={`${field} text-right font-mono`} placeholder="1" aria-label="Quantité du supplément" />
+                          <span className="text-[10px] text-slate-400 w-8 truncate">{ing?.unit}</span>
+                        </div>
+                        <input inputMode="decimal" value={o.price} onChange={(e) => set({ price: e.target.value })} className={`${field} text-right font-mono`} placeholder="1500" aria-label="Prix du supplément" />
+                        <button type="button" onClick={() => setOptLines((ls) => ls.filter((_, j) => j !== i))} className="p-1.5 text-slate-400 hover:text-red-500" aria-label="Supprimer le supplément">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                      {ing && oPrice > 0 && (
+                        <p className={`text-[10px] mt-0.5 ${oPrice < oCost ? 'text-red-500' : 'text-slate-400'}`}>
+                          Coût {format(oCost)} · marge {format(oPrice - oCost)}{oPrice < oCost ? ' — prix inférieur au coût !' : ''}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
           {/* Coût & marge */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2" data-testid="dish-summary">
             <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-2.5">
@@ -344,6 +415,52 @@ export default function DishForm({
             </button>
           </div>
         </form>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Caisse : choix des suppléments d'un plat (cases à cocher), prix total en direct.
+ */
+export function DishOptionsPicker({
+  dish, basePrice, format, onCancel, onConfirm,
+}: {
+  dish: Product;
+  basePrice: number;
+  format: (n: number) => string;
+  onCancel: () => void;
+  onConfirm: (optionIds: string[]) => void;
+}) {
+  const [picked, setPicked] = useState<string[]>([]);
+  const options = dish.options || [];
+  const total = basePrice + options.filter((o) => picked.includes(o.id)).reduce((s, o) => s + o.price, 0);
+  const toggle = (id: string) => setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" role="dialog" aria-label="Suppléments">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl animate-fade-in">
+        <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center gap-3">
+          {dish.image ? <img src={dish.image} alt="" className="w-12 h-12 rounded-lg object-cover" /> : <ChefHat className="w-8 h-8 text-cyan-500" />}
+          <div className="min-w-0 flex-1">
+            <p className="font-bold text-slate-900 dark:text-white truncate">{dish.name}</p>
+            <p className="text-[11px] text-slate-400">Suppléments ? (facultatif)</p>
+          </div>
+          <button type="button" onClick={onCancel} className="text-slate-400 hover:text-slate-900 dark:hover:text-white text-sm" aria-label="Fermer">✕</button>
+        </div>
+        <div className="p-3 space-y-1.5 max-h-[50vh] overflow-y-auto">
+          {options.map((o) => (
+            <label key={o.id} className={`flex items-center gap-3 p-2.5 rounded-xl border cursor-pointer text-sm ${picked.includes(o.id) ? 'border-cyan-500 bg-cyan-500/10' : 'border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/40'}`}>
+              <input type="checkbox" checked={picked.includes(o.id)} onChange={() => toggle(o.id)} className="w-4 h-4 accent-cyan-600" aria-label={o.label} />
+              <span className="flex-1 text-slate-800 dark:text-slate-100">{o.label}</span>
+              <span className="font-mono text-cyan-600 dark:text-cyan-400">+{format(o.price)}</span>
+            </label>
+          ))}
+        </div>
+        <div className="p-4 border-t border-slate-200 dark:border-slate-800 flex items-center gap-2">
+          <span className="text-xs text-slate-400 mr-auto">Total : <b className="font-mono text-slate-900 dark:text-white" data-testid="options-total">{format(total)}</b></span>
+          <button type="button" onClick={() => onConfirm([])} className="px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800">Sans supplément</button>
+          <button type="button" onClick={() => onConfirm(picked)} className="px-3 py-2 text-xs rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-bold">Ajouter au panier</button>
+        </div>
       </div>
     </div>
   );

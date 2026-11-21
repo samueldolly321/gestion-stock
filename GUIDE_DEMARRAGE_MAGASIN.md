@@ -167,6 +167,11 @@ Dans **Articles & Stocks → onglet « Ingrédients & articles » → Nouveau Pr
 - [ ] Vérifiez le résumé, calculé en direct : **coût de revient**, **marge**, **coût matière %**
       (on vise souvent **25 à 35 %** ; orange au-delà de 40 %) et **portions possibles**.
 
+- [ ] *(Facultatif)* **Suppléments** (« + œuf », « + crevettes ») : dans la fiche du plat,
+      section **Suppléments** → nom affiché, **ingrédient retiré**, quantité et **prix**. À la
+      caisse, ajouter ce plat ouvre une fenêtre pour les cocher ; ils s'impriment sous le plat
+      sur le ticket et leur ingrédient sort du stock.
+
 > Les **portions possibles** = combien de plats on peut faire avec le stock actuel :
 > c'est l'ingrédient **le plus limitant** qui décide (ex. plus que 0,5 kg de brèdes à
 > 0,05 kg/portion → 10 portions, même s'il reste beaucoup de riz).

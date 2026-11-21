@@ -92,6 +92,37 @@ export function dishMargins(sales: Sale[], movements: StockMovement[], products:
     .sort((a, b) => b.margin - a.margin);
 }
 
+// ---------------------------------------------------------- Suppléments vendus
+
+export interface SupplementRow {
+  label: string;
+  count: number;    // nombre de suppléments vendus (portions × quantité de la ligne)
+  revenue: number;  // prix des suppléments
+  cost: number;     // coût de l'ingrédient au jour de la vente
+  margin: number;
+}
+
+export function supplementsSold(sales: Sale[], period: Period): SupplementRow[] {
+  const rows = new Map<string, SupplementRow>();
+  for (const s of sales) {
+    if (s.type !== 'invoice' || !inPeriod(s.createdAt, period)) continue;
+    for (const it of (s.items || []) as any[]) {
+      const qty = Number(it.quantity) || 0;
+      for (const o of it.options || []) {
+        const key = String(o.label).replace(/^\+\s*/, '').toLowerCase();
+        if (!rows.has(key)) rows.set(key, { label: String(o.label), count: 0, revenue: 0, cost: 0, margin: 0 });
+        const r = rows.get(key)!;
+        r.count += qty;
+        r.revenue += (Number(o.price) || 0) * qty;
+        r.cost += (Number(o.cost) || 0) * qty;
+      }
+    }
+  }
+  return [...rows.values()]
+    .map((r) => ({ ...r, count: round3(r.count), revenue: round2(r.revenue), cost: round2(r.cost), margin: round2(r.revenue - r.cost) }))
+    .sort((a, b) => b.count - a.count);
+}
+
 // ---------------------------------------------------------- Consommation d'ingrédients
 
 export interface ConsumptionRow {

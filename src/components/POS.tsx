@@ -27,7 +27,8 @@ import ReceiptModal from './ReceiptModal';
 import BarcodeScannerModal from './BarcodeScannerModal';
 import { VariantPicker, groupForPos, modelVariants } from './VariantsUI';
 import { priceUnitSuffix } from '../services/sectors';
-import { isDish, portionsPossible } from '../services/recipes';
+import { isDish, portionsPossible, optionsKey } from '../services/recipes';
+import { DishOptionsPicker } from './DishForm';
 
 /** Un plat n'a pas de limite de stock en caisse (ses ingrédients sont retirés à la vente). */
 const DISH_NO_LIMIT = 9999;
@@ -77,7 +78,13 @@ interface CartLine extends TransactionItem {
   packLabel?: string | null;
   /** Article suivi à l'unité : numéros de série / IMEI vendus (quantity = nombre de numéros) */
   serials?: string[];
+  /** Plat avec suppléments : clé « plat|suppléments » (une ligne par combinaison) */
+  lineKey?: string;
+  options?: { id: string; label: string; price: number }[];
 }
+
+/** Clé d'une ligne de panier : l'id de l'article, ou « plat|suppléments ». */
+const keyOf = (i: { productId: string; lineKey?: string }) => i.lineKey || i.productId;
 
 export default function POS({
   products,
@@ -148,6 +155,7 @@ export default function POS({
   // Appareils suivis par numéro de série / IMEI, en stock (tous entrepôts) — rechargés après chaque vente.
   const [serialStock, setSerialStock] = useState<ProductSerial[]>([]);
   const [serialPickFor, setSerialPickFor] = useState<Product | null>(null);
+  const [optionsPickFor, setOptionsPickFor] = useState<Product | null>(null); // plat : choix des suppléments
   const reloadSerials = React.useCallback(() => {
     listSerials({ status: 'in_stock' }).then(setSerialStock).catch(() => setSerialStock([]));
   }, []);
@@ -232,13 +240,52 @@ export default function POS({
     return { inStockHere, outHere: products.length - inStockHere, elsewhere };
   }, [products, availOf, sellableWarehouses, activeWarehouseId, productStock]);
 
+  // Article d'une ligne de panier, à partir de sa clé.
+  const productOfKey = (key: string) => {
+    const line = cart.find((i) => keyOf(i) === key);
+    return products.find((p) => p.id === (line?.productId || key));
+  };
+
   // Pas de progression (+/-) d'une ligne : 1 carton si la ligne est en mode carton, sinon 1 pièce.
   const stepFor = (item: CartLine) => (item.saleUnit === 'pack' ? item.packSize : 1);
+
+  // Restauration : un plat avec suppléments → une ligne par combinaison (plat + suppléments).
+  const addDishWithOptions = (product: Product, optionIds: string[]) => {
+    const chosen = (product.options || []).filter((o) => optionIds.includes(o.id));
+    const key = optionsKey(product.id, chosen.map((o) => o.id));
+    const n = portionsOf(product);
+    const already = cart.filter((i) => i.productId === product.id).reduce((s, i) => s + i.quantity, 0);
+    if (n != null && already + 1 > n) {
+      showToast(`Ingrédients insuffisants pour « ${product.name} » (${n} portion${n > 1 ? 's' : ''} possible${n > 1 ? 's' : ''} ici). La vente reste possible — pensez à vérifier le stock.`, { title: 'Cuisine', type: 'warning', duration: 4000 });
+    }
+    const existing = cart.find((i) => keyOf(i) === key);
+    if (existing) {
+      setCart(cart.map((i) => (keyOf(i) === key ? { ...i, quantity: i.quantity + 1, total: (i.quantity + 1) * i.unitPrice * (1 - i.discount / 100) } : i)));
+      return;
+    }
+    const price = priceForClient(product) + chosen.reduce((s, o) => s + o.price, 0);
+    setCart([...cart, {
+      productId: product.id,
+      productName: product.name,
+      sku: product.sku,
+      quantity: 1,
+      unitPrice: price,
+      discount: 0,
+      tax: product.vatRate,
+      total: price,
+      saleUnit: 'piece',
+      packSize: 1,
+      packLabel: null,
+      lineKey: key,
+      options: chosen.map((o) => ({ id: o.id, label: o.label, price: o.price })),
+    }]);
+  };
 
   // Add product to cart
   const addToCart = (product: Product) => {
     if (product.trackSerial) { setSerialPickFor(product); return; } // choix des appareils (IMEI)
-    const cartItem = cart.find((item) => item.productId === product.id);
+    if (isDish(product) && (product.options || []).length) { setOptionsPickFor(product); return; } // choix des suppléments
+    const cartItem = cart.find((item) => keyOf(item) === product.id);
     if (isDish(product)) {
       const n = portionsOf(product);
       if (n != null && (cartItem?.quantity || 0) + 1 > n) {
@@ -253,7 +300,7 @@ export default function POS({
       }
       setCart(
         cart.map((item) =>
-          item.productId === product.id
+          keyOf(item) === product.id
             ? { ...item, quantity: item.quantity + step, total: (item.quantity + step) * item.unitPrice * (1 - item.discount / 100) }
             : item
         )
@@ -325,12 +372,13 @@ export default function POS({
 
   // Bascule pièce ↔ carton pour une ligne. Recalcule le prix/pièce et arrondit la quantité
   // à un multiple de la taille de colis (au moins 1 colis).
-  const setSaleUnit = (productId: string, saleUnit: 'piece' | 'pack') => {
-    const prod = products.find((p) => p.id === productId);
+  // (Les fonctions ci-dessous reçoivent la CLÉ de ligne : l'id de l'article, ou « plat|suppléments ».)
+  const setSaleUnit = (key: string, saleUnit: 'piece' | 'pack') => {
+    const prod = productOfKey(key);
     if (!prod) return;
     const size = packSizeOf(prod.packSize);
     setCart(cart.map((item) => {
-      if (item.productId !== productId) return item;
+      if (keyOf(item) !== key) return item;
       const newPrice = perPiecePrice(prod, saleUnit);
       let qty = item.quantity;
       if (saleUnit === 'pack') {
@@ -343,14 +391,14 @@ export default function POS({
   };
 
   // Adjust quantity in cart
-  const updateQuantity = (productId: string, delta: number) => {
-    const p = products.find((prod) => prod.id === productId);
+  const updateQuantity = (key: string, delta: number) => {
+    const p = productOfKey(key);
     if (!p) return;
 
     setCart(
       cart
         .map((item) => {
-          if (item.productId === productId) {
+          if (keyOf(item) === key) {
             const newQty = item.quantity + delta * stepFor(item); // 1 pièce ou 1 carton
             if (newQty <= 0) return null;
             if (newQty > availOf(p)) {
@@ -371,9 +419,9 @@ export default function POS({
 
   // Définit une quantité absolue (saisie directe au clavier). En mode carton, la valeur
   // saisie est un nombre de cartons ; convertie en pièces. Toujours bornée au stock.
-  const setQuantity = (productId: string, value: number | string) => {
-    const p = products.find((prod) => prod.id === productId);
-    const item = cart.find((i) => i.productId === productId);
+  const setQuantity = (key: string, value: number | string) => {
+    const p = productOfKey(key);
+    const item = cart.find((i) => keyOf(i) === key);
     if (!p || !item) return;
     // Quantités décimales autorisées (poids/volume : 1,5 kg / 0,75 L). Arrondi à 3 décimales.
     const round3 = (n: number) => Math.round(n * 1000) / 1000;
@@ -386,16 +434,16 @@ export default function POS({
     } else {
       pieces = round3(Math.max(0, Math.min(Number(value) || 0, avail)));
     }
-    setCart(cart.map((it) => it.productId === productId
+    setCart(cart.map((it) => keyOf(it) === key
       ? { ...it, quantity: pieces, total: pieces * it.unitPrice * (1 - it.discount / 100) }
       : it));
   };
 
   // Définit le prix de vente unitaire d'une ligne (négociation par client au comptoir).
   // Saisie libre : aucune alerte ici — le garde-fou vente à perte est vérifié à l'encaissement.
-  const setUnitPrice = (productId: string, value: number | string) => {
+  const setUnitPrice = (key: string, value: number | string) => {
     const price = Math.max(0, Number(value) || 0);
-    setCart(cart.map((item) => item.productId === productId
+    setCart(cart.map((item) => keyOf(item) === key
       ? { ...item, unitPrice: price, total: item.quantity * price * (1 - item.discount / 100) }
       : item));
   };
@@ -424,8 +472,8 @@ export default function POS({
     });
   };
 
-  const removeFromCart = (productId: string) => {
-    setCart(cart.filter((item) => item.productId !== productId));
+  const removeFromCart = (key: string) => {
+    setCart(cart.filter((item) => keyOf(item) !== key));
   };
 
   // Clear Cart
@@ -711,7 +759,7 @@ export default function POS({
                     </button>
                   );
                 }
-                const quantityInCart = cart.find((i) => i.productId === p.id)?.quantity || 0;
+                const quantityInCart = cart.filter((i) => i.productId === p.id).reduce((s, i) => s + i.quantity, 0); // toutes lignes (suppléments)
                 const isMax = quantityInCart >= availOf(p);
                 return (
                   <button
@@ -805,18 +853,23 @@ export default function POS({
             ) : (
               cart.map((item) => (
                 <div
-                  key={item.productId}
+                  key={keyOf(item)}
                   className="p-3 bg-white dark:bg-slate-950/20 border border-slate-200 dark:border-slate-800/40 rounded-xl flex items-center justify-between gap-3"
                 >
                   <div className="min-w-0 flex-1">
                     <span className="text-xs font-bold text-slate-900 dark:text-white block truncate">{item.productName}</span>
+                    {item.options && item.options.length > 0 && (
+                      <span className="text-[10px] text-cyan-500 block truncate" data-testid="cart-line-options">
+                        {item.options.map((o) => `${o.label.startsWith('+') ? '' : '+ '}${o.label}`).join(' · ')}
+                      </span>
+                    )}
                     <div className="flex items-center gap-1 mt-0.5">
                       <input
                         type="number"
                         min={0}
                         value={item.unitPrice}
                         onFocus={(e) => e.target.select()}
-                        onChange={(e) => setUnitPrice(item.productId, e.target.value)}
+                        onChange={(e) => setUnitPrice(keyOf(item), e.target.value)}
                         title="Prix de vente unitaire (HT) — modifiable pour ce client."
                         className={`w-20 font-mono text-[10px] bg-transparent border rounded px-1 py-0.5 focus:outline-none focus:border-cyan-500 ${
                           isBelowCost(item)
@@ -857,7 +910,7 @@ export default function POS({
                       <div className="flex items-center gap-1.5 mt-1">
                         <select
                           value={item.saleUnit}
-                          onChange={(e) => setSaleUnit(item.productId, e.target.value as 'piece' | 'pack')}
+                          onChange={(e) => setSaleUnit(keyOf(item), e.target.value as 'piece' | 'pack')}
                           className="text-[9px] font-mono bg-transparent border border-slate-200 dark:border-slate-700 rounded px-1 py-0.5 text-slate-600 dark:text-slate-300 focus:outline-none focus:border-cyan-500"
                           title="Vendre au détail ou en gros (conditionnement)"
                         >
@@ -873,7 +926,7 @@ export default function POS({
                     <button
                       onClick={() => {
                         if (item.serials) { const prod = products.find((p) => p.id === item.productId); if (prod) setSerialsInCart(prod, item.serials.slice(0, -1)); return; }
-                        updateQuantity(item.productId, -1);
+                        updateQuantity(keyOf(item), -1);
                       }}
                       className="p-1 bg-slate-200 dark:bg-slate-800 hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded cursor-pointer"
                     >
@@ -885,7 +938,7 @@ export default function POS({
                       step="any"
                       value={item.saleUnit === 'pack' ? Math.round((item.quantity / item.packSize) * 1000) / 1000 : item.quantity}
                       onFocus={(e) => e.target.select()}
-                      onChange={(e) => setQuantity(item.productId, e.target.value)}
+                      onChange={(e) => setQuantity(keyOf(item), e.target.value)}
                       readOnly={!!item.serials}
                       title={item.saleUnit === 'pack' ? 'Nombre de cartons' : 'Quantité (pièces / kg / L)'}
                       className="font-mono text-xs font-bold text-slate-900 dark:text-white w-14 text-center bg-transparent border border-slate-200 dark:border-slate-700 rounded p-0.5 focus:outline-none focus:border-cyan-500"
@@ -893,7 +946,7 @@ export default function POS({
                     <button
                       onClick={() => {
                         if (item.serials) { const prod = products.find((p) => p.id === item.productId); if (prod) setSerialPickFor(prod); return; }
-                        updateQuantity(item.productId, 1);
+                        updateQuantity(keyOf(item), 1);
                       }}
                       className="p-1 bg-slate-200 dark:bg-slate-800 hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded cursor-pointer"
                     >
@@ -901,7 +954,7 @@ export default function POS({
                     </button>
 
                     <button
-                      onClick={() => removeFromCart(item.productId)}
+                      onClick={() => removeFromCart(keyOf(item))}
                       className="p-1.5 text-red-400 hover:bg-red-500/10 rounded cursor-pointer ml-1"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -1147,6 +1200,17 @@ export default function POS({
       {/* Reçu / facture imprimable (composant partagé avec l'onglet Ventes) */}
       {showReceipt && (
         <ReceiptModal sale={showReceipt} company={company} client={clients.find((c) => c.id === showReceipt.clientId)} onClose={() => setShowReceipt(null)} />
+      )}
+
+      {/* Restauration : choix des suppléments d'un plat */}
+      {optionsPickFor && (
+        <DishOptionsPicker
+          dish={optionsPickFor}
+          basePrice={priceForClient(optionsPickFor)}
+          format={format}
+          onCancel={() => setOptionsPickFor(null)}
+          onConfirm={(ids) => { addDishWithOptions(optionsPickFor, ids); setOptionsPickFor(null); }}
+        />
       )}
 
       {/* Choix des appareils (numéros de série / IMEI) */}

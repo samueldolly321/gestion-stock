@@ -9,7 +9,7 @@ import { listSales } from '../services/salesService';
 import { listMovements } from '../services/movementsService';
 import { exportExcel } from '../services/exportExcel';
 import { fmtQty } from '../services/pack';
-import { dishMargins, ingredientConsumption, stockGaps, periodDays, type Period, type DishMarginRow, type ConsumptionRow, type GapRow } from '../services/kitchenReports';
+import { dishMargins, ingredientConsumption, stockGaps, supplementsSold, periodDays, type Period, type DishMarginRow, type ConsumptionRow, type GapRow, type SupplementRow } from '../services/kitchenReports';
 
 type Preset = '7' | '30' | 'month' | 'custom';
 
@@ -58,6 +58,7 @@ export default function KitchenReports({ products, format }: { products: Product
   const margins = useMemo(() => dishMargins(sales, movements, products, period), [sales, movements, products, period]);
   const consumption = useMemo(() => ingredientConsumption(movements, products, period), [movements, products, period]);
   const gaps = useMemo(() => stockGaps(sales, movements, products, period), [sales, movements, products, period]);
+  const supplements = useMemo(() => supplementsSold(sales, period), [sales, period]);
 
   const totals = useMemo(() => {
     const revenue = margins.reduce((s, r) => s + r.revenue, 0);
@@ -199,6 +200,44 @@ export default function KitchenReports({ products, format }: { products: Product
           </table>
         </div>
       </section>
+
+      {/* Suppléments vendus (seulement s'il y en a) */}
+      {supplements.length > 0 && (
+        <section className={card}>
+          <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-800">
+            <div>
+              <h3 className="font-bold text-slate-900 dark:text-white text-sm">Suppléments vendus</h3>
+              <p className="text-[11px] text-slate-400">Déjà inclus dans la marge par plat ci-dessus ; détaillés ici pour voir ce qu'ils rapportent.</p>
+            </div>
+            {exportBtn(() => exportExcel<SupplementRow>(`supplements_${fileTag}`, 'Suppléments', [
+              { label: 'Supplément', value: (r) => r.label },
+              { label: 'Vendus', value: (r) => r.count },
+              { label: 'CA', value: (r) => Math.round(r.revenue) },
+              { label: 'Coût', value: (r) => Math.round(r.cost) },
+              { label: 'Marge', value: (r) => Math.round(r.margin) },
+            ], supplements), false)}
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs" data-testid="report-supplements">
+              <thead><tr className="border-b border-slate-200 dark:border-slate-800/60">
+                <th className={th}>Supplément</th><th className={`${th} text-right`}>Vendus</th><th className={`${th} text-right`}>CA</th>
+                <th className={`${th} text-right`}>Coût</th><th className={`${th} text-right`}>Marge</th>
+              </tr></thead>
+              <tbody className="divide-y divide-slate-200 dark:divide-slate-800/40">
+                {supplements.map((r) => (
+                  <tr key={r.label}>
+                    <td className={`${td} font-semibold text-slate-900 dark:text-white`}>{r.label}</td>
+                    <td className={`${td} text-right font-mono`}>{fmtQty(r.count)}</td>
+                    <td className={`${td} text-right font-mono`}>{format(Math.round(r.revenue))}</td>
+                    <td className={`${td} text-right font-mono`}>{format(Math.round(r.cost))}</td>
+                    <td className={`${td} text-right font-mono ${r.margin < 0 ? 'text-red-500' : 'text-emerald-500'}`}>{format(Math.round(r.margin))}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
 
       {/* Consommation d'ingrédients */}
       <section className={card}>

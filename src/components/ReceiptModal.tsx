@@ -66,10 +66,15 @@ export default function ReceiptModal({ sale, company, client, onClose }: Receipt
 
         {/* Lignes d'articles */}
         <div className="space-y-1.5 text-[11px]">
-          {sale.items.map((item) => (
-            <div key={item.productId} className="flex justify-between items-start">
+          {sale.items.map((item, idx) => (
+            <div key={`${item.productId}-${idx}`} className="flex justify-between items-start">
               <div>
                 <span>{item.productName}</span>
+                {Array.isArray((item as any).options) && (item as any).options.length > 0 && (
+                  <span className="text-[9px] text-slate-600 block" data-testid="receipt-options">
+                    {(item as any).options.map((o: any) => `${String(o.label).startsWith('+') ? '' : '+ '}${o.label} (${format(o.price)})`).join(' · ')}
+                  </span>
+                )}
                 <span className="text-[9px] text-slate-500 block">
                   {item.packQty && item.unitLabel
                     ? `${item.packQty} ${item.unitLabel} (${item.quantity} pcs) x ${format(item.unitPrice)}`

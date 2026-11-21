@@ -7,7 +7,7 @@ import { generateId, computeProductStatus, writeAuditLog } from '../helpers.ts';
 import { setWarehouseStock, resolveWarehouseId, recomputeProductTotal, adjustWarehouseStock, getWarehouseStock, lockProducts } from '../stock.ts';
 import { generateEan13 } from '../../services/barcode.ts';
 import { cleanList, cellKey, skuPart, variantName } from '../../services/variants.ts';
-import { normalizeRecipe } from '../../services/recipes.ts';
+import { normalizeRecipe, normalizeOptions } from '../../services/recipes.ts';
 import type { RecipeItem } from '../../types.ts';
 
 export const productsRouter = Router();
@@ -53,8 +53,9 @@ function pickProductFields(body: any) {
     // Absents de la requête → inchangés (undefined est ignoré par l'UPDATE, défaut à l'INSERT).
     trackSerial: body.trackSerial === undefined ? undefined : body.trackSerial === true,
     warrantyMonths: body.warrantyMonths === undefined ? undefined : Math.max(0, Math.min(120, Math.floor(Number(body.warrantyMonths) || 0))),
-    // Restauration : recette (absente de la requête → inchangée).
+    // Restauration : recette et suppléments (absents de la requête → inchangés).
     recipe: body.recipe === undefined ? undefined : normalizeRecipe(body.recipe),
+    options: body.options === undefined ? undefined : normalizeOptions(body.options),
   };
 }
 
@@ -85,7 +86,7 @@ async function dishesUsing(ingredientId: string) {
   return db
     .select({ id: products.id, name: products.name })
     .from(products)
-    .where(sql`${products.kind} = 'dish' AND ${products.recipe} @> ${JSON.stringify([{ ingredientId }])}::jsonb`);
+    .where(sql`${products.kind} = 'dish' AND (${products.recipe} @> ${JSON.stringify([{ ingredientId }])}::jsonb OR ${products.options} @> ${JSON.stringify([{ ingredientId }])}::jsonb)`);
 }
 
 /** Article qui utilise déjà ce code-barres (hors `exceptId`), sinon null. */
@@ -302,11 +303,11 @@ productsRouter.post('/', requireAuth, requireWrite('products'), async (req: Auth
       return res.status(400).json({ error: 'Les prix ne peuvent pas être négatifs.' });
     }
     if (kind === 'dish') {
-      f = asDishFields({ ...f, recipe: f.recipe ?? [] });
-      const err = await recipeError(f.recipe!);
+      f = asDishFields({ ...f, recipe: f.recipe ?? [], options: f.options ?? [] });
+      const err = (await recipeError(f.recipe!)) || (await recipeError(f.options!.map((o) => ({ ingredientId: o.ingredientId, quantity: o.quantity }))));
       if (err) return res.status(400).json({ error: err });
     } else {
-      f = { ...f, recipe: null as any };
+      f = { ...f, recipe: null as any, options: null as any };
     }
     const owner = await barcodeOwner(f.barcode);
     if (owner) return res.status(409).json({ error: barcodeTakenMessage(f.barcode!, owner) });
@@ -356,8 +357,12 @@ productsRouter.put('/:id', requireAuth, requireWrite('products'), async (req: Au
         const err = await recipeError(f.recipe, req.params.id);
         if (err) return res.status(400).json({ error: err });
       }
+      if (f.options) {
+        const err = await recipeError(f.options.map((o) => ({ ingredientId: o.ingredientId, quantity: o.quantity })), req.params.id);
+        if (err) return res.status(400).json({ error: `Supplément : ${err}` });
+      }
     } else {
-      f = { ...f, recipe: undefined };
+      f = { ...f, recipe: undefined, options: undefined };
     }
     const owner = await barcodeOwner(f.barcode, req.params.id);
     if (owner) return res.status(409).json({ error: barcodeTakenMessage(f.barcode!, owner) });
