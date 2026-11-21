@@ -46,6 +46,8 @@ interface DashboardProps {
   expenses: Expense[];
   onNavigate: (tab: string, filter?: string) => void;
   currencySymbol: string;
+  /** Catalogue complet (plats compris) : sert seulement aux images des meilleures ventes. */
+  catalog?: Product[];
 }
 
 export default function Dashboard({
@@ -59,9 +61,12 @@ export default function Dashboard({
   purchases,
   expenses,
   onNavigate,
-  currencySymbol
+  currencySymbol,
+  catalog
 }: DashboardProps) {
   const { format } = useMoney();
+  // Image de chaque article (plats compris) pour la liste des meilleures ventes.
+  const imageById = useMemo(() => new Map((catalog || products).map((p) => [p.id, p.image])), [catalog, products]);
 
   // Période des classements commerciaux (meilleures ventes / clients).
   const [periodDays, setPeriodDays] = React.useState(30);
@@ -190,18 +195,18 @@ export default function Dashboard({
 
   // 6. Top produits vendus (quantité + chiffre d'affaires) sur 30 jours.
   const topProducts = useMemo(() => {
-    const map: Record<string, { name: string; sku: string; qty: number; revenue: number }> = {};
+    const map: Record<string, { name: string; sku: string; image?: string; qty: number; revenue: number }> = {};
     salesInPeriod.forEach((s) => {
       (s.items || []).forEach((it: any) => {
         const key = it.productId || it.sku || it.productName;
         if (!key) return;
-        if (!map[key]) map[key] = { name: it.productName || 'Article', sku: it.sku || '', qty: 0, revenue: 0 };
+        if (!map[key]) map[key] = { name: it.productName || 'Article', sku: it.sku || '', image: it.productId ? imageById.get(it.productId) : undefined, qty: 0, revenue: 0 };
         map[key].qty += Number(it.quantity) || 0;
         map[key].revenue += Number(it.total ?? (it.quantity || 0) * (it.unitPrice || 0)) || 0;
       });
     });
     return Object.values(map).sort((a, b) => b.qty - a.qty).slice(0, 5);
-  }, [salesInPeriod]);
+  }, [salesInPeriod, imageById]);
 
   const maxTopQty = Math.max(1, ...topProducts.map((p) => p.qty));
 
@@ -506,8 +511,15 @@ export default function Dashboard({
                 topProducts.map((p, i) => (
                   <div key={`${p.sku}-${i}`} className="p-3 bg-slate-50 dark:bg-slate-950/25 border border-slate-200 dark:border-slate-800/40 rounded-xl">
                     <div className="flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-2 min-w-0">
+                      <div className="flex items-center gap-2.5 min-w-0">
                         <span className="text-xs font-bold font-mono text-slate-400 w-4 shrink-0">{i + 1}</span>
+                        {p.image ? (
+                          <img src={p.image} alt="" className="w-10 h-10 rounded-lg object-cover shrink-0 border border-slate-200 dark:border-slate-700/50" referrerPolicy="no-referrer" data-testid="top-product-img" />
+                        ) : (
+                          <span className="w-10 h-10 rounded-lg shrink-0 flex items-center justify-center bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/50" data-testid="top-product-img">
+                            <Package className="w-4 h-4 text-slate-400" />
+                          </span>
+                        )}
                         <div className="min-w-0">
                           <span className="text-xs font-bold text-slate-900 dark:text-white truncate block">{p.name}</span>
                           <span className="text-[9px] font-mono text-slate-400">{p.sku}</span>
