@@ -28,7 +28,7 @@ import {
   ChefHat
 } from 'lucide-react';
 import DishForm, { usedInDishes } from './DishForm';
-import { isDish, portionsPossible, recipeCost } from '../services/recipes';
+import { dishMargin, isDish, portionsPossible, recipeCost } from '../services/recipes';
 import { Product, Category, Brand, Supplier, User, Warehouse as WarehouseType, StockMovement, ProductStock } from '../types';
 import { generateId } from '../services/ids';
 import { useMoney } from '../services/CurrencyContext';
@@ -138,6 +138,8 @@ export default function Products({
   // Applique le filtre reçu du Dashboard (ex. clic sur « Ruptures » / « Périmés »).
   React.useEffect(() => {
     if (initialStatus) setSelectedStatus(initialStatus);
+    // Restauration : une alerte de stock concerne les ingrédients, pas les plats.
+    if (initialStatus && initialStatus !== 'all') setKindTab('stock');
   }, [initialStatus]);
   const [selectedWarehouse, setSelectedWarehouse] = useState<string>('all');
 
@@ -197,6 +199,8 @@ export default function Products({
   const [warrantyMonths, setWarrantyMonths] = useState<number>(0); // garantie client (mois)
   const [lookupOpen, setLookupOpen] = useState(false); // recherche « numéro de série / garantie »
   const [dishForm, setDishForm] = useState<{ dish: Product | null } | null>(null); // restauration : plat + recette
+  // Restauration : onglet affiché (plats ou ingrédients). Arrivée depuis une alerte de stock → ingrédients.
+  const [kindTab, setKindTab] = useState<'dish' | 'stock'>(initialStatus && initialStatus !== 'all' ? 'stock' : 'dish');
 
   // Quick Adjustment State
   const [adjustingProduct, setAdjustingProduct] = useState<Product | null>(null);
@@ -603,15 +607,29 @@ export default function Products({
     }
   };
 
+  // Restauration : deux tableaux séparés — plats (recettes) et ingrédients & articles stockés.
+  const showKindTabs = features.recipes || products.some(isDish);
+  const dishCount = useMemo(() => products.filter(isDish).length, [products]);
+  const dishMode = showKindTabs && kindTab === 'dish';
+  // Nombre de plats qui utilisent chaque ingrédient.
+  const dishUsage = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const d of products) if (isDish(d)) for (const l of d.recipe || []) m.set(l.ingredientId, (m.get(l.ingredientId) || 0) + 1);
+    return m;
+  }, [products]);
+
   // Filtered products list — toujours les plus récents en premier.
   const filteredProducts = useMemo(() => {
     const list = products.filter((p) => {
+      if (showKindTabs && (kindTab === 'dish') !== isDish(p)) return false;
       const matchSearch =
         p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         p.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (p.barcode || '').includes(searchTerm);
 
-      const matchCat = selectedCategory === 'all' || p.categoryId === selectedCategory;
+      const matchCat = selectedCategory === 'all' || p.categoryId === selectedCategory || p.subCategoryId === selectedCategory;
+      // Entrepôt et statut de stock ne concernent pas les plats (pas de stock propre).
+      if (isDish(p)) return matchSearch && matchCat;
       const matchWarehouse = selectedWarehouse === 'all' || p.locationId === selectedWarehouse;
 
       let matchStatus = true;
@@ -635,9 +653,97 @@ export default function Products({
       compareSizes(a.variantSize || '', b.variantSize || '') ||
       (a.variantColor || '').localeCompare(b.variantColor || '', 'fr'),
     );
-  }, [products, searchTerm, selectedCategory, selectedWarehouse, selectedStatus]);
+  }, [products, searchTerm, selectedCategory, selectedWarehouse, selectedStatus, showKindTabs, kindTab]);
 
   const productsPage = usePagination<Product>(filteredProducts);
+
+  // Tableau des plats (restauration) : coût, marge, coût matière, portions possibles.
+  const renderDishTable = () => (
+    <table className="w-full text-left border-collapse" data-testid="dish-table">
+      <thead>
+        <tr className="bg-slate-50 dark:bg-slate-950/15 border-b border-slate-200 dark:border-slate-800/60 text-[10px] font-mono text-slate-400 uppercase tracking-wider">
+          <th className="py-3 px-4">Plat</th>
+          <th className="py-3 px-4">Catégorie</th>
+          <th className="py-3 px-4 text-right" title="Coût des ingrédients pour 1 portion (prix d'achat actuels)">Coût de revient</th>
+          <th className="py-3 px-4 text-right">Prix de vente</th>
+          <th className="py-3 px-4 text-right">Marge</th>
+          <th className="py-3 px-4 text-right" title="Part du coût des ingrédients dans le prix de vente — on vise souvent 25 à 35 %">Coût matière</th>
+          <th className="py-3 px-4 text-center" title="Portions réalisables avec le stock actuel des ingrédients">Portions possibles</th>
+          <th className="py-3 px-4 text-right">Actions</th>
+        </tr>
+      </thead>
+      <tbody className="divide-y divide-slate-200 dark:divide-slate-800/40 text-xs">
+        {filteredProducts.length === 0 ? (
+          <tr>
+            <td colSpan={8} className="py-12 text-center text-slate-500">
+              {dishCount === 0 ? (
+                <>Aucun plat pour l'instant.{canWrite && <> <button onClick={() => setDishForm({ dish: null })} className="text-cyan-500 hover:underline">Créer votre premier plat</button></>}</>
+              ) : 'Aucun plat ne correspond aux filtres appliqués.'}
+            </td>
+          </tr>
+        ) : productsPage.paged.map((p) => {
+          const cost = recipeCost(p.recipe, productsById);
+          const { margin, costRatio } = dishMargin(p.salePrice, cost);
+          const portions = portionsPossible(p.recipe, (id) => productsById.get(id)?.quantity || 0);
+          const nIng = (p.recipe || []).length;
+          return (
+            <React.Fragment key={p.id}>
+              <tr className="hover:bg-slate-50 dark:hover:bg-slate-800/10 transition duration-150 cursor-pointer" onClick={() => setViewProduct(p)}>
+                <td className="py-3.5 px-4 flex items-center gap-3">
+                  <img src={p.image || PRODUCT_IMAGES[0]} alt={p.name} className="w-9 h-9 rounded-lg object-cover bg-slate-800/20 shrink-0" referrerPolicy="no-referrer" />
+                  <div className="min-w-0">
+                    <span className="font-semibold text-slate-900 dark:text-white block truncate">{p.name}</span>
+                    <span
+                      className="text-[10px] text-slate-400 block cursor-help"
+                      title={nIng ? 'Recette pour 1 portion :\n' + (p.recipe || []).map((l) => {
+                        const ing = productsById.get(l.ingredientId);
+                        return `• ${ing?.name || 'Ingrédient supprimé'} : ${fmtQty(l.quantity)} ${ing?.unit || ''}`;
+                      }).join('\n') : 'Pas encore de recette'}
+                    >
+                      {nIng ? `${nIng} ingrédient${nIng > 1 ? 's' : ''}` : 'sans recette'} · <span className="font-mono">{p.sku}</span>
+                    </span>
+                  </div>
+                </td>
+                <td className="py-3.5 px-4 text-slate-600 dark:text-slate-300">
+                  {p.categoryName || '—'}
+                  {p.subCategoryName && <span className="block text-[10px] text-slate-400">{p.subCategoryName}</span>}
+                </td>
+                <td className="py-3.5 px-4 text-right font-mono text-slate-900 dark:text-gray-300">{format(cost)}</td>
+                <td className="py-3.5 px-4 text-right font-mono font-medium text-cyan-400">{format(p.salePrice)}</td>
+                <td className={`py-3.5 px-4 text-right font-mono ${margin < 0 ? 'text-red-500' : 'text-emerald-500'}`}>{format(margin)}</td>
+                <td className={`py-3.5 px-4 text-right font-mono ${costRatio == null ? 'text-slate-400' : costRatio > 60 ? 'text-red-500' : costRatio > 40 ? 'text-amber-500' : 'text-emerald-500'}`}>
+                  {costRatio == null ? '—' : `${String(costRatio).replace('.', ',')} %`}
+                </td>
+                <td className="py-3.5 px-4 text-center font-mono font-semibold">
+                  {portions == null ? <span className="text-slate-400 font-sans font-normal">—</span>
+                    : <span className={portions === 0 ? 'text-red-500' : portions < 5 ? 'text-amber-500' : 'text-slate-900 dark:text-emerald-400'}>{portions}</span>}
+                </td>
+                <td className="py-3.5 px-4 text-right">
+                  <div className="flex justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
+                    {canWrite && (
+                      <>
+                        <button onClick={() => openEditModal(p)} className="p-1.5 bg-slate-100 hover:bg-cyan-500/10 text-slate-500 hover:text-cyan-500 dark:bg-slate-800/60 dark:text-slate-400 dark:hover:text-cyan-400 rounded-md transition duration-150" title="Modifier le plat et sa recette">
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                        <button onClick={() => handleDeleteProduct(p)} className="p-1.5 bg-slate-100 hover:bg-red-500/10 text-slate-500 hover:text-red-500 dark:bg-slate-800/60 dark:text-slate-400 rounded-md transition duration-150" title="Supprimer">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </td>
+              </tr>
+              {viewProduct?.id === p.id && (
+                <tr className="xl:hidden">
+                  <td colSpan={8} className="p-3 bg-slate-50 dark:bg-slate-950/20 border-b border-slate-200 dark:border-slate-800/60">{renderFiche(p)}</td>
+                </tr>
+              )}
+            </React.Fragment>
+          );
+        })}
+      </tbody>
+    </table>
+  );
 
   const handleExport = (fmt: 'pdf' | 'excel') => {
     const columns = [
@@ -875,6 +981,31 @@ export default function Products({
         </div>
       </div>
 
+      {/* Restauration : plats d'un côté, ingrédients & articles stockés de l'autre */}
+      {showKindTabs && (
+        <div className="flex gap-1 p-1 bg-slate-100 dark:bg-slate-900/60 rounded-xl border border-slate-200 dark:border-slate-800 w-fit" role="tablist" aria-label="Type d'articles">
+          {([
+            ['dish', `Plats (${dishCount})`],
+            ['stock', `Ingrédients & articles (${products.length - dishCount})`],
+          ] as const).map(([k, label]) => (
+            <button
+              key={k}
+              role="tab"
+              aria-selected={kindTab === k}
+              onClick={() => { setKindTab(k); setViewProduct(null); }}
+              className={`px-4 py-2 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition ${
+                kindTab === k
+                  ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm'
+                  : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+              }`}
+            >
+              {k === 'dish' ? <ChefHat className="w-4 h-4 text-cyan-500" /> : <Archive className="w-4 h-4 text-cyan-500" />}
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Advanced Filter Panel */}
       <div className="bg-white dark:bg-slate-900/40 p-4 rounded-xl border border-slate-200 dark:border-slate-800/80 shadow-sm flex flex-col md:flex-row gap-3">
         {/* Search */}
@@ -905,7 +1036,8 @@ export default function Products({
           </select>
         </div>
 
-        {/* Warehouses */}
+        {/* Warehouses — sans objet pour les plats */}
+        {!dishMode && (<>
         <div className="w-full md:w-48">
           <select
             value={selectedWarehouse}
@@ -935,6 +1067,7 @@ export default function Products({
             <option value="expired">Périmé</option>
           </select>
         </div>
+        </>)}
       </div>
 
       {/* Main Grid: Catalog List & Quick view sidebar */}
@@ -943,10 +1076,11 @@ export default function Products({
         {/* Catalog List */}
         <div className="xl:col-span-3 bg-white dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800/80 rounded-2xl overflow-hidden shadow-sm">
           <div className="overflow-x-auto">
+            {dishMode ? renderDishTable() : (
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-slate-50 dark:bg-slate-950/15 border-b border-slate-200 dark:border-slate-800/60 text-[10px] font-mono text-slate-400 uppercase tracking-wider">
-                  <th className="py-3 px-4">Produit</th>
+                  <th className="py-3 px-4">{showKindTabs ? 'Ingrédient / article' : 'Produit'}</th>
                   <th className="py-3 px-4">Fournisseur</th>
                   <th className="py-3 px-4">SKU / Code-barres</th>
                   <th className="py-3 px-4">Catégorie</th>
@@ -1002,6 +1136,11 @@ export default function Products({
                             <span className="text-[10px] text-slate-400 block">
                               <span className="inline-block px-1.5 rounded bg-cyan-500/10 text-cyan-500 font-semibold mr-1">IMEI</span>
                               {p.warrantyMonths ? `garantie ${p.warrantyMonths} mois` : 'suivi à l\'unité'}
+                            </span>
+                          ) : dishUsage.get(p.id) ? (
+                            <span className="text-[10px] text-slate-400 block" title={'Utilisé dans : ' + usedInDishes(p.id, products).map((d) => d.name).join(', ')}>
+                              <span className="inline-block px-1.5 rounded bg-emerald-500/10 text-emerald-500 font-semibold mr-1">Ingrédient</span>
+                              {dishUsage.get(p.id)} plat{dishUsage.get(p.id)! > 1 ? 's' : ''}
                             </span>
                           ) : (
                             <span className="text-[10px] text-slate-400 block font-mono">ID: {p.id}</span>
@@ -1115,6 +1254,7 @@ export default function Products({
                 )}
               </tbody>
             </table>
+            )}
           </div>
           <Pagination
             page={productsPage.page}
