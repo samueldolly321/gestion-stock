@@ -234,6 +234,14 @@ export default function Products({
   // Permissions check
   const canWrite = useMemo(() => hasWritePerm(user.role, 'products', writePerms), [user.role, writePerms]);
 
+  // Ouvre la gestion des catégories ; `parentId` présélectionne la catégorie parente
+  // (ajout direct d'une sous-catégorie).
+  const openCategoryManager = (parentId?: string) => {
+    setNewCatParentId(parentId || '');
+    setNewCatName('');
+    setIsCatModalOpen(true);
+  };
+
   // Handle open modal for create
   const openCreateModal = () => {
     setEditingProduct(null);
@@ -956,7 +964,15 @@ export default function Products({
                         <div className="min-w-0">
                           <span className="font-semibold text-slate-900 dark:text-white block truncate">{p.name}</span>
                           {isDish(p) ? (
-                            <span className="text-[10px] text-slate-400 block">
+                            <span
+                              className="text-[10px] text-slate-400 block cursor-help"
+                              title={(p.recipe || []).length
+                                ? 'Recette pour 1 portion :\n' + (p.recipe || []).map((l) => {
+                                    const ing = productsById.get(l.ingredientId);
+                                    return `• ${ing?.name || 'Ingrédient supprimé'} : ${fmtQty(l.quantity)} ${ing?.unit || ''}`;
+                                  }).join('\n')
+                                : "Pas encore de recette"}
+                            >
                               <span className="inline-block px-1.5 rounded bg-cyan-500/10 text-cyan-500 font-semibold mr-1">Plat</span>
                               {(p.recipe || []).length ? `${(p.recipe || []).length} ingrédient${(p.recipe || []).length > 1 ? 's' : ''}` : 'sans recette'}
                             </span>
@@ -1434,7 +1450,17 @@ export default function Products({
 
                 {/* Sous-catégorie (filtrée selon la catégorie) */}
                 <div>
-                  <label className="text-xs text-slate-400 block mb-1">Sous-catégorie</label>
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="text-xs text-slate-400 block">Sous-catégorie</label>
+                    <button
+                      type="button"
+                      onClick={() => openCategoryManager(categoryId)}
+                      title={categoryId ? 'Ajouter une sous-catégorie dans la catégorie choisie' : 'Gérer les catégories et sous-catégories'}
+                      className="text-[10px] text-cyan-400 hover:underline"
+                    >
+                      + Gérer
+                    </button>
+                  </div>
                   <select
                     value={subCategoryId}
                     onChange={(e) => setSubCategoryId(e.target.value)}
@@ -1838,6 +1864,7 @@ export default function Products({
           categories={categories}
           productStock={productStock}
           format={format}
+          onManageCategories={openCategoryManager}
           onClose={() => setDishForm(null)}
           onSaved={() => { setDishForm(null); onRefresh(); }}
         />

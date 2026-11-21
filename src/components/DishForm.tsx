@@ -45,8 +45,10 @@ function shrinkImage(file: File): Promise<string> {
 interface Line { ingredientId: string; quantity: string }
 
 export default function DishForm({
-  dish, products, categories, productStock, format, onClose, onSaved,
+  dish, products, categories, productStock, format, onManageCategories, onClose, onSaved,
 }: {
+  /** Ouvre la gestion des catégories (parentId = catégorie parente présélectionnée) */
+  onManageCategories?: (parentId?: string) => void;
   /** Plat à modifier, ou null pour un nouveau plat */
   dish: Product | null;
   products: Product[];
@@ -185,14 +187,31 @@ export default function DishForm({
                 <input required value={name} onChange={(e) => setName(e.target.value)} className={field} placeholder="ex. Soupe Won Ton, Riz cantonais, Mine sao poulet" />
               </div>
               <div>
-                <label className="text-slate-400 block mb-1">Catégorie</label>
+                <div className="flex justify-between items-center mb-1">
+                  <label className="text-slate-400 block">Catégorie</label>
+                  {onManageCategories && (
+                    <button type="button" onClick={() => onManageCategories()} className="text-[10px] text-cyan-400 hover:underline">+ Gérer</button>
+                  )}
+                </div>
                 <select value={categoryId} onChange={(e) => { setCategoryId(e.target.value); setSubCategoryId(''); }} className={field}>
                   <option value="">— Aucune —</option>
                   {topCategories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
               <div>
-                <label className="text-slate-400 block mb-1">Sous-catégorie</label>
+                <div className="flex justify-between items-center mb-1">
+                  <label className="text-slate-400 block">Sous-catégorie</label>
+                  {onManageCategories && (
+                    <button
+                      type="button"
+                      onClick={() => onManageCategories(categoryId || undefined)}
+                      title={categoryId ? 'Ajouter une sous-catégorie dans la catégorie choisie' : 'Gérer les catégories et sous-catégories'}
+                      className="text-[10px] text-cyan-400 hover:underline"
+                    >
+                      + Gérer
+                    </button>
+                  )}
+                </div>
                 <select value={subCategoryId} onChange={(e) => setSubCategoryId(e.target.value)} className={field} disabled={!categories.some((c) => c.parentId === categoryId)}>
                   <option value="">— Aucune —</option>
                   {categories.filter((c) => c.parentId === categoryId).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
