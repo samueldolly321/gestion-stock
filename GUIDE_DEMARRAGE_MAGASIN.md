@@ -119,18 +119,80 @@ avec le rôle **Caissier** :
 ## 5. Saisir les données de départ
 
 Dans l'ordre conseillé :
-- [ ] **Configuration ERP** : raison sociale, logo (initiales), devise (Ariary), TVA.
-- [ ] **Entrepôts** (onglet **Entrepôts & Localisations**) : créez vos dépôts/magasins.
-      Vous y voyez aussi la **répartition du stock par entrepôt** et pouvez **transférer**
-      des produits d'un dépôt à un autre (A→B).
+- [ ] **Configuration ERP** : raison sociale, logo, **NIF** et **STAT** (imprimés sur les
+      factures — tant qu'ils manquent, la facture affiche un rappel à l'écran), devise (Ariary), TVA.
+- [ ] **Entrepôts** (onglet **Entrepôts & Localisations**) : un **« Entrepôt Central »** est créé
+      automatiquement au 1er lancement (renommez-le si vous voulez). Ajoutez vos autres
+      dépôts/magasins s'il y en a. Vous y voyez aussi la **répartition du stock par entrepôt**
+      et pouvez **transférer** des produits d'un dépôt à un autre (A→B).
 - [ ] **Catégories** de produits.
 - [ ] **Fournisseurs** (nom + téléphone).
 - [ ] **Articles** : produits avec prix d'achat/vente, unité (pièce, **kg**, **carton**…),
       stock de départ. *(Le code-barres EAN-13 peut être généré par l'app.)*
-- [ ] **Clients** (nom + téléphone ; tarifs négociés si besoin).
+- [ ] **Clients** (nom + téléphone ; tarifs négociés si besoin ; pour une entreprise,
+      son **NIF** et son **STAT**, imprimés sur ses factures).
 
 > 💡 Astuce : pour repartir « propre » après des essais, **Configuration ERP →
 > Zone de danger → Remettre les chiffres à zéro** (garde produits/clients/fournisseurs).
+
+---
+
+## 5 bis. Restaurant, gargote, snack (plats avec recette)
+
+Au 1er lancement, à la question **« Quel est votre commerce ? »**, choisissez
+**« Restauration, gargote, snack »**. Les catégories sont créées pour vous (Entrées, Plats,
+Desserts, Boissons, **Ingrédients**, Emballages).
+
+**Le principe en une phrase :** on stocke les **ingrédients** ; un **plat** n'a pas de stock à
+lui, il a une **recette**. Chaque fois qu'on vend un plat, ses ingrédients sortent du stock.
+
+```
+   Achats / réceptions ──► INGRÉDIENTS (riz, poulet, huile…) ──► stock
+                                    ▲
+   Vente d'un PLAT (caisse) ────────┘  retire les ingrédients de la recette
+```
+
+### 5 bis.1 Créer les ingrédients (articles normaux)
+Dans **Articles & Stocks → onglet « Ingrédients & articles » → Nouveau Produit** :
+- [ ] Un article par ingrédient : **unité** adaptée (**Kg**, **g**, **Litre**, **Pièces**…),
+      **prix d'achat** (il sert au calcul du coût des plats), **stock de départ**.
+- [ ] Les boissons et produits revendus tels quels (Coca, eau, barquettes) se créent de la
+      même façon : ils se vendent directement en caisse.
+
+### 5 bis.2 Créer les plats
+**Articles & Stocks → onglet « Plats » → Nouveau plat (recette)** :
+- [ ] Nom, catégorie, **prix de vente d'une portion**, photo.
+- [ ] **Recette pour 1 portion** : cherchez chaque ingrédient et saisissez la quantité
+      **dans son unité** (ex. riz `0,15` kg, huile `0,02` L, œuf `1` pièce).
+- [ ] Vérifiez le résumé, calculé en direct : **coût de revient**, **marge**, **coût matière %**
+      (on vise souvent **25 à 35 %** ; orange au-delà de 40 %) et **portions possibles**.
+
+> Les **portions possibles** = combien de plats on peut faire avec le stock actuel :
+> c'est l'ingrédient **le plus limitant** qui décide (ex. plus que 0,5 kg de brèdes à
+> 0,05 kg/portion → 10 portions, même s'il reste beaucoup de riz).
+
+### 5 bis.3 Au quotidien
+- [ ] **Caisse** : on vend les plats comme n'importe quel article ; la carte affiche les
+      **portions possibles**. Si un ingrédient manque, **la vente passe quand même** (le
+      service n'est jamais bloqué) et une alerte liste ce qui manquait → vérifiez le stock.
+- [ ] **Plat raté, invendu jeté, renversé** : onglet **Plats** → icône ⚠ **« Déclarer une
+      perte »** → nombre de portions + motif. Les ingrédients sortent du stock en « Perte ».
+- [ ] **Réceptions** : les achats et entrées se font sur les **ingrédients** (pas sur les
+      plats) ; les portions possibles remontent toutes seules.
+- [ ] **Inventaire** régulier des ingrédients (**Audits & Ajustements**) : c'est lui qui
+      révèle les pertes non déclarées.
+
+### 5 bis.4 Rapports cuisine
+**Articles & Stocks → onglet « Rapports cuisine »** (période 7 j / 30 j / mois / dates) :
+- **Marge par plat** : portions vendues, chiffre d'affaires, coût matière, marge, pertes.
+- **Consommation d'ingrédients** : ce qui est parti (plats, vente directe, pertes) et
+  **jours de stock restant** au rythme actuel → la liste de courses.
+- **Écarts** : ce que l'inventaire a trouvé en moins, et les ingrédients qui manquaient au
+  moment de vendre (réception ou inventaire oublié).
+Chaque tableau s'exporte en **Excel**.
+
+> ❓ **Pourquoi pas « Ajuster le stock » sur un plat ?** Parce qu'un plat n'a pas de stock
+> propre : on ajuste ses **ingrédients**, et ses portions possibles se recalculent.
 
 ---
 
@@ -232,6 +294,8 @@ Fréquence conseillée : **tous les jours** en fin de journée.
 | Un poste **navigateur** voit « impossible d'accéder au site » | PC principal allumé et Vokatra-ko ouvert ? Même réseau ? Bonne adresse `http://IP:34519` ? Pare-feu ouvert (§6.1) ? |
 | Ça marchait, puis plus rien (multi-postes) | L'IP du PC principal a changé → refaire §6.1 (relever l'IP) et mettre à jour le favori, ou fixer l'IP. |
 | Un caissier a oublié son mot de passe | Le chef le réinitialise dans **Utilisateurs**. |
+| *(Restaurant)* Un plat affiche « 0 portion » | Un ingrédient de la recette est épuisé : faites une réception ou un ajustement de cet **ingrédient** (survolez « N ingrédients » sous le plat pour voir sa recette). |
+| *(Restaurant)* Alerte « ingrédients insuffisants » après une vente | La vente est enregistrée ; le stock de l'ingrédient était trop bas (réception oubliée ?). Corrigez par une entrée ou un inventaire. |
 
 ---
 
@@ -240,6 +304,8 @@ Fréquence conseillée : **tous les jours** en fin de journée.
 - [ ] PC de caisse : `Vokatra-ko Setup 0.0.0.exe` installé, 1er lancement OK.
 - [ ] Compte chef (Super Admin) + comptes caissiers (rôle **Caissier**, lieu de travail affecté) créés.
 - [ ] Données de base saisies (articles, clients, fournisseurs).
+- [ ] *(Restaurant)* ingrédients créés avec prix d'achat et stock, plats créés avec leur
+      recette, une vente test faite et le stock des ingrédients vérifié.
 - [ ] *(Multi-postes)* pare-feu ouvert (34519), IP notée/fixée, postes caissiers connectés en navigateur.
 - [ ] Impression testée (reçu).
 - [ ] Sauvegarde testée + onduleur en place.
