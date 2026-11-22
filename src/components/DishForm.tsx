@@ -6,7 +6,7 @@
  * retirés du stock. Le coût de revient, la marge et le coût matière sont calculés en direct.
  */
 import React, { useMemo, useState } from 'react';
-import { ChefHat, Search, Trash2, ImagePlus, AlertTriangle, PackagePlus } from 'lucide-react';
+import { ChefHat, Trash2, ImagePlus, AlertTriangle, PackagePlus } from 'lucide-react';
 import type { Category, Product, ProductStock } from '../types';
 import { createProduct, updateProduct, declareDishLoss } from '../services/productsService';
 import { createMovement } from '../services/movementsService';
@@ -87,7 +87,6 @@ export default function DishForm({
   const [created, setCreated] = useState<Product[]>([]);
   const [newIng, setNewIng] = useState<null | { name: string; unit: string; price: string; qty: string; warehouseId: string }>(null);
   const [creatingIng, setCreatingIng] = useState(false);
-  const [search, setSearch] = useState('');
   const [busy, setBusy] = useState(false);
   // Tailles de portion (« Petite », « Grande ») : prix propre + coefficient sur la recette.
   const [sizeLines, setSizeLines] = useState<{ id?: string; label: string; factor: string; price: string }[]>(
@@ -113,14 +112,24 @@ export default function DishForm({
     return m;
   }, [productStock]);
 
-  const suggestions = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return [];
+  // Liste de TOUS les ingrédients disponibles (pas encore dans la recette), groupés par rayon :
+  // d'abord la catégorie « Ingrédients » (par sous-catégorie), puis les autres articles.
+  const ingredientGroups = useMemo(() => {
     const used = new Set(lines.map((l) => l.ingredientId));
-    return ingredients
-      .filter((p) => !used.has(p.id) && (p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q)))
-      .slice(0, 8);
-  }, [search, ingredients, lines]);
+    const groups = new Map<string, { label: string; first: boolean; items: Product[] }>();
+    for (const p of ingredients) {
+      if (used.has(p.id)) continue;
+      const isIngr = /ingr[ée]dient/i.test(p.categoryName || '');
+      const label = isIngr ? (p.subCategoryName || p.categoryName || 'Ingrédients') : (p.categoryName || 'Autres articles');
+      const key = `${isIngr ? 0 : 1}|${label}`;
+      if (!groups.has(key)) groups.set(key, { label, first: isIngr, items: [] });
+      groups.get(key)!.items.push(p);
+    }
+    return [...groups.entries()]
+      .sort(([a], [b]) => a.localeCompare(b, 'fr'))
+      .map(([, g]) => ({ ...g, items: g.items.sort((x, y) => x.name.localeCompare(y.name, 'fr')) }));
+  }, [ingredients, lines]);
+  const availableCount = ingredientGroups.reduce((s, g) => s + g.items.length, 0);
 
   // Quantité d'une ligne dans l'unité de stock de l'ingrédient (4 cl → 0,04 L ; 120 g → 0,12 kg).
   const baseQty = (l: Line) => {
@@ -137,11 +146,9 @@ export default function DishForm({
 
   const addIngredient = (p: Product) => {
     setLines((ls) => (ls.some((l) => l.ingredientId === p.id) ? ls : [...ls, { ingredientId: p.id, quantity: '', unit: defaultEntryUnit(p.unit) }]));
-    setSearch('');
   };
 
   // Création rapide d'un ingrédient sans quitter la fiche du plat.
-  const exactMatch = ingredients.find((p) => p.name.trim().toLowerCase() === search.trim().toLowerCase());
   const openNewIngredient = (nm = '') =>
     setNewIng({ name: nm.trim(), unit: 'Kg', price: '', qty: '', warehouseId: warehouses[0]?.id || '' });
   const saveNewIngredient = async () => {
@@ -210,7 +217,6 @@ export default function DishForm({
       setCreated((c) => [...c, { ...p, quantity: qty }]);
       setLines((ls) => [...ls, { ingredientId: p.id, quantity: '', unit: defaultEntryUnit(p.unit) }]);
       setNewIng(null);
-      setSearch('');
       onIngredientCreated?.();
       showToast(`Ingrédient « ${p.name} » créé${qty > 0 ? ` (stock ${String(qty).replace('.', ',')} ${p.unit})` : ''}.`, { title: 'Ingrédients' });
     } catch (err: any) {
@@ -421,39 +427,38 @@ export default function DishForm({
                 );
               })}
 
-              <div className="relative pt-1">
-                <Search className="w-3.5 h-3.5 absolute left-2.5 top-[1.1rem] text-slate-400" />
-                <input
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className={`${field} pl-8`}
-                  placeholder="Ajouter un ingrédient : tapez son nom (riz, poulet, huile…)"
-                  aria-label="Rechercher un ingrédient"
-                />
-                {suggestions.length > 0 && (
-                  <div className="absolute z-10 left-0 right-0 mt-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl max-h-56 overflow-y-auto">
-                    {suggestions.map((p) => (
-                      <button key={p.id} type="button" onClick={() => addIngredient(p)} className="w-full text-left px-3 py-2 hover:bg-cyan-500/10 flex justify-between gap-2">
-                        <span className="text-slate-800 dark:text-slate-100">{p.name}</span>
-                        <span className="text-[10px] text-slate-400 whitespace-nowrap">{fmtQty(stockTotal.get(p.id) || 0)} {p.unit} · {format(p.purchasePrice)}/{p.unit}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-                {search.trim() && !exactMatch && !newIng && (
-                  <button
-                    type="button"
-                    onClick={() => openNewIngredient(search)}
-                    className="mt-1.5 text-[11px] font-semibold text-cyan-600 dark:text-cyan-400 hover:underline flex items-center gap-1"
-                    data-testid="create-ingredient-from-search"
-                  >
-                    <PackagePlus className="w-3.5 h-3.5" />
-                    {suggestions.length === 0 ? `Aucun ingrédient « ${search.trim()} » : le créer maintenant` : `Créer l'ingrédient « ${search.trim()} »`}
-                  </button>
-                )}
+              <div className="pt-1">
+                <select
+                  value=""
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v === '__new__') openNewIngredient();
+                    else { const p = byId.get(v); if (p) addIngredient(p); }
+                  }}
+                  className={`${field} font-semibold text-cyan-700 dark:text-cyan-300`}
+                  aria-label="Ajouter un ingrédient"
+                  data-testid="ingredient-picker"
+                >
+                  <option value="">
+                    {availableCount ? `+ Ajouter un ingrédient (${availableCount} disponibles)…` : '+ Ajouter un ingrédient…'}
+                  </option>
+                  {ingredientGroups.map((g) => (
+                    <optgroup key={g.label + g.first} label={g.label}>
+                      {g.items.map((p) => {
+                        const st = stockTotal.get(p.id) || 0;
+                        return (
+                          <option key={p.id} value={p.id}>
+                            {p.name} — stock {fmtQty(st)} {p.unit}{st <= 0 ? ' ⚠ rupture' : ''} · {format(p.purchasePrice)}/{p.unit}
+                          </option>
+                        );
+                      })}
+                    </optgroup>
+                  ))}
+                  <option value="__new__">➕ Créer un nouvel ingrédient…</option>
+                </select>
               </div>
 
-              {!newIng && !search.trim() && (
+              {!newIng && (
                 <button type="button" onClick={() => openNewIngredient()} className="text-[11px] text-cyan-600 dark:text-cyan-400 hover:underline flex items-center gap-1">
                   <PackagePlus className="w-3.5 h-3.5" /> Nouvel ingrédient (pas encore dans la liste)
                 </button>

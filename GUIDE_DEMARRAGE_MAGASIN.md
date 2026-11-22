@@ -158,15 +158,17 @@ Dans **Articles & Stocks → bouton « Nouvel ingrédient / article »** :
       **Litre** pour le liquide, **Pièces** pour œufs, feuilles…), **prix d'achat** (il sert au
       calcul du coût des plats), **stock de départ**.
 - [ ] **Plus rapide** : un ingrédient oublié peut se créer **directement depuis la recette** d'un
-      plat (tapez son nom → « le créer maintenant » → unité, prix d'achat, stock → il est ajouté
-      à la recette).
+      plat (liste « + Ajouter un ingrédient » → tout en bas **« ➕ Créer un nouvel ingrédient »** →
+      nom, unité, prix d'achat, stock → il est ajouté à la recette).
 - [ ] Les boissons et produits revendus tels quels (Coca, eau, bière, barquettes) se créent
       comme des articles : ils se vendent directement en caisse.
 
 ### 5 bis.2 Créer les plats… et les boissons préparées
 **Articles & Stocks → Nouveau plat / boisson** :
 - [ ] Nom, catégorie, **prix de vente d'une portion**, photo.
-- [ ] **Recette pour 1 portion** : cherchez chaque ingrédient et saisissez la quantité en
+- [ ] **Recette pour 1 portion** : choisissez chaque ingrédient dans la liste
+      **« + Ajouter un ingrédient »** (tous les ingrédients, rangés par rayon, avec leur stock et
+      leur prix ; ceux déjà dans la recette n'y sont plus) et saisissez la quantité en
       **g, kg, cl, ml ou L** — la conversion vers l'unité de stock est automatique
       (ex. riz `150 g`, huile `2 cl`, rhum `4 cl`, œuf `1` pièce).
 - [ ] **Cocktails, jus frais, rhum arrangé au verre** : ce sont des « plats » avec une recette
