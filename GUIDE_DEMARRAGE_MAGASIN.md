@@ -195,10 +195,14 @@ Dans **Articles & Stocks → bouton « Nouvel ingrédient / article »** :
       chaque ingrédient. À la caisse, le choix de la taille s'affiche (Normale présélectionnée) ;
       la taille apparaît sur le ticket, le bon de cuisine, les rapports (une ligne par taille) et
       la déclaration de perte.
-- [ ] **Bon de cuisine** : après l'encaissement, bouton orange **« Imprimer le bon de cuisine »**
-      (ticket 80 mm, gros caractères, sans prix) : numéro de commande, heure, plats et
-      suppléments, et la **note** de la commande (ex. « table 4, sans piment »). Les boissons n'y
-      figurent pas. Réimpression possible depuis **Ventes → Réimprimer le reçu**.
+- [ ] **Bon de cuisine et bon de bar** : après l'encaissement, bouton orange **« Bon de cuisine »**
+      (les plats) et bouton violet **« Bon de bar »** (les boissons : tout ce qui est rangé dans la
+      catégorie **Boissons** — cocktails, jus, mais aussi Coca, bières…). Si la commande contient
+      les deux : **« Imprimer les deux bons »** (cuisine puis bar). Ticket 80 mm, gros caractères,
+      sans prix : numéro de commande, heure, tailles, suppléments et **note** (ex. « table 4,
+      sans piment »). Réimpression depuis **Ventes → Réimprimer le reçu**.
+      ⚠ Rangez bien vos boissons dans la catégorie **Boissons** (ou une sous-catégorie) : c'est
+      elle qui envoie la ligne au bar.
 - [ ] **Plat raté, invendu jeté, renversé** : onglet **Plats** → icône ⚠ **« Déclarer une
       perte »** → nombre de portions + motif. Les ingrédients sortent du stock en « Perte ».
 - [ ] **Réceptions** : les achats et entrées se font sur les **ingrédients** (pas sur les

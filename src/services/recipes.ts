@@ -62,6 +62,22 @@ export function fromEntry(stockUnit: string | undefined, value: number, unit: st
 /** Unité de saisie proposée par défaut pour une nouvelle ligne (cl pour un litre, g pour un kilo). */
 export const defaultEntryUnit = (stockUnit: string | undefined) => entryUnits(stockUnit)[0].label;
 
+/** Catégorie « bar » : boissons (bouteilles, cocktails, jus, cafés…) → bon de bar. */
+export const isBarCategory = (...names: (string | null | undefined)[]) =>
+  names.some((n) => /boisson|cocktail|\bbar\b/i.test(String(n || '')));
+
+/**
+ * Poste de préparation d'une ligne de vente : « bar » pour les boissons (catégorie Boissons, préparées
+ * ou en bouteille), « kitchen » pour les plats, null pour le reste (emballages…).
+ */
+export function stationOf(item: { productId?: string; kind?: string; recipe?: unknown; categoryName?: string; subCategoryName?: string }, product?: Product | null): 'bar' | 'kitchen' | null {
+  const cat = product ? product.categoryName : item.categoryName;
+  const sub = product ? product.subCategoryName : item.subCategoryName;
+  if (isBarCategory(cat, sub)) return 'bar';
+  if (item.kind === 'dish' || Array.isArray(item.recipe) || (product && isDish(product))) return 'kitchen';
+  return null;
+}
+
 export const MAX_DISH_SIZES = 6;
 
 /**

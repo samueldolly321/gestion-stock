@@ -700,6 +700,7 @@ export default function App() {
               currencySymbol={currencySymbol}
               company={companyInfo}
               clients={clients}
+              products={products}
             />
           )}
 
