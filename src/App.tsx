@@ -796,6 +796,9 @@ export default function App() {
               products={products}
               movements={movements}
               deliveries={deliveries}
+              settings={settings}
+              canEditInvestment={['Super Admin', 'Admin', 'Manager'].includes(currentUser.role)}
+              onSettingsSaved={setSettings}
             />
           )}
 

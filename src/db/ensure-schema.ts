@@ -57,6 +57,8 @@ export async function ensureSchema(): Promise<void> {
   await db.execute(sql`ALTER TABLE settings ADD COLUMN IF NOT EXISTS stat_number text;`);
   // Secteurs d'activité (question du 1er démarrage).
   await db.execute(sql`ALTER TABLE settings ADD COLUMN IF NOT EXISTS business_sectors jsonb;`);
+  // Fonds de départ (écran Rentabilité) : { openingDate, items: [{ label, amount }] }.
+  await db.execute(sql`ALTER TABLE settings ADD COLUMN IF NOT EXISTS investment jsonb;`);
   // Numéros de série / IMEI à l'unité + garantie (high-tech).
   await db.execute(sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS track_serial boolean DEFAULT false NOT NULL;`);
   await db.execute(sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS warranty_months integer DEFAULT 0 NOT NULL;`);

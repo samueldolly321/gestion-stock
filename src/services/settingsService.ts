@@ -25,6 +25,11 @@ export function saveCompany(data: {
   return apiFetch<Setting>('/settings/company', { method: 'PUT', body: JSON.stringify(data) });
 }
 
+/** Fonds de départ (Comptabilité → Rentabilité) ; `null` l'efface. */
+export function saveInvestment(investment: { openingDate: string; items: { label: string; amount: number }[] } | null): Promise<Setting> {
+  return apiFetch<Setting>('/settings/investment', { method: 'PUT', body: JSON.stringify(investment ?? { clear: true }) });
+}
+
 /** Secteurs d'activité + création optionnelle des catégories proposées. */
 export function saveSectors(
   sectors: string[],

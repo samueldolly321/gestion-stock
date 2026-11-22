@@ -395,5 +395,7 @@ export const settings = pgTable('settings', {
   writePermissions: jsonb('write_permissions').$type<Record<string, string[]>>(),
   // Secteurs d'activité choisis au 1er démarrage (null = pas encore choisi → tout affiché).
   businessSectors: jsonb('business_sectors').$type<string[]>(),
+  // Fonds de départ (retour sur investissement) : date d'ouverture + postes investis.
+  investment: jsonb('investment').$type<{ openingDate: string; items: { label: string; amount: number }[] }>(),
   updatedAt,
 });

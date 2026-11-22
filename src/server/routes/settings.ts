@@ -171,6 +171,51 @@ settingsRouter.put('/company', requireAuth, requireRole(...MANAGE_ROLES), async 
   }
 });
 
+/**
+ * PUT /api/settings/investment — fonds de départ (écran Comptabilité → Rentabilité) :
+ * { openingDate: 'AAAA-MM-JJ', items: [{ label, amount }] }, ou { clear: true } pour l'effacer.
+ * Ne touche à aucun autre réglage.
+ */
+settingsRouter.put('/investment', requireAuth, requireRole(...MANAGE_ROLES), async (req: AuthedRequest, res) => {
+  try {
+    const b = req.body ?? {};
+    let investment: { openingDate: string; items: { label: string; amount: number }[] } | null = null;
+    if (!b.clear) {
+      const openingDate = String(b.openingDate || '');
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(openingDate) || Number.isNaN(Date.parse(openingDate))) {
+        return res.status(400).json({ error: "Date d'ouverture invalide." });
+      }
+      if (Date.parse(openingDate) > Date.now() + 86400000) {
+        return res.status(400).json({ error: "La date d'ouverture ne peut pas être dans le futur." });
+      }
+      const items = (Array.isArray(b.items) ? b.items : [])
+        .map((i: any) => ({ label: txt(i?.label, 60) || 'Autre', amount: Math.round((Number(i?.amount) || 0) * 100) / 100 }))
+        .filter((i: { amount: number }) => i.amount > 0)
+        .slice(0, 20);
+      if (!items.length) return res.status(400).json({ error: 'Indiquez au moins un montant investi.' });
+      investment = { openingDate, items };
+    }
+    const values = { investment, updatedAt: new Date().toISOString() };
+    const [row] = await db
+      .insert(settings)
+      .values({ id: 'global', ...values })
+      .onConflictDoUpdate({ target: settings.id, set: values })
+      .returning();
+    const total = investment ? investment.items.reduce((a, i) => a + i.amount, 0) : 0;
+    await writeAuditLog({
+      userId: req.user?.sub,
+      userName: req.user?.name,
+      action: investment ? `Fonds de départ : ${total} (ouverture ${investment.openingDate})` : 'Fonds de départ effacé',
+      module: 'Comptabilité',
+      entityId: 'global',
+    });
+    res.json(row);
+  } catch (err) {
+    console.error('save investment error:', err);
+    res.status(500).json({ error: "Erreur lors de l'enregistrement du fonds de départ." });
+  }
+});
+
 /** PUT /api/settings — crée ou met à jour la ligne unique 'global' (upsert). */
 settingsRouter.put('/', requireAuth, requireRole(...MANAGE_ROLES), async (req: AuthedRequest, res) => {
   try {

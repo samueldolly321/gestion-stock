@@ -470,6 +470,8 @@ export interface Setting {
   rolePermissions?: Record<string, string[]> | null;
   writePermissions?: Record<string, string[]> | null;
   businessSectors?: string[] | null; // secteurs d'activité (src/services/sectors.ts)
+  /** Fonds de départ (Comptabilité → Rentabilité) */
+  investment?: { openingDate: string; items: { label: string; amount: number }[] } | null;
   updatedAt: string;
 }
 

@@ -296,6 +296,13 @@ Quand une nouvelle version sort, on installe simplement le **nouveau `.exe`**
 - [ ] Vérifier les ventes du jour (onglet **Ventes** / **Tableau de bord**).
 - [ ] **Sauvegarder les données** (voir §9).
 
+**Chaque mois :**
+- [ ] **Comptabilité → États** : TVA et résultat du mois.
+- [ ] **Comptabilité → Rentabilité** : où en est le remboursement du **fonds de départ** (à saisir une
+      fois : date d'ouverture + matériel, travaux, stock de départ…). L'écran estime la durée restante
+      au rythme des derniers mois. Pour un chiffre juste, enregistrez **toutes** les dépenses
+      (loyer, salaires, électricité, gaz…) et votre propre salaire si vous vous en versez un.
+
 ---
 
 ## 9. Sauvegardes (à ne pas négliger)
