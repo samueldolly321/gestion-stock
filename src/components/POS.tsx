@@ -163,7 +163,15 @@ export default function POS({
     listSerials({ status: 'in_stock' }).then(setSerialStock).catch(() => setSerialStock([]));
   }, []);
   React.useEffect(() => { if (products.some((p) => p.trackSerial)) reloadSerials(); }, [products, reloadSerials]);
-  const [selectedClientId, setSelectedClientId] = useState<string>(clients[0]?.id || '');
+  // Client par défaut : le client de passage (fiche « Client de passage » si elle existe, sinon
+  // vente sans compte = ''), jamais le premier client de la liste.
+  const walkInClient = clients.find((c) => /passage/i.test(c.name)) || null;
+  const walkInId = walkInClient?.id || '';
+  const [selectedClientId, setSelectedClientId] = useState<string>(walkInId);
+  // Liste des clients chargée après coup : rattache la vente sans compte à la fiche « passage ».
+  React.useEffect(() => {
+    if (selectedClientId === '' && walkInId) setSelectedClientId(walkInId);
+  }, [walkInId, selectedClientId]);
   const [paymentMethod, setPaymentMethod] = useState<Sale['paymentMethod']>('cash');
   const [discountPercent, setDiscountPercent] = useState<number>(0);
   const [applyVat, setApplyVat] = useState<boolean>(false); // TVA optionnelle (désactivée par défaut)
@@ -519,6 +527,12 @@ export default function POS({
   const handleCheckout = async () => {
     if (cart.length === 0) return;
 
+    // Une vente à crédit doit être rattachée à un vrai client (sinon la dette n'est suivie nulle part).
+    if (advanceMode && (!selectedClient || selectedClient.id === walkInClient?.id)) {
+      showAlert('Pour une vente à crédit ou un paiement partiel, choisissez le client concerné (la dette sera suivie dans Créances clients).', { variant: 'warning' });
+      return;
+    }
+
     // Garde-fou marge : aucune ligne ne peut être vendue sous son prix d'achat.
     for (const item of cart) {
       const prod = products.find((p) => p.id === item.productId);
@@ -551,7 +565,7 @@ export default function POS({
 
       const created = await createSale({
         type: 'invoice',
-        clientId: selectedClientId,
+        clientId: selectedClientId || 'PASSAGE',
         clientName: selectedClient?.name || 'Client de Passage',
         status: 'delivered',
         items: itemsForSale,
@@ -619,6 +633,7 @@ export default function POS({
       setDeliveryEnabled(false);
       setAdvanceMode(false);
       setAmountReceived(0);
+      setSelectedClientId(walkInId); // vente suivante : client de passage (évite de facturer le client précédent)
       onRefresh();
     } catch (err: any) {
       console.error(err);
@@ -983,7 +998,9 @@ export default function POS({
                 value={selectedClientId}
                 onChange={(e) => setSelectedClientId(e.target.value)}
                 className="w-full bg-white dark:bg-slate-950/20 p-2 text-xs rounded-lg border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-gray-200 focus:outline-none"
+                aria-label="Client"
               >
+                {!walkInClient && <option value="">Client de passage (comptoir)</option>}
                 {clients.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name} {c.balance > 0 ? `(Solde: ${format(c.balance)})` : ''}
