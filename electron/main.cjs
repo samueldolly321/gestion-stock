@@ -176,6 +176,7 @@ function createWindow() {
     height: 900,
     minWidth: 1024,
     minHeight: 700,
+    icon: path.join(__dirname, 'icon.ico'),
     title: 'Vokatra-ko',
     backgroundColor: '#0b0f19',
     autoHideMenuBar: true,
