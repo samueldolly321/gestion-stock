@@ -19,6 +19,10 @@
 | **Supérettes / mini-markets** | Multi-rayons, dates de péremption, inventaires |
 | **Grossistes / demi-gros** | Achat et vente **au carton ou à la pièce**, tarifs négociés par client, dette fournisseurs |
 | **Distributeurs multi-dépôts** | Gestion de plusieurs entrepôts, mouvements de stock tracés |
+| **Restaurants, gargotes, snacks, bars** | Plats et cocktails avec recette : chaque vente retire les ingrédients du stock ; coût et marge par plat ; bon de cuisine et bon de bar |
+| **Vêtements, chaussures** | Un modèle décliné en tailles et couleurs, chacune avec son stock |
+| **High-tech, téléphonie** | Suivi par numéro de série / IMEI et garantie client |
+| **Quincailleries & commerces généraux** | Unités au choix (pièce, kg, mètre, sac…), vente au détail ou en gros |
 
 ---
 
@@ -33,6 +37,8 @@
 | « Combien je dois à mes fournisseurs ? Qui me doit de l'argent ? » | **Dettes fournisseurs** et **créances clients** suivies automatiquement. |
 | « J'achète en carton mais je vends à la pièce, le stock est faux. » | **Conversion carton ↔ pièce automatique** : le stock reste juste. |
 | « J'ai peur de perdre mes données ou qu'elles soient dans un cloud étranger. » | **Vos données restent sur votre propre base**, en local ou sur votre serveur. |
+| « Je ne sais pas combien me coûte vraiment un plat. » | **Coût de revient, marge et coût matière** de chaque plat, calculés à partir de la recette. |
+| « Quand vais-je récupérer l'argent investi ? » | Écran **Rentabilité** : part du fonds de départ déjà récupérée et **date estimée**. |
 
 ---
 
@@ -58,14 +64,22 @@
 - **Réception** qui met à jour le stock **et** le coût d'achat moyen.
 - **Dette fournisseurs** et **règlements** suivis automatiquement.
 
+### 🍽️ Restaurant, gargote, snack, bar
+- **Plats, cocktails et jus avec recette** (saisie en g, cl, ml) : chaque vente retire automatiquement les ingrédients du stock.
+- **Coût de revient, marge, coût matière et portions possibles** calculés en direct.
+- **Tailles** (Petite / Normale / Grande) et **suppléments** (« + œuf ») choisis à la caisse.
+- **Bon de cuisine** pour les plats, **bon de bar** pour les boissons.
+- **Rapports cuisine** : marge par plat, consommation des ingrédients, jours de stock restant, pertes.
+
 ### 📊 Pilotage & comptabilité
 - **Tableau de bord** : meilleures ventes, meilleurs clients, recettes / dépenses / solde.
 - **États de TVA** (collectée, déductible, nette) et **compte de résultat** (CA, marge, résultat).
+- **Rentabilité** : en combien de temps votre fonds de départ sera récupéré, mois par mois.
 - **Résumé d'activité rédigé par une intelligence artificielle** : votre journée/mois expliqué en français clair.
 - **Exports PDF et Excel** de tous les tableaux.
 
 ### 👥 Plusieurs utilisateurs, chacun son rôle
-- Comptes **Caissier, Magasinier, Comptable, Commercial, Administrateur…**
+- Comptes **Caissier, Magasinier, Comptable, Manager, Administrateur…**
 - **Chaque rôle ne voit que ce qui le concerne** (contrôle d'accès configurable).
 - **Journal d'audit** : chaque action est tracée.
 
@@ -80,13 +94,15 @@
 | **Simple à utiliser** | Interface claire, en français, pensée pour le terrain — pas besoin d'être informaticien. |
 | **Sécurité sérieuse** | Mots de passe chiffrés, droits vérifiés côté serveur, montants recalculés (impossible de tricher depuis l'écran). |
 | **Une installation par client** | Vos données sont **100 % isolées** des autres commerces. |
+| **Installation en un clic** | Un seul fichier **.exe**, base de données intégrée : rien d'autre à installer. |
+| **Essayez avant d'acheter** | **7 jours d'essai gratuit** avec toutes les fonctions, puis une **licence à vie**. |
 | **Évolutif** | Le logiciel s'enrichit régulièrement de nouvelles fonctions. |
 
 ---
 
 ## 6. Comment ça se déploie ?
 
-1. **Installation** sur votre ordinateur (ou un petit serveur) — Windows.
+1. **Installation** sur votre ordinateur Windows : **un seul fichier .exe**, base de données intégrée, **7 jours d'essai gratuit**.
 2. **Création de votre compte propriétaire** (Super Admin) en 1 minute.
 3. **Création des comptes de vos employés** avec leurs rôles.
 4. **Saisie ou import de votre catalogue** (articles, fournisseurs, clients).
@@ -109,7 +125,8 @@
 
 > _(À personnaliser selon votre politique commerciale.)_
 
-- **Licence** : _[ex. paiement unique par installation / par magasin]_.
+- **Essai** : 7 jours gratuits, toutes fonctions incluses.
+- **Licence** : **à vie**, pour le PC principal (les autres caisses du magasin en navigateur incluses) — _[prix à préciser]_.
 - **Mise en service** : installation, formation de base, import du catalogue.
 - **Support** : _[ex. assistance par téléphone / à distance]_.
 - **Mises à jour** : _[incluses / selon formule]_.
@@ -129,6 +146,12 @@ Oui, en local. Internet n'est nécessaire que pour certaines options (ex. résum
 
 **« Je vends en gros ET au détail. »**
 C'est prévu : achat/vente au carton **ou** à la pièce, avec conversion automatique du stock.
+
+**« Je tiens un restaurant, pas une boutique. »**
+C'est prévu : plats et boissons avec recette, tailles, suppléments, bon de cuisine et de bar, marge par plat.
+
+**« Je veux essayer avant de payer. »**
+**7 jours d'essai gratuit** avec toutes les fonctions ; vos données sont conservées quand vous activez la licence.
 
 ---
 

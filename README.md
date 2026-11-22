@@ -1,20 +1,29 @@
-# StockFlow ERP
+# Vokatra-ko (version 1.1.0)
 
-Application web de **gestion de stock / ERP** : React 19 + Vite + Tailwind côté front, API **Express** côté serveur, base de données **PostgreSQL** (via Drizzle ORM).
+Logiciel de **gestion de stock, de caisse et de comptabilité** pour les commerces : React 19 + Vite + Tailwind côté front, API **Express** côté serveur, base de données **PostgreSQL** (via Drizzle ORM).
+
+Deux façons de l'utiliser :
+- **Version de bureau (.exe Windows)** : Electron + PostgreSQL intégré, 100 % hors ligne — `npm run desktop:build` produit `release/Vokatra-ko Setup 1.1.0.exe`. Essai de 7 jours puis licence à vie liée au PC (voir `GUIDE_LICENCES.md`).
+- **Version serveur / web** : API + front, en local ou sur Render.
 
 Authentification maison (JWT, mots de passe hachés bcrypt) — aucune dépendance cloud.
 
 ## Modules
 
-Authentification & rôles (RBAC) · Catégories & sous-catégories · Articles & stocks · **Vente en gros (conditionnement carton ↔ pièces)** · Mouvements de stock (+ historique par article) · Caisse POS (impression ticket/A4, vente pièce ou carton) · Achats & fournisseurs (catalogue multi-fournisseurs, réception valorisée) · Tarifs de vente par client · Ventes & comptabilité (TVA, facturation, avoirs) · Clients & fournisseurs · Audits d'inventaire · Marques & entrepôts · Réglages entreprise (+ pages À propos / Confidentialité éditables) · Journal d'audit · Notifications temps réel (SSE).
+Authentification & rôles (RBAC) · Secteurs d'activité (épicerie, restauration, grossiste, mode, high-tech, quincaillerie…) · Catégories & sous-catégories · Articles & stocks par entrepôt · **Vente en gros (conditionnement carton ↔ pièces)** · Tailles/couleurs · N° de série / IMEI · Mouvements de stock (+ historique par article) · **Caisse POS** (ticket 80 mm, facture A4 multi-pages, client de passage par défaut, crédit) · **Restauration** (plats et boissons à recette, saisie g/cl/ml, tailles, suppléments, bon de cuisine / bon de bar, pertes, rapports cuisine) · Achats & fournisseurs (catalogue multi-fournisseurs, réception valorisée) · Tarifs de vente par client · Ventes, créances & avoirs · Dépenses (loyer, salaires, énergie…) · Livraisons · **Comptabilité** (TVA, résultat, **rentabilité du fonds de départ**) · Audits d'inventaire · Entrepôts & transferts · Réglages entreprise · Journal d'audit · Notifications temps réel (SSE) · **Licences** (essai 7 jours, clé hors ligne signée).
 
 ## Documentation
 
 | Document | Contenu |
 |---|---|
-| [`GUIDE_INSTALLATION.md`](GUIDE_INSTALLATION.md) | Installation complète pas-à-pas sur un PC Windows (Node, PostgreSQL, base de données, `.env`, lancement, dépannage). **Commence ici pour installer le projet.** |
+| `MODE_EMPLOI_CLIENT.docx` | **Mode d'emploi pour les clients** (38 pages, captures) : installation, licence, chaque onglet, restaurant, rentabilité, dépannage. |
+| [`GUIDE_DEMARRAGE_MAGASIN.md`](GUIDE_DEMARRAGE_MAGASIN.md) | Mise en route d'un magasin ou d'un restaurant avec le `.exe` (check-lists). |
+| [`GUIDE_LICENCES.md`](GUIDE_LICENCES.md) | Vendre et générer les licences (`generer-licence.cmd`), essai de 7 jours. |
+| [`GUIDE_RESEAU_LOCAL.md`](GUIDE_RESEAU_LOCAL.md) | Plusieurs caisses en réseau local autour du PC principal. |
+| [`GUIDE_INSTALLATION.md`](GUIDE_INSTALLATION.md) | Installation développeur pas-à-pas (Node, PostgreSQL, `.env`, lancement, dépannage). |
 | [`GUIDE_RENDER.md`](GUIDE_RENDER.md) | Déploiement en production sur Render. |
-| `DOCUMENTATION_PROJET.docx` | Documentation fonctionnelle : tous les onglets, la comptabilité, les rôles… |
+| `DOCUMENTATION_PROJET.docx` | Documentation fonctionnelle et technique (`node scripts/generate-doc.mjs`). |
+| `ARGUMENTAIRE_COMMERCIAL.docx` / `ARGUMENTAIRE_FLYER.docx` | Plaquette et flyer commerciaux (`scripts/generate-argumentaire.mjs`, `scripts/generate-flyer.mjs`). |
 | [`RECAP.md`](RECAP.md) | Journal technique détaillé des évolutions. |
 
 > ⚡ Tu connais déjà l'environnement ? Le [récapitulatif express](GUIDE_INSTALLATION.md#9-récapitulatif-express-si-tu-connais-déjà) du guide d'installation liste toutes les commandes d'un coup.

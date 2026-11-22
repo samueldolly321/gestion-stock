@@ -53,7 +53,7 @@ A(
   subtitle('ERP de gestion de stock, ventes, achats et comptabilité'),
   new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Documentation complète du projet — de A à Z', size: 22 })] }),
   new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 120 }, children: [new TextRun({ text: 'Contexte Madagascar · Devise Ariary (Ar)', italics: true, size: 20, color: '777777' })] }),
-  new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Généré le 2026-07-27', size: 18, color: '999999' })] }),
+  new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Version 1.1.0 — mise à jour le 2026-11-22', size: 18, color: '999999' })] }),
   new Paragraph({ pageBreakBefore: true }),
 );
 
@@ -74,6 +74,8 @@ A(
     ['Devise', 'Base Ariary (MGA), affichage Ar ou € converti (taux configurable)'],
     ['Assistant IA', 'API Claude (Anthropic) — résumé d\'activité'],
     ['Hébergement', 'En ligne sur Render (redéploiement auto à chaque mise à jour)'],
+    ['Version de bureau', 'Fichier .exe Windows (Electron) avec PostgreSQL intégré : aucune installation, 100 % hors ligne, port 34519'],
+    ['Licences', 'Clé hors ligne signée (Ed25519) liée au PC — 7 jours d\'essai, puis licence à vie'],
   ]),
 );
 
@@ -102,6 +104,13 @@ A(
   h2('Première connexion'),
   bullet('Le tout premier compte créé sur une base vide devient automatiquement « Super Admin » (le propriétaire).'),
   bullet('Ensuite, l\'inscription publique est fermée : les comptes suivants se créent depuis l\'onglet Utilisateurs (réservé aux administrateurs).'),
+  bullet('Au premier lancement, la question « Quel est votre commerce ? » (épicerie, restauration, poissonnerie, grossiste, vêtements, chaussures, high-tech, quincaillerie, commerce général) crée des catégories adaptées et active les fonctions utiles (recettes, tailles/couleurs, numéros de série…).'),
+  h2('Version de bureau (.exe) et licences'),
+  bullet([b('Installation'), r(' : un seul fichier « Vokatra-ko Setup 1.1.0.exe ». La base PostgreSQL est intégrée ; les données vivent dans %APPDATA%\\Vokatra-ko et survivent aux mises à jour.')]),
+  bullet([b('Essai'), r(' : 7 jours avec toutes les fonctions ; un bandeau en haut de l\'écran indique les jours restants (rouge les 2 derniers jours).')]),
+  bullet([b('Licence'), r(' : à vie, pour un PC. Le client envoie son « code machine », le vendeur génère une clé VK1… signée (generer-licence.cmd, clé privée hors du projet). Sans clé à la fin de l\'essai, l\'API est bloquée (données conservées).')]),
+  bullet([b('Anti-contournement'), r(' : date de début d\'essai conservée à trois endroits (fichier, base, registre) ; horloge reculée détectée ; clé d\'un autre PC ou modifiée refusée.')]),
+  bullet([b('Plusieurs caisses'), r(' : le .exe sur le PC principal, les autres postes en navigateur (http://IP:34519) — une seule licence.')]),
 );
 
 // 4. Les onglets
@@ -111,19 +120,19 @@ A(
 );
 const tabs = [
   ['Tableau de bord', 'Vue d\'ensemble : indicateurs clés (KPI), graphiques, alertes cliquables (ruptures, périmés), performance commerciale (7/30/90 jours), recettes/dépenses/solde, et la carte « Résumé d\'activité (IA) ».'],
-  ['Articles & Stocks', 'Le catalogue produits : création/modification, catégories & sous-catégories, marques, entrepôts, champ fournisseur, unité de base, conditionnement « vente en gros » (1 carton = N pièces, prix carton), import d\'image (limite 2 Mo), code-barres EAN-13 (génération + étiquette imprimable), fiche produit avec historique des mouvements, ajustement rapide de stock (avec bouton « Créer un achat » qui transforme une entrée en commande fournisseur réceptionnée).'],
-  ['Caisse POS', 'La vente au comptoir : image produit mise en avant, panier, quantités, vente à la pièce ou au carton par ligne, remise, moyens de paiement, livraison, paiement partiel/à crédit, TVA optionnelle, prix éditable par ligne (tarif client appliqué automatiquement, vente à perte bloquée), impression du reçu (ticket 80 mm ou facture A4).'],
+  ['Articles & Stocks', 'Le catalogue produits : création/modification, catégories & sous-catégories, marques, entrepôts, champ fournisseur, unité de base, conditionnement « vente en gros » (1 carton = N pièces, prix carton), import d\'image (limite 2 Mo), code-barres EAN-13 (génération + étiquette imprimable), fiche produit avec historique des mouvements, ajustement rapide de stock (avec bouton « Créer un achat » qui transforme une entrée en commande fournisseur réceptionnée). Restauration : onglets « Plats », « Ingrédients & articles » et « Rapports cuisine » (marge par plat et par taille, suppléments vendus, consommation d\'ingrédients, écarts) ; plats et boissons préparées avec recette (saisie en g/cl/ml), tailles de portion, suppléments, création d\'un ingrédient depuis la recette, déclaration de perte.'],
+  ['Caisse POS', 'La vente au comptoir : image produit mise en avant, panier, quantités, vente à la pièce ou au carton par ligne, remise, moyens de paiement, livraison, paiement partiel/à crédit (refusé sans vrai client), TVA optionnelle, prix éditable par ligne (tarif client appliqué automatiquement, vente à perte bloquée), « Client de passage (comptoir) » par défaut et après chaque vente. Restauration : choix de la taille et des suppléments, portions possibles. Impression : ticket 80 mm, facture A4 (multi-pages), bon de cuisine (plats) et bon de bar (boissons).'],
   ['Ventes', 'Le journal de toutes les ventes : filtre Jour/Mois/Année (ou dates personnalisées), synthèse (nb ventes, CA, encaissé, reste dû), détail d\'une vente et réimpression du reçu, export PDF/Excel.'],
   ['Créances Clients', 'Ce que les clients doivent : avances et reste dû par vente, encaissements, historique des règlements, et établissement d\'avoirs (notes de crédit).'],
   ['Clients & Fournisseurs', 'Les tiers commerciaux : fiches clients (fidélité, encours) et fournisseurs (coffre-fort documents). Panneau « Produits fournis » par fournisseur (prix négocié) et panneau « Tarifs » par client (prix de vente négocié).'],
   ['Achats', 'Les commandes fournisseurs : création (produits pré-remplis selon le fournisseur), colonne « Produits » (nom + quantité), saisie à la pièce ou au carton, réception valorisée (met à jour le stock et le prix d\'achat moyen), suivi des règlements (dette fournisseurs). TVA optionnelle, filtre par date.'],
   ['Réapprovisionnement', 'Les articles sous le seuil minimum : quantités suggérées et création groupée de commandes d\'achat par fournisseur (avec anti-doublon).'],
-  ['Dépenses', 'Les frais divers (transport, douane, taxes, carburant…), liés ou non à un achat, avec statut payé/non payé.'],
+  ['Dépenses', 'Les frais sans stock : loyer, salaires, électricité/eau, gaz/charbon, entretien, transport, douane, taxes, carburant…, liés ou non à un achat, avec statut payé/non payé. Ils diminuent directement le résultat.'],
   ['Livraisons', 'Les livraisons chez le client : type de transport (moto, voiture, camion…), tarif ajouté à la facture, statut, chauffeur, date planifiée.'],
   ['Calendrier', 'Vue mensuelle des commandes fournisseurs (réception prévue), livraisons planifiées et échéances de créances. Bouton « + » sur chaque date pour créer directement une commande ou une livraison.'],
   ['Audits & Ajustements', 'Les inventaires physiques : comptage, validation (ajuste le stock), historique.'],
   ['Historique des Flux', 'Le registre inaltérable de tous les mouvements de stock (entrées, sorties, retours…).'],
-  ['Comptabilité', 'États de TVA et compte de résultat (voir section dédiée).'],
+  ['Comptabilité', 'Deux sous-onglets : « États » (TVA et compte de résultat) et « Rentabilité » (en combien de temps le fonds de départ est récupéré) — voir section dédiée.'],
   ['Utilisateurs', 'La gestion des comptes : création, rôles, activation/désactivation, réinitialisation de mot de passe (Super Admin / Admin).'],
   ['Configuration ERP', 'Les réglages : raison sociale, nom de marque, logo (initiales), NIF/Stat, devise et taux, thème, numérotation des factures/avoirs, la matrice des permissions par rôle, et les pages « À propos » / « Confidentialité » éditables (affichées sur le portail de connexion).'],
 ];
@@ -141,13 +150,12 @@ A(
   table(['Rôle', 'Vocation'], [
     ['Super Admin', 'Propriétaire — accès complet garanti (non verrouillable)'],
     ['Admin', 'Administration générale'],
-    ['Manager / Gérant', 'Gère tout sauf les comptes utilisateurs'],
-    ['Commercial', 'Ventes, caisse, clients, créances, livraisons'],
-    ['Acheteur', 'Achats / approvisionnement'],
-    ['Comptable', 'Comptabilité, règlements, dépenses'],
-    ['Magasinier', 'Stock, réception, réapprovisionnement, inventaires'],
-    ['Auditeur', 'Consultation, mouvements, inventaires'],
+    ['Manager', 'Gère tout sauf les comptes utilisateurs (peut saisir le fonds de départ)'],
+    ['Caissier', 'Caisse, ventes, articles, clients, créances — rattaché à son lieu de travail (entrepôt)'],
+    ['Comptable', 'Ventes, créances, achats, dépenses, livraisons, comptabilité, configuration'],
+    ['Magasinier', 'Stock, achats, réapprovisionnement, livraisons, entrepôts, inventaires'],
   ]),
+  p('Les anciens rôles Commercial, Acheteur et Auditeur ne sont plus proposés ; un compte qui les porte encore continue de fonctionner et peut être réattribué dans Utilisateurs.'),
   p('La sécurité est appliquée sur le serveur : même en modifiant l\'affichage, un utilisateur ne peut pas effectuer une action que son rôle n\'autorise pas, ni lire des données sensibles réservées.'),
 );
 
@@ -166,6 +174,12 @@ A(
   bullet([b('Marge brute'), r(' = CA HT − COGS. Le taux de marge = marge ÷ CA HT.')]),
   bullet([b('Charges externes'), r(' = les dépenses de la période.')]),
   bullet([b('Résultat net'), r(' = marge brute − charges. C\'est le bénéfice (ou la perte) de la période.')]),
+  h2('C. Rentabilité (fonds de départ)'),
+  p('L\'utilisateur saisit une fois son fonds de départ (date d\'ouverture + postes : matériel, travaux, stock de départ, frais d\'ouverture). L\'écran additionne les résultats nets de chaque mois depuis l\'ouverture (même calcul que le compte de résultat) et affiche :'),
+  bullet([b('% récupéré'), r(' = cumul des résultats ÷ fonds de départ, avec le reste à récupérer.')]),
+  bullet([b('Rythme'), r(' = moyenne des 3 derniers mois complets (ou, au début, le résultat depuis l\'ouverture ramené à 30,4 jours).')]),
+  bullet([b('Délai estimé'), r(' = reste ÷ rythme, avec la date prévue ; message spécifique si l\'activité est en perte ; mention « provisoire » avant 60 jours.')]),
+  bullet([b('Graphique et tableau'), r(' : cumul mois par mois face au fonds de départ, export Excel.')]),
   h2('Comment le coût d\'achat reste juste (PMP)'),
   p('À chaque réception d\'une commande d\'achat, le prix d\'achat de la fiche article est recalculé en « coût moyen pondéré » (CUMP/PMP) : on mélange l\'ancien stock et sa valeur avec la nouvelle quantité reçue et son coût. Cela garde le COGS et le contrôle « vente à perte » fondés sur un coût à jour, même si les prix d\'achat varient.'),
   h2('Numérotation légale'),
@@ -179,6 +193,8 @@ A(
   p('Commande fournisseur → Réception (entrée de stock valorisée, mise à jour du prix d\'achat moyen) → Dépenses annexes éventuelles → Règlements fournisseurs (réduit la dette).'),
   h2('Côté ventes (recettes / sorties de stock)'),
   p('Vente en caisse (avec avance ou à crédit) → Créance client si reste dû → Encaissements successifs → éventuel Avoir (retour/annulation) → historique des règlements. Chaque vente déduit le stock et crédite la fidélité du client.'),
+  h2('Restauration : vente d\'un plat'),
+  p('Un plat (ou une boisson préparée) n\'a pas de stock propre : il a une recette pour une portion. À la vente, le serveur retire chaque ingrédient du stock (× coefficient de la taille choisie, + les suppléments), fige le coût de revient sur la ligne de vente et contrôle la vente à perte. Si un ingrédient manque, la vente passe quand même (stock ramené à 0) et le manque est signalé. Les lignes de la catégorie Boissons partent sur le bon de bar, les autres plats sur le bon de cuisine.'),
   h2('Les avoirs (notes de crédit)'),
   p('Un avoir corrige une facture : il réintègre le stock, s\'impute sur le reste dû puis crée un crédit client si la facture était déjà réglée (solde négatif = crédit dû au client), et reprend la fidélité au prorata. Justificatif imprimable.'),
 );
@@ -226,7 +242,8 @@ A(
   h1('12. Modèle de données (tables principales)'),
   table(['Table', 'Contenu'], [
     ['users', 'Comptes et rôles'],
-    ['products', 'Articles (prix, stock, code-barres, fournisseur…)'],
+    ['products', 'Articles (prix, stock, code-barres, fournisseur…) ; plats : kind = dish, recipe, options (suppléments), sizes (tailles)'],
+    ['product_stock', 'Stock de chaque article par entrepôt'],
     ['categories / brands / warehouses', 'Catégories, marques, entrepôts'],
     ['clients / suppliers', 'Clients et fournisseurs'],
     ['supplier_products', 'Prix d\'achat par fournisseur (catalogue appro)'],
@@ -238,7 +255,8 @@ A(
     ['expenses / deliveries', 'Dépenses et livraisons'],
     ['inventory_audits', 'Inventaires physiques'],
     ['document_counters', 'Compteurs de numéros légaux (factures, avoirs)'],
-    ['settings', 'Réglages entreprise + matrices de permissions'],
+    ['settings', 'Réglages entreprise + matrices de permissions + secteur + fonds de départ (investment)'],
+    ['app_meta', 'Informations techniques (dont la date de début d\'essai de la licence)'],
     ['audit_logs', 'Journal d\'actions'],
   ]),
 );
@@ -258,9 +276,14 @@ A(
     ['Avoir', 'Note de crédit (remboursement/annulation partielle d\'une facture)'],
     ['RBAC', 'Contrôle d\'accès basé sur les rôles'],
     ['SSE', 'Server-Sent Events — notifications temps réel du serveur'],
+    ['Recette', 'Quantité de chaque ingrédient pour une portion d\'un plat'],
+    ['Coût matière', 'Coût des ingrédients ÷ prix de vente (souvent visé entre 25 et 35 %)'],
+    ['Portions possibles', 'Nombre de plats réalisables avec le stock actuel (ingrédient le plus limitant)'],
+    ['Fonds de départ', 'Somme investie pour ouvrir le commerce ; suivie dans Comptabilité → Rentabilité'],
+    ['Code machine', 'Identifiant d\'un PC, utilisé pour fabriquer sa clé de licence'],
   ]),
   spacer(),
-  new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 200 }, children: [new TextRun({ text: 'Fin du document — Vokatra-ko · 2026-07-27', italics: true, color: '999999', size: 18 })] }),
+  new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 200 }, children: [new TextRun({ text: 'Fin du document — Vokatra-ko 1.1.0 · 2026-11-22', italics: true, color: '999999', size: 18 })] }),
 );
 
 const doc = new Document({

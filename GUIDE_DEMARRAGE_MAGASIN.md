@@ -64,10 +64,10 @@ aucun serveur à configurer, aucun réseau. Les données restent sur ce PC.
 > ⏱️ ~3 min.
 
 ### 3.1 Copier l'installeur
-- [ ] Récupérer le fichier **`Vokatra-ko Setup 0.0.0.exe`** (clé USB) et le copier sur le PC.
+- [ ] Récupérer le fichier **`Vokatra-ko Setup 1.1.0.exe`** (clé USB) et le copier sur le PC.
 
 ### 3.2 Installer
-- [ ] Double-cliquer **`Vokatra-ko Setup 0.0.0.exe`**.
+- [ ] Double-cliquer **`Vokatra-ko Setup 1.1.0.exe`**.
       *(Windows peut afficher « Windows a protégé votre ordinateur / Éditeur inconnu »
       → **Informations complémentaires** → **Exécuter quand même**.)*
 - [ ] Choisir le dossier d'installation (ou laisser par défaut), laisser cocher
@@ -342,7 +342,7 @@ Fréquence conseillée : **tous les jours** en fin de journée.
 
 ## 11. Check-list finale (tout est prêt si tout est coché)
 
-- [ ] PC de caisse : `Vokatra-ko Setup 0.0.0.exe` installé, 1er lancement OK.
+- [ ] PC de caisse : `Vokatra-ko Setup 1.1.0.exe` installé, 1er lancement OK.
 - [ ] Compte chef (Super Admin) + comptes caissiers (rôle **Caissier**, lieu de travail affecté) créés.
 - [ ] Données de base saisies (articles, clients, fournisseurs).
 - [ ] *(Restaurant)* ingrédients créés avec prix d'achat et stock, plats créés avec leur

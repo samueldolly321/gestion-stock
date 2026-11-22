@@ -54,7 +54,7 @@ PC principal — ils n'installent rien.
 ## A. Préparer le PC PRINCIPAL
 
 ### 1. Installer et lancer l'application
-- Installer **`Vokatra-ko Setup 0.0.0.exe`** (double-clic ; si Windows affiche
+- Installer **`Vokatra-ko Setup 1.1.0.exe`** (double-clic ; si Windows affiche
   « Éditeur inconnu » → *Informations complémentaires* → *Exécuter quand même*).
 - Lancer **Vokatra-ko**. Le 1er lancement prépare la base intégrée (patienter jusqu'à
   l'écran de connexion). Le **1er compte créé devient Super Admin**.

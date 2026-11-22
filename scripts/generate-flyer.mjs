@@ -33,7 +33,8 @@ const doc = new Document({
       bullet([b('Caisse rapide'), r(' — encaissement en quelques secondes, ticket imprimé, prix par client, paiement à crédit.')]),
       bullet([b('Vente en gros'), r(' — achat/vente au carton ou à la pièce, conversion automatique du stock.')]),
       bullet([b('Achats & fournisseurs'), r(' — commandes, réception, dette fournisseurs suivie automatiquement.')]),
-      bullet([b('Vous savez où vous en êtes'), r(' — tableau de bord recettes/dépenses/solde, TVA, compte de résultat, résumé par IA.')]),
+      bullet([b('Restaurant & bar'), r(' — plats et cocktails avec recette, coût et marge par plat, tailles, suppléments, bon de cuisine et de bar.')]),
+      bullet([b('Vous savez où vous en êtes'), r(' — tableau de bord, TVA, compte de résultat, et en combien de temps votre mise de départ est récupérée.')]),
       bullet([b('Plusieurs utilisateurs'), r(' — un rôle par employé (caissier, magasinier, comptable…), chaque action tracée.')]),
       rule(),
 
@@ -41,12 +42,12 @@ const doc = new Document({
       bullet([b('Vos données chez vous'), r(' — sans cloud étranger, fonctionne sans Internet permanent.')]),
       bullet([b('Adapté à Madagascar'), r(' — devise Ariary, interface simple en français.')]),
       bullet([b('Sécurité sérieuse'), r(' — accès par rôle, anti-fraude, mots de passe chiffrés.')]),
-      bullet([b('Une installation par magasin'), r(' — vos données 100 % isolées.')]),
+      bullet([b('Installation en un clic'), r(' — un seul fichier .exe, base intégrée ; 7 jours d\'essai gratuit, puis licence à vie.')]),
       rule(),
 
-      center([b('Pour qui ? ', { color: CY }), r('Boutiques • Supérettes • Grossistes / demi-gros • Distributeurs multi-dépôts')], { after: 100 }),
+      center([b('Pour qui ? ', { color: CY }), r('Boutiques • Supérettes • Grossistes • Restaurants, gargotes, bars • Quincailleries • Mode • High-tech')], { after: 100 }),
 
-      center([b('Demandez une démonstration gratuite sur votre activité.', { size: 22 })], { after: 30 }),
+      center([b('Essai gratuit de 7 jours — demandez une démonstration sur votre activité.', { size: 22 })], { after: 30 }),
       center([r('Contact : ', { size: 20 }), b('Samuel · 034 21 890 51 · hariniainasamuelandrianirina@gmail.com', { size: 20, color: CY })], { after: 80 }),
       center([b('Vokatra-ko — votre commerce sous contrôle, en un coup d\'œil.', { italics: true, color: CY })]),
     ],
