@@ -331,7 +331,7 @@ export const auditLogs = pgTable('audit_logs', {
 export const expenses = pgTable('expenses', {
   id: text('id').primaryKey(),
   label: text('label').notNull(),
-  category: text('category').notNull(), // transport | douane | taxe | commission | manutention | carburant | autre
+  category: text('category').notNull(), // transport | douane | taxe | commission | manutention | carburant | loyer | salaires | electricite_eau | gaz_charbon | entretien | autre
   amount: doublePrecision('amount').default(0).notNull(),
   supplierId: text('supplier_id'),
   supplierName: text('supplier_name'),

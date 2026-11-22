@@ -11,6 +11,11 @@ export const EXPENSE_CATEGORIES: { value: ExpenseCategory; label: string; icon: 
   { value: 'commission', label: 'Commission', icon: '🤝' },
   { value: 'manutention', label: 'Manutention', icon: '📦' },
   { value: 'carburant', label: 'Carburant', icon: '⛽' },
+  { value: 'loyer', label: 'Loyer', icon: '🏠' },
+  { value: 'salaires', label: 'Salaires', icon: '👥' },
+  { value: 'electricite_eau', label: 'Électricité / eau', icon: '💡' },
+  { value: 'gaz_charbon', label: 'Gaz / charbon', icon: '🔥' },
+  { value: 'entretien', label: 'Entretien / réparation', icon: '🔧' },
   { value: 'autre', label: 'Autre', icon: '💸' },
 ];
 

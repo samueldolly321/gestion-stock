@@ -186,6 +186,10 @@ Dans **Articles & Stocks → bouton « Nouvel ingrédient / article »** :
 > 0,05 kg/portion → 10 portions, même s'il reste beaucoup de riz).
 
 ### 5 bis.3 Au quotidien
+- [ ] **Achat ou dépense ?** Ce qui **entre en stock** (riz, poulet, Coca…) → **Achats** (le
+      coût compte quand c'est vendu). Ce qui **n'entre pas en stock** → **Dépenses** : catégories
+      **Loyer**, **Salaires**, **Électricité / eau**, **Gaz / charbon**, **Entretien / réparation**,
+      Transport… (elles diminuent directement le résultat dans Comptabilité).
 - [ ] **Caisse** : on vend les plats comme n'importe quel article ; la carte affiche les
       **portions possibles**. Si un ingrédient manque, **la vente passe quand même** (le
       service n'est jamais bloqué) et une alerte liste ce qui manquait → vérifiez le stock.

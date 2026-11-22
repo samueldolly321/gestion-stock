@@ -247,6 +247,12 @@ export type ExpenseCategory =
   | 'commission'
   | 'manutention'
   | 'carburant'
+  // Frais de fonctionnement (restaurants, boutiques…)
+  | 'loyer'
+  | 'salaires'
+  | 'electricite_eau'
+  | 'gaz_charbon'
+  | 'entretien'
   | 'autre';
 
 export interface Expense {

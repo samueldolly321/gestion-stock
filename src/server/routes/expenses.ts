@@ -7,7 +7,7 @@ import { generateId, writeAuditLog } from '../helpers.ts';
 
 export const expensesRouter = Router();
 
-const CATEGORIES = ['transport', 'douane', 'taxe', 'commission', 'manutention', 'carburant', 'autre'];
+const CATEGORIES = ['transport', 'douane', 'taxe', 'commission', 'manutention', 'carburant', 'loyer', 'salaires', 'electricite_eau', 'gaz_charbon', 'entretien', 'autre'];
 
 function pickFields(b: any) {
   return {
