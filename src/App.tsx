@@ -504,7 +504,7 @@ export default function App() {
 
   return (
     <CurrencyProvider>
-    <div className="h-dvh overflow-hidden bg-slate-100 dark:bg-slate-950 text-slate-900 dark:text-gray-100 flex flex-col transition-colors duration-150">
+    <div className="h-[calc(100dvh-var(--license-banner-h,0px))] overflow-hidden bg-slate-100 dark:bg-slate-950 text-slate-900 dark:text-gray-100 flex flex-col transition-colors duration-150">
       
       {/* Main ERP Frame Structure */}
       <div className="flex-1 flex flex-col md:flex-row min-h-0">

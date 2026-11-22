@@ -6,15 +6,16 @@
  * retirés du stock. Le coût de revient, la marge et le coût matière sont calculés en direct.
  */
 import React, { useMemo, useState } from 'react';
-import { ChefHat, Search, Trash2, ImagePlus, AlertTriangle } from 'lucide-react';
+import { ChefHat, Search, Trash2, ImagePlus, AlertTriangle, PackagePlus } from 'lucide-react';
 import type { Category, Product, ProductStock } from '../types';
 import { createProduct, updateProduct, declareDishLoss } from '../services/productsService';
+import { createMovement } from '../services/movementsService';
 import { generateId } from '../services/ids';
 import { generateEan13 } from '../services/barcode';
 import { showAlert, showConfirm } from '../services/dialog';
 import { showToast } from '../services/toast';
 import { fmtQty, parseDecimal } from '../services/pack';
-import { dishMargin, isDish, normalizeRecipe, normalizeOptions, normalizeSizes, portionsPossible, recipeCost, roundPrice } from '../services/recipes';
+import { dishMargin, isDish, normalizeRecipe, normalizeOptions, normalizeSizes, portionsPossible, recipeCost, roundPrice, entryUnits, toEntry, fromEntry, defaultEntryUnit } from '../services/recipes';
 
 const field =
   'w-full bg-white dark:bg-slate-950/20 p-2.5 text-xs rounded-lg border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500';
@@ -42,11 +43,19 @@ function shrinkImage(file: File): Promise<string> {
   });
 }
 
-interface Line { ingredientId: string; quantity: string }
+/** Ligne de recette : quantité saisie dans l'unité de saisie `unit` (g, cl… ou l'unité de stock). */
+interface Line { ingredientId: string; quantity: string; unit?: string }
+
+/** Unités proposées pour un nouvel ingrédient (unité de stock). */
+const INGREDIENT_UNITS = ['Kg', 'Litre', 'Pièces', 'Bouteilles', 'Sacs', 'Pots', 'Unités'];
 
 export default function DishForm({
-  dish, products, categories, productStock, format, onManageCategories, onClose, onSaved,
+  dish, products, categories, productStock, warehouses = [], format, onManageCategories, onClose, onSaved, onIngredientCreated,
 }: {
+  /** Entrepôts (stock initial d'un ingrédient créé depuis la recette) */
+  warehouses?: { id: string; name: string }[];
+  /** Un ingrédient vient d'être créé depuis la fiche : recharger la liste des articles */
+  onIngredientCreated?: () => void;
   /** Ouvre la gestion des catégories (parentId = catégorie parente présélectionnée) */
   onManageCategories?: (parentId?: string) => void;
   /** Plat à modifier, ou null pour un nouveau plat */
@@ -69,8 +78,15 @@ export default function DishForm({
   const [description, setDescription] = useState(dish?.description || '');
   const [image, setImage] = useState<string>(dish?.image || '');
   const [lines, setLines] = useState<Line[]>(
-    (dish?.recipe || []).map((l) => ({ ingredientId: l.ingredientId, quantity: String(l.quantity).replace('.', ',') })),
+    (dish?.recipe || []).map((l) => {
+      const e = toEntry(products.find((p) => p.id === l.ingredientId)?.unit, l.quantity);
+      return { ingredientId: l.ingredientId, quantity: e.value, unit: e.unit };
+    }),
   );
+  // Ingrédients créés depuis cette fiche (visibles avant le rechargement de la liste).
+  const [created, setCreated] = useState<Product[]>([]);
+  const [newIng, setNewIng] = useState<null | { name: string; unit: string; price: string; qty: string; warehouseId: string }>(null);
+  const [creatingIng, setCreatingIng] = useState(false);
   const [search, setSearch] = useState('');
   const [busy, setBusy] = useState(false);
   // Tailles de portion (« Petite », « Grande ») : prix propre + coefficient sur la recette.
@@ -78,12 +94,18 @@ export default function DishForm({
     (dish?.sizes || []).map((s) => ({ id: s.id, label: s.label, factor: String(s.factor).replace('.', ','), price: String(s.price) })),
   );
   // Suppléments proposés en caisse (« + œuf ») : libellé, ingrédient, quantité, prix.
-  const [optLines, setOptLines] = useState<{ id?: string; label: string; ingredientId: string; quantity: string; price: string }[]>(
-    (dish?.options || []).map((o) => ({ id: o.id, label: o.label, ingredientId: o.ingredientId, quantity: String(o.quantity).replace('.', ','), price: String(o.price) })),
+  const [optLines, setOptLines] = useState<{ id?: string; label: string; ingredientId: string; quantity: string; unit?: string; price: string }[]>(
+    (dish?.options || []).map((o) => {
+      const e = toEntry(products.find((p) => p.id === o.ingredientId)?.unit, o.quantity);
+      return { id: o.id, label: o.label, ingredientId: o.ingredientId, quantity: e.value, unit: e.unit, price: String(o.price) };
+    }),
   );
 
   // Ingrédients possibles : tous les articles stockés (pas les autres plats).
-  const ingredients = useMemo(() => products.filter((p) => !isDish(p)), [products]);
+  const ingredients = useMemo(
+    () => [...products.filter((p) => !isDish(p)), ...created.filter((c) => !products.some((p) => p.id === c.id))],
+    [products, created],
+  );
   const byId = useMemo(() => new Map(ingredients.map((p) => [p.id, p])), [ingredients]);
   const stockTotal = useMemo(() => {
     const m = new Map<string, number>();
@@ -100,7 +122,13 @@ export default function DishForm({
       .slice(0, 8);
   }, [search, ingredients, lines]);
 
-  const recipe = useMemo(() => normalizeRecipe(lines.map((l) => ({ ingredientId: l.ingredientId, quantity: l.quantity }))), [lines]);
+  // Quantité d'une ligne dans l'unité de stock de l'ingrédient (4 cl → 0,04 L ; 120 g → 0,12 kg).
+  const baseQty = (l: Line) => {
+    const v = parseDecimal(l.quantity);
+    return v > 0 ? fromEntry(byId.get(l.ingredientId)?.unit, v, l.unit) : 0;
+  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const recipe = useMemo(() => normalizeRecipe(lines.map((l) => ({ ingredientId: l.ingredientId, quantity: baseQty(l) }))), [lines, byId]);
   const cost = recipeCost(recipe, byId);
   const price = parseDecimal(salePrice) || 0;
   const { margin, costRatio } = dishMargin(price, cost);
@@ -108,8 +136,88 @@ export default function DishForm({
   const invalidLines = lines.filter((l) => !(parseDecimal(l.quantity) > 0));
 
   const addIngredient = (p: Product) => {
-    setLines((ls) => [...ls, { ingredientId: p.id, quantity: '' }]);
+    setLines((ls) => (ls.some((l) => l.ingredientId === p.id) ? ls : [...ls, { ingredientId: p.id, quantity: '', unit: defaultEntryUnit(p.unit) }]));
     setSearch('');
+  };
+
+  // Création rapide d'un ingrédient sans quitter la fiche du plat.
+  const exactMatch = ingredients.find((p) => p.name.trim().toLowerCase() === search.trim().toLowerCase());
+  const openNewIngredient = (nm = '') =>
+    setNewIng({ name: nm.trim(), unit: 'Kg', price: '', qty: '', warehouseId: warehouses[0]?.id || '' });
+  const saveNewIngredient = async () => {
+    if (!newIng) return;
+    const nm = newIng.name.trim();
+    if (!nm) return showAlert("Donnez un nom à l'ingrédient.", { variant: 'warning' });
+    const existing = ingredients.find((p) => p.name.trim().toLowerCase() === nm.toLowerCase());
+    if (existing) { addIngredient(existing); setNewIng(null); return; }
+    const buy = parseDecimal(newIng.price);
+    if (newIng.price.trim() === '' || !(buy >= 0)) return showAlert(`Indiquez le prix d'achat (par ${newIng.unit}).`, { variant: 'warning' });
+    const qty = newIng.qty.trim() === '' ? 0 : parseDecimal(newIng.qty);
+    if (!(qty >= 0)) return showAlert('Stock initial invalide.', { variant: 'warning' });
+    const cat = categories.find((c) => !c.parentId && /ingr[ée]dient/i.test(c.name));
+    const now = new Date().toISOString();
+    setCreatingIng(true);
+    try {
+      const p = await createProduct({
+        sku: 'ING-' + generateId().slice(0, 6).toUpperCase(),
+        barcode: generateEan13(products.map((x) => x.barcode)),
+        qrCode: '',
+        name: nm,
+        description: '',
+        categoryId: cat?.id || '',
+        categoryName: cat?.name || '',
+        subCategoryId: null,
+        subCategoryName: '',
+        brandId: '',
+        brandName: '',
+        purchasePrice: buy,
+        salePrice: Math.round(buy * 1.3),
+        vatRate: 0,
+        unit: newIng.unit,
+        packSize: 1,
+        packLabel: null,
+        packPurchasePrice: null,
+        packSalePrice: null,
+        minStock: 0,
+        maxStock: 0,
+        image: '',
+        expirationDate: null,
+        lotNumber: '',
+        supplierId: '',
+        supplierName: '',
+        locationId: newIng.warehouseId,
+        quantity: 0,
+        trackSerial: false,
+        warrantyMonths: 0,
+        status: 'out_of_stock',
+        createdAt: now,
+        updatedAt: now,
+      } as Omit<Product, 'id'>);
+      if (qty > 0) {
+        await createMovement({
+          type: 'entry_reception',
+          productId: p.id,
+          productName: p.name,
+          sku: p.sku,
+          warehouseId: newIng.warehouseId,
+          quantity: qty,
+          reason: "Quantité d'entrée initiale",
+          costPrice: buy,
+          costTotal: buy * qty,
+          referenceId: 'INITIAL',
+        } as any);
+      }
+      setCreated((c) => [...c, { ...p, quantity: qty }]);
+      setLines((ls) => [...ls, { ingredientId: p.id, quantity: '', unit: defaultEntryUnit(p.unit) }]);
+      setNewIng(null);
+      setSearch('');
+      onIngredientCreated?.();
+      showToast(`Ingrédient « ${p.name} » créé${qty > 0 ? ` (stock ${String(qty).replace('.', ',')} ${p.unit})` : ''}.`, { title: 'Ingrédients' });
+    } catch (err: any) {
+      showAlert(err?.message || "Erreur de création de l'ingrédient.", { variant: 'error' });
+    } finally {
+      setCreatingIng(false);
+    }
   };
 
   const pickImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -122,7 +230,7 @@ export default function DishForm({
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) return showAlert('Donnez un nom au plat.', { variant: 'warning' });
+    if (!name.trim()) return showAlert('Donnez un nom au plat ou à la boisson.', { variant: 'warning' });
     if (!(price > 0)) return showAlert('Indiquez le prix de vente du plat.', { variant: 'warning' });
     if (invalidLines.length) return showAlert('Indiquez la quantité de chaque ingrédient (par portion).', { variant: 'warning' });
     if (recipe.length === 0 && !(await showConfirm(
@@ -145,7 +253,7 @@ export default function DishForm({
     const data = {
       kind: 'dish' as const,
       recipe,
-      options: normalizeOptions(optLines.map((o) => ({ ...o, quantity: o.quantity, price: o.price }))),
+      options: normalizeOptions(optLines.map((o) => ({ ...o, quantity: fromEntry(byId.get(o.ingredientId)?.unit, parseDecimal(o.quantity), o.unit), price: o.price }))),
       sizes: normalizeSizes(sizeLines),
       name: name.trim(),
       sku: dish?.sku || 'PLAT-' + generateId().slice(0, 6).toUpperCase(),
@@ -189,7 +297,7 @@ export default function DishForm({
         <div className="bg-slate-50 dark:bg-slate-950/40 p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
           <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
             <ChefHat className="w-4 h-4 text-cyan-500" />
-            {dish ? 'Modifier le plat' : 'Nouveau plat'}
+            {dish ? 'Modifier le plat' : 'Nouveau plat ou boisson préparée'}
           </h3>
           <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-900 dark:hover:text-white text-sm" aria-label="Fermer">✕</button>
         </div>
@@ -199,8 +307,8 @@ export default function DishForm({
           <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="sm:col-span-2">
-                <label className="text-slate-400 block mb-1">Nom du plat *</label>
-                <input required value={name} onChange={(e) => setName(e.target.value)} className={field} placeholder="ex. Soupe Won Ton, Riz cantonais, Mine sao poulet" />
+                <label className="text-slate-400 block mb-1">Nom (plat ou boisson) *</label>
+                <input required value={name} onChange={(e) => setName(e.target.value)} className={field} placeholder="ex. Riz cantonais, Mine sao poulet, Mojito, Jus de mangue frais" />
               </div>
               <div>
                 <div className="flex justify-between items-center mb-1">
@@ -258,7 +366,7 @@ export default function DishForm({
           <div className="rounded-xl border border-slate-200 dark:border-slate-800">
             <div className="px-3.5 py-2.5 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/40">
               <p className="font-bold text-slate-900 dark:text-white">Recette — pour 1 portion</p>
-              <p className="text-[11px] text-slate-500 mt-0.5">À chaque vente, ces quantités sont retirées du stock. Saisissez-les dans l'unité de l'ingrédient (ex. 0,12 kg, 0,3 L).</p>
+              <p className="text-[11px] text-slate-500 mt-0.5">À chaque vente, ces quantités sont retirées du stock. Saisissez en g, kg, cl, ml ou L : la conversion vers l'unité de stock est automatique (ex. 4 cl de rhum, 120 g de riz).</p>
             </div>
 
             <div className="p-3.5 space-y-2">
@@ -266,8 +374,11 @@ export default function DishForm({
               {lines.map((l, i) => {
                 const ing = byId.get(l.ingredientId);
                 const qty = parseDecimal(l.quantity);
-                const lineCost = ing && qty > 0 ? qty * ing.purchasePrice : 0;
+                const base = baseQty(l);
+                const lineCost = ing && base > 0 ? base * ing.purchasePrice : 0;
                 const bad = l.quantity !== '' && !(qty > 0);
+                const units = entryUnits(ing?.unit);
+                const converted = ing && base > 0 && (l.unit || ing.unit) !== ing.unit;
                 return (
                   <div key={l.ingredientId} className="flex items-center gap-2" data-testid="recipe-line">
                     <div className="flex-1 min-w-0">
@@ -284,10 +395,24 @@ export default function DishForm({
                         autoFocus={i === lines.length - 1 && l.quantity === ''}
                         onChange={(e) => setLines((ls) => ls.map((x, j) => (j === i ? { ...x, quantity: e.target.value } : x)))}
                         className={`${field} w-24 text-right font-mono ${bad ? 'border-red-500' : ''}`}
-                        placeholder="0,000"
+                        placeholder={l.unit === 'g' ? '120' : l.unit === 'cl' ? '4' : l.unit === 'ml' ? '30' : '0,000'}
                       />
-                      <span className="w-14 text-slate-500 truncate">{ing?.unit}</span>
+                      {units.length > 1 ? (
+                        <select
+                          value={l.unit || ing?.unit}
+                          onChange={(e) => setLines((ls) => ls.map((x, j) => (j === i ? { ...x, unit: e.target.value } : x)))}
+                          className={`${field} w-20 px-1.5`}
+                          aria-label={`Unité de saisie de ${ing?.name || 'ingrédient'}`}
+                        >
+                          {units.map((u) => <option key={u.label} value={u.label}>{u.label}</option>)}
+                        </select>
+                      ) : (
+                        <span className="w-20 text-slate-500 truncate">{ing?.unit}</span>
+                      )}
                     </div>
+                    <span className="w-20 text-right text-[10px] text-slate-400 font-mono" data-testid="recipe-line-base">
+                      {converted ? `= ${fmtQty(base)} ${ing!.unit}` : ''}
+                    </span>
                     <span className="w-24 text-right font-mono text-slate-600 dark:text-slate-300">{format(lineCost)}</span>
                     <button type="button" onClick={() => setLines((ls) => ls.filter((_, j) => j !== i))} className="p-1.5 text-slate-400 hover:text-red-500" aria-label={`Retirer ${ing?.name || "l'ingrédient"}`}>
                       <Trash2 className="w-3.5 h-3.5" />
@@ -315,10 +440,69 @@ export default function DishForm({
                     ))}
                   </div>
                 )}
-                {search.trim() && suggestions.length === 0 && (
-                  <p className="mt-1 text-[11px] text-slate-400">Aucun article ne correspond. Créez d'abord l'ingrédient comme un article normal (avec son stock et son prix d'achat).</p>
+                {search.trim() && !exactMatch && !newIng && (
+                  <button
+                    type="button"
+                    onClick={() => openNewIngredient(search)}
+                    className="mt-1.5 text-[11px] font-semibold text-cyan-600 dark:text-cyan-400 hover:underline flex items-center gap-1"
+                    data-testid="create-ingredient-from-search"
+                  >
+                    <PackagePlus className="w-3.5 h-3.5" />
+                    {suggestions.length === 0 ? `Aucun ingrédient « ${search.trim()} » : le créer maintenant` : `Créer l'ingrédient « ${search.trim()} »`}
+                  </button>
                 )}
               </div>
+
+              {!newIng && !search.trim() && (
+                <button type="button" onClick={() => openNewIngredient()} className="text-[11px] text-cyan-600 dark:text-cyan-400 hover:underline flex items-center gap-1">
+                  <PackagePlus className="w-3.5 h-3.5" /> Nouvel ingrédient (pas encore dans la liste)
+                </button>
+              )}
+
+              {newIng && (
+                <div className="rounded-lg border border-cyan-500/40 bg-cyan-500/5 p-3 space-y-2" data-testid="new-ingredient-form">
+                  <p className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                    <PackagePlus className="w-3.5 h-3.5 text-cyan-500" /> Nouvel ingrédient
+                  </p>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <div className="col-span-2">
+                      <label className="text-slate-400 block mb-1">Nom *</label>
+                      <input autoFocus value={newIng.name} onChange={(e) => setNewIng({ ...newIng, name: e.target.value })} className={field} placeholder="Rhum blanc, citron vert…" aria-label="Nom du nouvel ingrédient" />
+                    </div>
+                    <div>
+                      <label className="text-slate-400 block mb-1">Unité de stock *</label>
+                      <select value={newIng.unit} onChange={(e) => setNewIng({ ...newIng, unit: e.target.value })} className={field} aria-label="Unité du nouvel ingrédient">
+                        {INGREDIENT_UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-slate-400 block mb-1">Prix d'achat / {newIng.unit} *</label>
+                      <input inputMode="decimal" value={newIng.price} onChange={(e) => setNewIng({ ...newIng, price: e.target.value })} className={`${field} font-mono text-right`} placeholder="0" aria-label="Prix d'achat du nouvel ingrédient" />
+                    </div>
+                    <div>
+                      <label className="text-slate-400 block mb-1">Stock actuel ({newIng.unit})</label>
+                      <input inputMode="decimal" value={newIng.qty} onChange={(e) => setNewIng({ ...newIng, qty: e.target.value })} className={`${field} font-mono text-right`} placeholder="0" aria-label="Stock initial du nouvel ingrédient" />
+                    </div>
+                    {warehouses.length > 1 && (
+                      <div className="col-span-2 sm:col-span-1">
+                        <label className="text-slate-400 block mb-1">Entrepôt</label>
+                        <select value={newIng.warehouseId} onChange={(e) => setNewIng({ ...newIng, warehouseId: e.target.value })} className={field} aria-label="Entrepôt du nouvel ingrédient">
+                          {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+                        </select>
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-slate-500">
+                    Astuce : stockez les liquides en <b>Litre</b> et le reste en <b>Kg</b> : dans la recette vous pourrez saisir en cl, ml ou g.
+                  </p>
+                  <div className="flex justify-end gap-2">
+                    <button type="button" onClick={() => setNewIng(null)} className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300">Annuler</button>
+                    <button type="button" disabled={creatingIng} onClick={saveNewIngredient} className="px-3 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-bold disabled:opacity-50">
+                      {creatingIng ? 'Création…' : "Créer et ajouter à la recette"}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -408,7 +592,9 @@ export default function DishForm({
                 </div>
                 {optLines.map((o, i) => {
                   const ing = byId.get(o.ingredientId);
-                  const oCost = ing && parseDecimal(o.quantity) > 0 ? parseDecimal(o.quantity) * ing.purchasePrice : 0;
+                  const oBase = parseDecimal(o.quantity) > 0 ? fromEntry(ing?.unit, parseDecimal(o.quantity), o.unit) : 0;
+                  const oCost = ing && oBase > 0 ? oBase * ing.purchasePrice : 0;
+                  const oUnits = entryUnits(ing?.unit);
                   const oPrice = parseDecimal(o.price) || 0;
                   const set = (patch: Partial<typeof o>) => setOptLines((ls) => ls.map((x, j) => (j === i ? { ...x, ...patch } : x)));
                   return (
@@ -419,7 +605,7 @@ export default function DishForm({
                           value={o.ingredientId}
                           onChange={(e) => {
                             const picked = byId.get(e.target.value);
-                            set({ ingredientId: e.target.value, label: o.label || (picked ? `+ ${picked.name}` : '') });
+                            set({ ingredientId: e.target.value, unit: defaultEntryUnit(picked?.unit), label: o.label || (picked ? `+ ${picked.name}` : '') });
                           }}
                           className={field}
                           aria-label="Ingrédient du supplément"
@@ -429,7 +615,13 @@ export default function DishForm({
                         </select>
                         <div className="flex items-center gap-1">
                           <input inputMode="decimal" value={o.quantity} onChange={(e) => set({ quantity: e.target.value })} className={`${field} text-right font-mono`} placeholder="1" aria-label="Quantité du supplément" />
-                          <span className="text-[10px] text-slate-400 w-8 truncate">{ing?.unit}</span>
+                          {oUnits.length > 1 ? (
+                            <select value={o.unit || ing?.unit} onChange={(e) => set({ unit: e.target.value })} className={`${field} w-14 px-1 text-[10px]`} aria-label="Unité du supplément">
+                              {oUnits.map((u) => <option key={u.label} value={u.label}>{u.label}</option>)}
+                            </select>
+                          ) : (
+                            <span className="text-[10px] text-slate-400 w-8 truncate">{ing?.unit}</span>
+                          )}
                         </div>
                         <input inputMode="decimal" value={o.price} onChange={(e) => set({ price: e.target.value })} className={`${field} text-right font-mono`} placeholder="1500" aria-label="Prix du supplément" />
                         <button type="button" onClick={() => setOptLines((ls) => ls.filter((_, j) => j !== i))} className="p-1.5 text-slate-400 hover:text-red-500" aria-label="Supprimer le supplément">

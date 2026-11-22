@@ -33,6 +33,35 @@ export function normalizeOptions(raw: unknown): DishOption[] {
   return out;
 }
 
+/**
+ * Unités de saisie d'une recette : on peut taper 4 cl ou 120 g, la quantité est convertie dans
+ * l'unité de stock de l'ingrédient (Litre, Kg). La première entrée est l'unité de stock (×1).
+ */
+export interface EntryUnit { label: string; factor: number }
+const isLitre = (u: string) => /^(l|litres?)$/i.test(u.trim());
+const isKilo = (u: string) => /^(kg|kilos?|kilogrammes?)$/i.test(u.trim());
+export function entryUnits(stockUnit: string | undefined): EntryUnit[] {
+  const u = stockUnit || '';
+  if (isLitre(u)) return [{ label: 'cl', factor: 0.01 }, { label: 'ml', factor: 0.001 }, { label: u, factor: 1 }];
+  if (isKilo(u)) return [{ label: 'g', factor: 0.001 }, { label: u, factor: 1 }];
+  return [{ label: u, factor: 1 }];
+}
+const r3 = (n: number) => Math.round(n * 1000) / 1000;
+/** Quantité en unité de stock → { valeur affichée, unité de saisie } (petites quantités en cl / g). */
+export function toEntry(stockUnit: string | undefined, qty: number): { value: string; unit: string } {
+  const units = entryUnits(stockUnit);
+  const small = units.find((x) => x.factor < 1 && x.label !== 'ml');
+  const pick = small && qty > 0 && qty < 1 ? small : units.find((x) => x.factor === 1)!;
+  return { value: String(r3(qty / pick.factor)).replace('.', ','), unit: pick.label };
+}
+/** Valeur saisie dans une unité de saisie → quantité en unité de stock. */
+export function fromEntry(stockUnit: string | undefined, value: number, unit: string | undefined): number {
+  const f = entryUnits(stockUnit).find((x) => x.label === unit)?.factor ?? 1;
+  return Math.round(value * f * 100000) / 100000;
+}
+/** Unité de saisie proposée par défaut pour une nouvelle ligne (cl pour un litre, g pour un kilo). */
+export const defaultEntryUnit = (stockUnit: string | undefined) => entryUnits(stockUnit)[0].label;
+
 export const MAX_DISH_SIZES = 6;
 
 /**

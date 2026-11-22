@@ -966,7 +966,7 @@ export default function Products({
               className="px-3.5 py-1.5 bg-cyan-500 hover:bg-cyan-600 text-white text-xs font-semibold rounded-lg cursor-pointer flex items-center gap-1.5 transition duration-150"
             >
               <Plus className="w-4 h-4 shrink-0" />
-              Nouveau Produit
+              {features.recipes ? 'Nouvel ingrédient / article' : 'Nouveau Produit'}
             </button>
           )}
           {(features.serials || products.some((p) => p.trackSerial)) && (
@@ -992,11 +992,11 @@ export default function Products({
           {canWrite && (features.recipes || products.some(isDish)) && (
             <button
               onClick={() => setDishForm({ dish: null })}
-              title="Restauration : un plat composé d'ingrédients — chaque vente retire les ingrédients du stock"
+              title="Restauration : un plat, un cocktail ou un jus frais composé d'ingrédients — chaque vente retire les ingrédients du stock"
               className="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 text-white text-xs font-semibold rounded-lg cursor-pointer flex items-center gap-1.5 transition duration-150"
             >
               <ChefHat className="w-4 h-4 shrink-0 text-cyan-400" />
-              Nouveau plat (recette)
+              Nouveau plat / boisson
             </button>
           )}
         </div>
@@ -2070,6 +2070,8 @@ export default function Products({
           products={products}
           categories={categories}
           productStock={productStock}
+          warehouses={warehouses}
+          onIngredientCreated={onRefresh}
           format={format}
           onManageCategories={openCategoryManager}
           onClose={() => setDishForm(null)}

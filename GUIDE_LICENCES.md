@@ -6,7 +6,7 @@ d'Internet pour activer.
 
 | | |
 |---|---|
-| **Essai** | 7 jours sans clé, avec un bandeau « jours restants » |
+| **Essai** | 7 jours sans clé, toutes fonctions ; bandeau toujours visible en haut (orange, rouge les 2 derniers jours) |
 | **Après l'essai** | écran d'activation ; les données du client sont **conservées** |
 | **Licence** | **à vie**, pour **un ordinateur** (le PC principal) |
 | **Réseau local** | les caisses en navigateur passent par le PC principal → **une seule licence** par magasin |
@@ -68,7 +68,7 @@ Dans le même dossier, `registre-licences.csv` garde la trace de chaque licence 
 ## 2. Vendre une licence, pas à pas
 
 1. Le client installe le `.exe` sur son **PC principal** et l'utilise (essai de 7 jours).
-2. Il clique sur **« Activer une licence »** (bandeau orange) — ou attend la fin de l'essai —
+2. Il clique sur **« Activer une licence »** (bandeau en haut de l’écran, orange puis rouge les 2 derniers jours) — ou attend la fin de l'essai —
    et vous envoie le **code machine** affiché, par ex. `1A2B-3C4D-5E6F-7A8B`
    (bouton « Copier » ; par SMS, WhatsApp, e-mail…).
 3. Après paiement, sur **votre** PC, double-cliquez sur **`generer-licence.cmd`** (à la

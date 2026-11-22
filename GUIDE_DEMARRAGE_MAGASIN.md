@@ -153,17 +153,26 @@ lui, il a une **recette**. Chaque fois qu'on vend un plat, ses ingrédients sort
 ```
 
 ### 5 bis.1 Créer les ingrédients (articles normaux)
-Dans **Articles & Stocks → onglet « Ingrédients & articles » → Nouveau Produit** :
-- [ ] Un article par ingrédient : **unité** adaptée (**Kg**, **g**, **Litre**, **Pièces**…),
-      **prix d'achat** (il sert au calcul du coût des plats), **stock de départ**.
-- [ ] Les boissons et produits revendus tels quels (Coca, eau, barquettes) se créent de la
-      même façon : ils se vendent directement en caisse.
+Dans **Articles & Stocks → bouton « Nouvel ingrédient / article »** :
+- [ ] Un article par ingrédient : **unité de stock** (conseillé : **Kg** pour le solide,
+      **Litre** pour le liquide, **Pièces** pour œufs, feuilles…), **prix d'achat** (il sert au
+      calcul du coût des plats), **stock de départ**.
+- [ ] **Plus rapide** : un ingrédient oublié peut se créer **directement depuis la recette** d'un
+      plat (tapez son nom → « le créer maintenant » → unité, prix d'achat, stock → il est ajouté
+      à la recette).
+- [ ] Les boissons et produits revendus tels quels (Coca, eau, bière, barquettes) se créent
+      comme des articles : ils se vendent directement en caisse.
 
-### 5 bis.2 Créer les plats
-**Articles & Stocks → onglet « Plats » → Nouveau plat (recette)** :
+### 5 bis.2 Créer les plats… et les boissons préparées
+**Articles & Stocks → Nouveau plat / boisson** :
 - [ ] Nom, catégorie, **prix de vente d'une portion**, photo.
-- [ ] **Recette pour 1 portion** : cherchez chaque ingrédient et saisissez la quantité
-      **dans son unité** (ex. riz `0,15` kg, huile `0,02` L, œuf `1` pièce).
+- [ ] **Recette pour 1 portion** : cherchez chaque ingrédient et saisissez la quantité en
+      **g, kg, cl, ml ou L** — la conversion vers l'unité de stock est automatique
+      (ex. riz `150 g`, huile `2 cl`, rhum `4 cl`, œuf `1` pièce).
+- [ ] **Cocktails, jus frais, rhum arrangé au verre** : ce sont des « plats » avec une recette
+      (ex. Mojito : rhum 4 cl, citron vert 50 g, menthe 10 g, sucre 20 g, eau gazeuse 10 cl,
+      glaçons 150 g). Rangez-les dans **Boissons › Cocktails et jus**. Supplément « + rhum 2 cl »
+      et tailles « Verre / Grand verre » possibles, comme pour les plats.
 - [ ] Vérifiez le résumé, calculé en direct : **coût de revient**, **marge**, **coût matière %**
       (on vise souvent **25 à 35 %** ; orange au-delà de 40 %) et **portions possibles**.
 

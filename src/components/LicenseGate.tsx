@@ -3,7 +3,7 @@
  * et bandeau « Version d'essai : N jours restants ». Sans effet hors .exe (required = false).
  * Tous les postes du réseau passent par le serveur du PC principal : c'est sa licence qui compte.
  */
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { KeyRound, Copy, Check, Loader2, ShieldCheck } from 'lucide-react';
 
 interface Status {
@@ -46,6 +46,21 @@ export default function LicenseGate({ children }: { children: React.ReactNode })
     return () => { window.removeEventListener(LICENSE_EVENT, onBlocked); clearInterval(t); };
   }, [refresh]);
 
+  // Hauteur du bandeau d'essai réservée à l'application (variable CSS lue par App.tsx),
+  // pour que le bandeau reste visible en haut sans couper le bas de l'écran.
+  const bannerRef = useRef<HTMLDivElement>(null);
+  const inTrial = status?.required && status.state === 'trial';
+  useLayoutEffect(() => {
+    const root = document.documentElement;
+    const el = bannerRef.current;
+    if (!inTrial || !el) { root.style.setProperty('--license-banner-h', '0px'); return; }
+    const apply = () => root.style.setProperty('--license-banner-h', `${el.offsetHeight}px`);
+    apply();
+    const ro = new ResizeObserver(apply);
+    ro.observe(el);
+    return () => { ro.disconnect(); root.style.setProperty('--license-banner-h', '0px'); };
+  }, [inTrial, status?.trialDaysLeft]);
+
   if (!loaded) return null;
   // Version web / dev, ou serveur injoignable : l'application gère elle-même ses erreurs.
   if (!status || !status.required) return <>{children}</>;
@@ -53,14 +68,28 @@ export default function LicenseGate({ children }: { children: React.ReactNode })
   const blocked = status.state === 'expired' || status.state === 'clock';
   if (blocked) return <ActivationScreen status={status} onActivated={setStatus} />;
 
+  const left = status.trialDaysLeft ?? 0;
+  const urgent = left <= 2;
+
   return (
     <>
       {status.state === 'trial' && (
-        <div className="bg-amber-500 text-slate-950 text-xs font-semibold px-4 py-1.5 flex items-center justify-center gap-3 flex-wrap">
+        <div
+          ref={bannerRef}
+          role="status"
+          data-testid="trial-banner"
+          className={`sticky top-0 z-[60] text-xs font-semibold px-4 py-1.5 flex items-center justify-center gap-3 flex-wrap shadow ${urgent ? 'bg-red-600 text-white' : 'bg-amber-500 text-slate-950'}`}
+        >
           <span>
-            Version d'essai : {status.trialDaysLeft} jour{(status.trialDaysLeft ?? 0) > 1 ? 's' : ''} restant{(status.trialDaysLeft ?? 0) > 1 ? 's' : ''} sur {status.trialDays}.
+            {left <= 1
+              ? "Version d'essai : dernier jour !"
+              : `Version d'essai : ${left} jours restants sur ${status.trialDays}.`}
+            {' '}
+            <span className="font-normal">
+              {urgent ? "Sans licence, l'application sera bloquée à la fin de l'essai (vos données sont conservées)." : 'Toutes les fonctions sont disponibles pendant l’essai.'}
+            </span>
           </span>
-          <button type="button" onClick={() => setShowActivate(true)} className="px-2.5 py-0.5 rounded-md bg-slate-950 text-white hover:bg-slate-800">
+          <button type="button" onClick={() => setShowActivate(true)} className={`px-2.5 py-0.5 rounded-md ${urgent ? 'bg-white text-red-700 hover:bg-red-50' : 'bg-slate-950 text-white hover:bg-slate-800'}`}>
             Activer une licence
           </button>
         </div>
