@@ -85,6 +85,27 @@ html:not(.dark) .bg-slate-900 .text-slate-500 { color: #94a3b8; } /* garde un gr
     margin: 0 !important;
     padding: 10px !important;
   }
+  /* Ticket / facture ouvert : on n'imprime QUE lui (l'application est masquée) et il s'écoule
+     sur plusieurs pages si besoin (plus de fenêtre fixe qui couperait au bas de la 1re page). */
+  body.receipt-open #root {
+    display: none !important;
+  }
+  body.receipt-open .receipt-overlay {
+    position: static !important;
+    display: block !important;
+    overflow: visible !important;
+    height: auto !important;
+    padding: 0 !important;
+    background: none !important;
+    backdrop-filter: none !important;
+  }
+  body.receipt-open .receipt-overlay .print-card {
+    max-width: none !important;
+    border-radius: 0 !important;
+    overflow: visible !important;
+    animation: none !important;
+    transform: none !important;
+  }
   /* Format A4 : le ticket occupe toute la largeur de la page. */
   .print-a4-card {
     max-width: 100% !important;

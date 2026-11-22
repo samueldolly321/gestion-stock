@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Printer, FileText, Receipt, ChefHat, Wine } from 'lucide-react';
 import { Sale, CompanyInfo, Client, Product } from '../types';
 import { stationOf } from '../services/recipes';
@@ -68,7 +69,7 @@ export default function ReceiptModal({ sale, company, client, products, onClose 
         </div>
         <div className="border-t border-dashed border-slate-400 pt-2 space-y-2.5">
           {stLines.map((it: any, i: number) => (
-            <div key={i}>
+            <div key={i} className="break-inside-avoid">
               <p className="text-lg font-black leading-tight">
                 <span className="font-mono">{Number(it.quantity) || 0} ×</span> {String(it.productName || '').toUpperCase()}
                 {it.size?.label && <span className="ml-1.5 px-1.5 border-2 border-slate-950 rounded" data-testid="kitchen-size">{String(it.size.label).toUpperCase()}</span>}
@@ -91,11 +92,19 @@ export default function ReceiptModal({ sale, company, client, products, onClose 
     );
   };
 
-  return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+  // Affichée PAR-DESSUS l'application (portail dans <body>) : à l'écran la fenêtre défile si la
+  // facture est longue ; à l'impression l'application est masquée et la facture s'étale sur
+  // plusieurs pages si besoin (au lieu d'être coupée).
+  useEffect(() => {
+    document.body.classList.add('receipt-open');
+    return () => document.body.classList.remove('receipt-open');
+  }, []);
+
+  return createPortal(
+    <div className="receipt-overlay fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-start justify-center p-4 overflow-y-auto" data-testid="receipt-overlay">
       {/* Taille de page dynamique selon le format choisi (ticket / bon de cuisine 80mm, ou A4) */}
       <style>{`@media print { @page { size: ${printFormat === 'a4' ? 'A4' : '80mm auto'}; margin: ${printFormat === 'a4' ? '15mm' : '4mm'}; } }`}</style>
-      <div className={`bg-white text-slate-950 rounded-2xl w-full ${printFormat === 'a4' ? 'max-w-md print-a4-card' : 'max-w-sm'} overflow-hidden shadow-2xl p-6 space-y-4 print-card animate-scale-up`}>
+      <div className={`my-auto bg-white text-slate-950 rounded-2xl w-full ${printFormat === 'a4' ? 'max-w-md print-a4-card' : 'max-w-sm'} overflow-hidden shadow-2xl p-6 space-y-4 print-card animate-scale-up`}>
         {printFormat === 'kitchen' || printFormat === 'bar' ? renderStation(printFormat) : (<>
 
         <div className="text-center space-y-1">
@@ -138,7 +147,7 @@ export default function ReceiptModal({ sale, company, client, products, onClose 
         {/* Lignes d'articles */}
         <div className="space-y-1.5 text-[11px]">
           {sale.items.map((item, idx) => (
-            <div key={`${item.productId}-${idx}`} className="flex justify-between items-start">
+            <div key={`${item.productId}-${idx}`} className="flex justify-between items-start break-inside-avoid">
               <div>
                 <span>{item.productName}{(item as any).size?.label ? ` (${(item as any).size.label})` : ''}</span>
                 {Array.isArray((item as any).options) && (item as any).options.length > 0 && (
@@ -286,6 +295,7 @@ export default function ReceiptModal({ sale, company, client, products, onClose 
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
