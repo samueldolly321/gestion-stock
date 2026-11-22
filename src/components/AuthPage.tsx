@@ -117,7 +117,9 @@ export default function AuthPage({ onLoginSuccess }: AuthPageProps) {
             <h1 className="text-xl font-bold tracking-tight bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent">
               Vokatra<span className="text-cyan-400 font-medium">-ko</span>
             </h1>
-            <p className="text-[10px] text-gray-400 font-mono tracking-widest uppercase">v2.5 Enterprise</p>
+            <p className="text-[10px] text-gray-400 font-mono tracking-widest uppercase" data-testid="app-version">
+              Version {typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : ''}
+            </p>
           </div>
         </div>
 
@@ -361,13 +363,15 @@ export default function AuthPage({ onLoginSuccess }: AuthPageProps) {
             </span>
           </div>
 
-          {/* Security disclaimer */}
-          <div className="p-3.5 bg-cyan-950/20 border border-cyan-500/20 rounded-xl flex items-start gap-2.5 text-[11px] text-cyan-300/80">
-            <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5" />
-            <span>
-              <strong>Note :</strong> assurez-vous que l'API (<code>npm run server</code>) est démarrée sur le port 3001.
-            </span>
-          </div>
+          {/* Aide au développeur : uniquement en mode développement (jamais dans le .exe ni en ligne). */}
+          {import.meta.env.DEV && (
+            <div className="p-3.5 bg-cyan-950/20 border border-cyan-500/20 rounded-xl flex items-start gap-2.5 text-[11px] text-cyan-300/80" data-testid="dev-note">
+              <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>
+                <strong>Note :</strong> assurez-vous que l'API (<code>npm run server</code>) est démarrée sur le port 3001.
+              </span>
+            </div>
+          )}
 
         </div>
       </div>
