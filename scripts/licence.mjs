@@ -27,6 +27,10 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const VAULT = process.env.VOKATRA_LICENCE_DIR || path.join(os.homedir(), '.vokatra-ko-licences');
 const PRIV = path.join(VAULT, 'cle-privee.pem');
 const PUB_TS = path.join(ROOT, 'src', 'server', 'license-public-key.ts');
+// Copie hors projet (release\outil-licence, déposée par scripts/copy-licence-tool.mjs) :
+// la clé publique est alors lue dans cle-publique.pem, à côté du script.
+const PUB_PEM = path.join(path.dirname(fileURLToPath(import.meta.url)), 'cle-publique.pem');
+const inProject = fs.existsSync(PUB_TS);
 const REGISTRY = path.join(VAULT, 'registre-licences.csv');
 
 const die = (msg) => { console.error(`\n✖ ${msg}\n`); process.exit(1); };
@@ -34,6 +38,7 @@ const normCode = (s) => String(s || '').toUpperCase().replace(/[^0-9A-F]/g, '');
 const fmtCode = (s) => normCode(s).match(/.{4}/g)?.join('-') ?? '';
 
 function init() {
+  if (!inProject) die('« init » se lance uniquement depuis le projet (scripts\\licence.mjs), pas depuis la copie du dossier release.');
   if (fs.existsSync(PRIV)) {
     die(`Une clé privée existe déjà : ${PRIV}\nLa remplacer rendrait INVALIDES toutes les licences déjà vendues. Opération annulée.`);
   }
@@ -76,7 +81,7 @@ function verifier(key, machine) {
   const parts = String(key || '').trim().split('.');
   if (parts.length !== 3 || parts[0] !== 'VK1') die('Clé illisible.');
   const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
-  const pubSrc = fs.readFileSync(PUB_TS, 'utf8').match(/`([^`]+)`/)?.[1];
+  const pubSrc = inProject ? fs.readFileSync(PUB_TS, 'utf8').match(/`(-----BEGIN PUBLIC KEY-----[^`]+)`/)?.[1] : fs.readFileSync(PUB_PEM, 'utf8');
   const ok = crypto.verify(null, Buffer.from(`VK1.${parts[1]}`), crypto.createPublicKey(pubSrc), Buffer.from(parts[2], 'base64url'));
   console.log(`\nClient : ${payload.c}\nDate : ${payload.d}\nOrdinateur : ${payload.m}\nSignature : ${ok ? 'valide ✔' : 'INVALIDE ✖'}`);
   if (machine) console.log(`Pour ${fmtCode(machine)} : ${normCode(machine) === normCode(payload.m) ? 'oui ✔' : 'non ✖ (autre ordinateur)'}`);

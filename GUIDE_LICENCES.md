@@ -23,13 +23,16 @@ Après `npm run desktop:build`, le dossier `release\` contient :
 |---|---|
 | `release\Vokatra-ko Setup X.Y.Z.exe` | **L'installateur** : c'est lui qu'on donne aux clients (raccourcis, désinstallation propre). |
 | `release\win-unpacked\Vokatra-ko.exe` | L'application **déjà décompressée** : se lance directement, sans installation. Pratique pour tester. Si on le déplace, copier **tout** le dossier `win-unpacked` (le `.exe` seul ne marche pas). |
+| `release\Generer une licence.cmd` (+ `outil-licence\`) | **Votre** générateur de clés (double-clic). À garder pour vous : **ne pas le donner aux clients** (sans votre clé privée il ne peut rien créer, mais il n'a rien à faire chez eux). |
 
 Les autres fichiers (`.blockmap`, `latest.yml`, `builder-debug.yml`) ne sont pas à distribuer.
 
 ### Ce qu'il faut sur votre PC pour générer des clés
 
 - **Node.js** installé (déjà le cas si vous compilez le projet).
-- Le **dossier du projet** (pour `generer-licence.cmd` et `scripts\licence.mjs`).
+- Le **dossier du projet** (pour `generer-licence.cmd` et `scripts\licence.mjs`), **ou** simplement le
+  dossier **`release\`** : chaque `npm run desktop:build` y dépose aussi **`Generer une licence.cmd`**
+  (+ `outil-licence\`), à côté de `Vokatra-ko Setup x.y.z.exe`. Pour le refaire seul : `npm run licence:tool`.
 - Votre **clé privée** dans `C:\Users\<vous>\.vokatra-ko-licences\cle-privee.pem`.
   Pour générer des clés depuis un **autre PC**, copiez-y ce fichier au même endroit
   (avec `registre-licences.csv` si vous voulez garder un seul registre).
@@ -72,7 +75,7 @@ Dans le même dossier, `registre-licences.csv` garde la trace de chaque licence 
    et vous envoie le **code machine** affiché, par ex. `1A2B-3C4D-5E6F-7A8B`
    (bouton « Copier » ; par SMS, WhatsApp, e-mail…).
 3. Après paiement, sur **votre** PC, double-cliquez sur **`generer-licence.cmd`** (à la
-   racine du projet), saisissez le code machine et le nom du client.
+   racine du projet) ou sur **`release\Generer une licence.cmd`**, saisissez le code machine et le nom du client.
    *(En ligne de commande : `node scripts/licence.mjs generer 1A2B-3C4D-5E6F-7A8B "Épicerie Rasoa"`)*
 4. Envoyez au client la clé affichée (elle commence par `VK1.` — environ 180 caractères,
    à copier **en entier**).
@@ -127,4 +130,6 @@ retirer le contrôle. Ce que la protection garantit :
 - Activée **uniquement** dans le `.exe` (`LICENSE_REQUIRED=1` posé par `electron/main.cjs`) :
   la version web (Render) et `npm run dev` ne sont pas concernées.
 - Outil vendeur : `scripts/licence.mjs` + `generer-licence.cmd` — **exclus de l'installateur**.
+  Copie dans `release\` par `scripts/copy-licence-tool.mjs` (clé publique lue dans
+  `outil-licence\cle-publique.pem` ; `init` y est refusé). La clé privée n'est jamais copiée.
 - Clé publique : `src/server/license-public-key.ts` (peut être publiée sans risque).

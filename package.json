@@ -24,7 +24,8 @@
     "db:push": "drizzle-kit push --config=src/db/drizzle.config.ts",
     "db:migrate": "drizzle-kit migrate --config=src/db/drizzle.config.ts",
     "desktop": "npm run build && npm run build:server && electron .",
-    "desktop:build": "npm run build && npm run build:server && electron-builder --win"
+    "desktop:build": "npm run build && npm run build:server && electron-builder --win && npm run licence:tool",
+    "licence:tool": "node scripts/copy-licence-tool.mjs"
   },
   "build": {
     "appId": "mg.vokatra.autonome",
