@@ -82,7 +82,7 @@ export default function Reorder({ products, suppliers, purchases, user, onRefres
       ? `\n\n⚠️ ${alreadyOrdered} de ces article(s) figurent déjà dans une commande en cours — vous risquez de commander en double.`
       : '';
     if (!(await showConfirm(
-      `Créer une commande d'achat pour « ${group.supplierName} » — ${items.length} article(s), ${format(totalHt)} HT ?${warn}`,
+      `Créer une commande d'achat pour « ${group.supplierName} » — ${items.length} article(s), ${format(totalHt)} TTC ?${warn}`,
       { title: 'Commande de réappro', variant: alreadyOrdered > 0 ? 'warning' : 'info', confirmText: 'Créer la commande' },
     ))) return;
     try {
@@ -112,7 +112,7 @@ export default function Reorder({ products, suppliers, purchases, user, onRefres
             <span className="text-sm font-bold font-mono text-amber-500">{lowStock.length} article(s)</span>
           </div>
           <div className="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 text-right">
-            <span className="text-[9px] uppercase font-mono text-slate-400 block">Valeur estimée (HT)</span>
+            <span className="text-[9px] uppercase font-mono text-slate-400 block">Valeur estimée (TTC)</span>
             <span className="text-sm font-bold font-mono text-slate-900 dark:text-white">{format(estimatedValue)}</span>
           </div>
           {canWrite && (
@@ -168,7 +168,7 @@ export default function Reorder({ products, suppliers, purchases, user, onRefres
                     <th className="py-2.5 px-4 text-center">Statut</th>
                     <th className="py-2.5 px-4 text-center">Qté à commander</th>
                     <th className="py-2.5 px-4 text-right hidden sm:table-cell">Coût unit.</th>
-                    <th className="py-2.5 px-4 text-right">Total HT</th>
+                    <th className="py-2.5 px-4 text-right">Total TTC</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200 dark:divide-slate-800/60 text-slate-600 dark:text-gray-300">

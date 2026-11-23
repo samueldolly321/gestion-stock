@@ -134,7 +134,13 @@ export default function ReceiptModal({ sale, company, client, products, onClose 
           <div className="flex justify-between"><span>Caissier :</span><span>{sale.cashierName}</span></div>
           {sale.warehouseName && <div className="flex justify-between"><span>Entrepôt :</span><span>{sale.warehouseName}</span></div>}
           <div className="flex justify-between"><span>Client :</span><span className="font-bold">{sale.clientName}</span></div>
-          {client && client.address && <div className="flex justify-between gap-3"><span>Adresse :</span><span className="text-right">{client.address}</span></div>}
+          {/* Coordonnées saisies en caisse (sinon celles de la fiche client, pour les anciennes ventes) */}
+          {(sale.clientPhone || client?.phone) && (
+            <div className="flex justify-between gap-3" data-testid="receipt-client-phone"><span>Tél. :</span><span className="text-right">{sale.clientPhone || client?.phone}</span></div>
+          )}
+          {(sale.clientAddress || client?.address) && (
+            <div className="flex justify-between gap-3" data-testid="receipt-client-address"><span>Adresse :</span><span className="text-right">{sale.clientAddress || client?.address}</span></div>
+          )}
           {client && (client.taxNumber || client.statNumber) && (
             <div className="flex justify-between gap-3" data-testid="receipt-client-ids">
               <span>NIF / STAT client :</span>
@@ -178,7 +184,10 @@ export default function ReceiptModal({ sale, company, client, products, onClose 
         </div>
 
         <div className="text-xs space-y-1 text-right font-mono">
-          <div className="flex justify-between"><span>TVA :</span><span>{format(sale.vatAmount)}</span></div>
+          <div className="flex justify-between"><span>{(sale.items || []).some((it: any) => it.vatIncluded) ? 'dont TVA :' : 'TVA :'}</span><span>{format(sale.vatAmount)}</span></div>
+          {(sale.deliveryFee || 0) > 0 && (
+            <div className="flex justify-between"><span>Livraison :</span><span>{format(sale.deliveryFee || 0)}</span></div>
+          )}
           <div className="flex justify-between text-sm font-bold border-t border-slate-200 pt-1 text-slate-950 font-sans">
             <span>TOTAL TTC :</span><span>{format(sale.totalAmount)}</span>
           </div>
@@ -193,7 +202,7 @@ export default function ReceiptModal({ sale, company, client, products, onClose 
         <div className="text-center pt-2 text-[10px] text-slate-500 border-t border-dashed border-slate-300">
           <p>Moyen de paiement: <strong className="uppercase">{sale.paymentMethod}</strong></p>
           {sale.notes && <p className="mt-0.5">{sale.notes}</p>}
-          <p className="mt-1">Points fidélité gagnés: +{sale.loyaltyPointsEarned}</p>
+          {sale.loyaltyPointsEarned > 0 && <p className="mt-1">Points fidélité gagnés : +{sale.loyaltyPointsEarned}</p>}
           <p className="font-bold mt-2">Merci de votre visite !</p>
         </div>
 

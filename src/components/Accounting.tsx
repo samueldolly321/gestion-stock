@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Landmark, Receipt, TrendingUp, TrendingDown, ChevronLeft, ChevronRight, Download, Scale, Info } from 'lucide-react';
-import { Sale, Purchase, Expense, Product, StockMovement, Delivery, Setting } from '../types';
+import { Sale, Purchase, Expense, Product, StockMovement, Setting } from '../types';
 import { useMoney } from '../services/CurrencyContext';
 import { exportPdf } from '../services/exportPdf';
 import { exportExcel } from '../services/exportExcel';
@@ -15,7 +15,6 @@ interface AccountingProps {
   expenses: Expense[];
   products: Product[];
   movements: StockMovement[];
-  deliveries: Delivery[];
   /** Réglages (fonds de départ de l'écran Rentabilité) */
   settings?: Setting | null;
   /** Peut saisir / modifier le fonds de départ */
@@ -23,7 +22,7 @@ interface AccountingProps {
   onSettingsSaved?: (s: Setting) => void;
 }
 
-export default function Accounting({ sales, purchases, expenses, products, movements, deliveries, settings = null, canEditInvestment = false, onSettingsSaved }: AccountingProps) {
+export default function Accounting({ sales, purchases, expenses, products, movements, settings = null, canEditInvestment = false, onSettingsSaved }: AccountingProps) {
   const { format } = useMoney();
   const [view, setView] = useState<'etats' | 'rentabilite'>('etats');
   const [gran, setGran] = useState<Gran>('month');
@@ -34,7 +33,7 @@ export default function Accounting({ sales, purchases, expenses, products, movem
   const shift = (dir: number) => setAnchor((a) => shiftAnchor(gran, a, dir));
 
   // Calcul UNIQUE du résultat (partagé avec l'écran Rentabilité) : voir services/profitability.ts.
-  const data = useMemo(() => ({ sales, purchases, expenses, movements, deliveries }), [sales, purchases, expenses, movements, deliveries]);
+  const data = useMemo(() => ({ sales, purchases, expenses, movements }), [sales, purchases, expenses, movements]);
   const f = useMemo(() => periodFigures(data, range.start, range.end), [data, range]);
 
   const exportRows = [

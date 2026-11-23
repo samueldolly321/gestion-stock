@@ -273,10 +273,15 @@ export const sales = pgTable('sales', {
   relatedSaleId: text('related_sale_id'),
   clientId: text('client_id').notNull(),
   clientName: text('client_name'),
+  // Coordonnées imprimées sur la facture (saisies en caisse ; obligatoires pour une livraison).
+  clientPhone: text('client_phone'),
+  clientAddress: text('client_address'),
   status: text('status').notNull(),
   items: jsonb('items').$type<unknown[]>().default([]).notNull(),
   vatAmount: doublePrecision('vat_amount').default(0).notNull(),
   totalAmount: doublePrecision('total_amount').default(0).notNull(),
+  // Frais de livraison inclus dans totalAmount, encaissés POUR le prestataire : hors chiffre d'affaires.
+  deliveryFee: doublePrecision('delivery_fee').default(0).notNull(),
   paymentStatus: text('payment_status').notNull(),
   paymentMethod: text('payment_method'), // cash | card | mobile_money | bank_transfer | check
   paidAmount: doublePrecision('paid_amount').default(0).notNull(), // encaissé (le reste = créance client)
@@ -351,6 +356,7 @@ export const deliveries = pgTable('deliveries', {
   clientId: text('client_id'),
   clientName: text('client_name'),
   address: text('address'),
+  phone: text('phone'), // téléphone du client à livrer
   type: text('type').notNull(), // moto | voiture | camion | velo | pied
   fee: doublePrecision('fee').default(0).notNull(),
   status: text('status').default('pending').notNull(), // pending | in_transit | delivered | cancelled

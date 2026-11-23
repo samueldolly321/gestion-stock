@@ -2,7 +2,7 @@
 
 > 🖥️ **Vous voulez juste UTILISER l'application ?** Ce guide-ci est réservé aux
 > **développeurs** (lancer le projet depuis les sources). Pour un magasin / un poste
-> de caisse, utilisez la **version autonome** : double-cliquez **`Vokatra-ko Setup 1.1.0.exe`**
+> de caisse, utilisez la **version autonome** : double-cliquez **`Vokatra-ko Setup 1.2.0.exe`**
 > — PostgreSQL est déjà intégré, **rien d'autre à installer**. Voir
 > **`GUIDE_DEMARRAGE_MAGASIN.md`** (et `GUIDE_RESEAU_LOCAL.md` pour plusieurs postes).
 

@@ -51,6 +51,38 @@ export async function ensureSchema(): Promise<void> {
   await db.execute(sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS pack_sale_price double precision;`);
   // Petites valeurs techniques (début d'essai de la licence .exe…).
   await db.execute(sql`CREATE TABLE IF NOT EXISTS app_meta (key text PRIMARY KEY, value text);`);
+  // Frais de livraison sur la vente (encaissés pour le prestataire, hors chiffre d'affaires).
+  await db.execute(sql`ALTER TABLE sales ADD COLUMN IF NOT EXISTS delivery_fee double precision DEFAULT 0 NOT NULL;`);
+  // Reprise unique des ventes existantes : frais lus sur les livraisons liées (drapeau dans app_meta,
+  // car sur Render la colonne peut déjà avoir été créée par db:push avant ce démarrage).
+  await db.execute(sql`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (SELECT 1 FROM app_meta WHERE key = 'backfill_sale_delivery_fee') THEN
+        UPDATE sales s SET delivery_fee = LEAST(GREATEST(d.total, 0), GREATEST(s.total_amount, 0))
+          FROM (SELECT sale_id, SUM(fee) AS total FROM deliveries WHERE sale_id IS NOT NULL GROUP BY sale_id) d
+          WHERE s.id = d.sale_id AND s.type <> 'return' AND s.delivery_fee = 0;
+        INSERT INTO app_meta (key, value) VALUES ('backfill_sale_delivery_fee', now()::text);
+      END IF;
+    END $$;
+  `);
+  // Téléphone / adresse du client sur la facture, téléphone sur la livraison.
+  await db.execute(sql`ALTER TABLE sales ADD COLUMN IF NOT EXISTS client_phone text;`);
+  await db.execute(sql`ALTER TABLE sales ADD COLUMN IF NOT EXISTS client_address text;`);
+  await db.execute(sql`ALTER TABLE deliveries ADD COLUMN IF NOT EXISTS phone text;`);
+  // Fidélité passée à 1 point / 10 000 Ar : remise à zéro UNIQUE des points (anciens chiffres
+  // en 1 pt / 10 Ar). Les points des anciennes factures sont aussi effacés, sinon un avoir sur
+  // une ancienne facture retirerait des milliers de points.
+  await db.execute(sql`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (SELECT 1 FROM app_meta WHERE key = 'loyalty_reset_10000') THEN
+        UPDATE clients SET loyalty_points = 0;
+        UPDATE sales SET loyalty_points_earned = 0;
+        INSERT INTO app_meta (key, value) VALUES ('loyalty_reset_10000', now()::text);
+      END IF;
+    END $$;
+  `);
   // Articles à livrer sur une livraison.
   await db.execute(sql`ALTER TABLE deliveries ADD COLUMN IF NOT EXISTS items jsonb;`);
   // Numéro STAT de la société (NIF = tax_id).

@@ -33,6 +33,7 @@ import {
 import { Product, StockMovement, Category, Supplier, Client, AuditLog, Sale, Purchase, Expense } from '../types';
 import { useMoney } from '../services/CurrencyContext';
 import AiSummaryCard from './AiSummaryCard';
+import { saleRevenue } from '../services/profitability';
 
 interface DashboardProps {
   products: Product[];
@@ -90,8 +91,8 @@ export default function Dashboard({
       }
     });
 
-    // CA net : les avoirs (montants négatifs) se déduisent naturellement.
-    const totalSales = sales.reduce((acc, s) => acc + s.totalAmount, 0);
+    // CA net : les avoirs (montants négatifs) se déduisent naturellement ; hors frais de livraison.
+    const totalSales = sales.reduce((acc, s) => acc + saleRevenue(s), 0);
     // Nombre de ventes : on ne compte pas les avoirs comme des transactions.
     const totalTransactions = sales.filter((s) => s.type !== 'return').length;
 
@@ -182,7 +183,7 @@ export default function Dashboard({
     const periodSales = sales.filter((s) => new Date(s.createdAt) >= cutoff);
     const ventes = periodSales.filter((s) => s.type !== 'return');
     const avoirs = periodSales.filter((s) => s.type === 'return');
-    const brut = ventes.reduce((a, s) => a + (Number(s.totalAmount) || 0), 0);
+    const brut = ventes.reduce((a, s) => a + saleRevenue(s), 0); // hors frais de livraison (prestataire)
     const remboursements = avoirs.reduce((a, s) => a + Math.abs(Number(s.totalAmount) || 0), 0);
     const recettes = brut - remboursements; // net des avoirs
     const periodPurch = purchases.filter((p) => p.status !== 'cancelled' && new Date(p.createdAt) >= cutoff);
@@ -216,7 +217,7 @@ export default function Dashboard({
     salesInPeriod.forEach((s) => {
       const key = s.clientId || s.clientName || 'inconnu';
       if (!map[key]) map[key] = { name: s.clientName || 'Client', total: 0, count: 0 };
-      map[key].total += Number(s.totalAmount) || 0; // les avoirs déduisent le CA client
+      map[key].total += saleRevenue(s); // les avoirs déduisent le CA client ; hors livraison
       if (s.type !== 'return') map[key].count += 1;
     });
     return Object.values(map).sort((a, b) => b.total - a.total).slice(0, 5);

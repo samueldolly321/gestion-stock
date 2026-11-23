@@ -53,7 +53,7 @@ A(
   subtitle('ERP de gestion de stock, ventes, achats et comptabilité'),
   new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Documentation complète du projet — de A à Z', size: 22 })] }),
   new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 120 }, children: [new TextRun({ text: 'Contexte Madagascar · Devise Ariary (Ar)', italics: true, size: 20, color: '777777' })] }),
-  new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Version 1.1.0 — mise à jour le 2026-11-22', size: 18, color: '999999' })] }),
+  new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Version 1.2.0 — mise à jour le 2026-11-23', size: 18, color: '999999' })] }),
   new Paragraph({ pageBreakBefore: true }),
 );
 
@@ -106,7 +106,7 @@ A(
   bullet('Ensuite, l\'inscription publique est fermée : les comptes suivants se créent depuis l\'onglet Utilisateurs (réservé aux administrateurs).'),
   bullet('Au premier lancement, la question « Quel est votre commerce ? » (épicerie, restauration, poissonnerie, grossiste, vêtements, chaussures, high-tech, quincaillerie, commerce général) crée des catégories adaptées et active les fonctions utiles (recettes, tailles/couleurs, numéros de série…).'),
   h2('Version de bureau (.exe) et licences'),
-  bullet([b('Installation'), r(' : un seul fichier « Vokatra-ko Setup 1.1.0.exe ». La base PostgreSQL est intégrée ; les données vivent dans %APPDATA%\\Vokatra-ko et survivent aux mises à jour.')]),
+  bullet([b('Installation'), r(' : un seul fichier « Vokatra-ko Setup 1.2.0.exe ». La base PostgreSQL est intégrée ; les données vivent dans %APPDATA%\\Vokatra-ko et survivent aux mises à jour.')]),
   bullet([b('Essai'), r(' : 7 jours avec toutes les fonctions ; un bandeau en haut de l\'écran indique les jours restants (rouge les 2 derniers jours).')]),
   bullet([b('Licence'), r(' : à vie, pour un PC. Le client envoie son « code machine », le vendeur génère une clé VK1… signée (generer-licence.cmd, clé privée hors du projet). Sans clé à la fin de l\'essai, l\'API est bloquée (données conservées).')]),
   bullet([b('Anti-contournement'), r(' : date de début d\'essai conservée à trois endroits (fichier, base, registre) ; horloge reculée détectée ; clé d\'un autre PC ou modifiée refusée.')]),
@@ -121,14 +121,14 @@ A(
 const tabs = [
   ['Tableau de bord', 'Vue d\'ensemble : indicateurs clés (KPI), graphiques, alertes cliquables (ruptures, périmés), performance commerciale (7/30/90 jours), recettes/dépenses/solde, et la carte « Résumé d\'activité (IA) ».'],
   ['Articles & Stocks', 'Le catalogue produits : création/modification, catégories & sous-catégories, marques, entrepôts, champ fournisseur, unité de base, conditionnement « vente en gros » (1 carton = N pièces, prix carton), import d\'image (limite 2 Mo), code-barres EAN-13 (génération + étiquette imprimable), fiche produit avec historique des mouvements, ajustement rapide de stock (avec bouton « Créer un achat » qui transforme une entrée en commande fournisseur réceptionnée). Restauration : onglets « Plats », « Ingrédients & articles » et « Rapports cuisine » (marge par plat et par taille, suppléments vendus, consommation d\'ingrédients, écarts) ; plats et boissons préparées avec recette (saisie en g/cl/ml), tailles de portion, suppléments, création d\'un ingrédient depuis la recette, déclaration de perte.'],
-  ['Caisse POS', 'La vente au comptoir : image produit mise en avant, panier, quantités, vente à la pièce ou au carton par ligne, remise, moyens de paiement, livraison, paiement partiel/à crédit (refusé sans vrai client), TVA optionnelle, prix éditable par ligne (tarif client appliqué automatiquement, vente à perte bloquée), « Client de passage (comptoir) » par défaut et après chaque vente. Restauration : choix de la taille et des suppléments, portions possibles. Impression : ticket 80 mm, facture A4 (multi-pages), bon de cuisine (plats) et bon de bar (boissons).'],
+  ['Caisse POS', 'La vente au comptoir : image produit mise en avant, panier, quantités, vente à la pièce ou au carton par ligne, remise, moyens de paiement, livraison à domicile (téléphone et adresse du client obligatoires, imprimés sur la facture), paiement partiel/à crédit (refusé sans vrai client), prix toujours TVA comprise (« dont TVA » sur le ticket), fidélité 1 point / 10 000 Ar, prix éditable par ligne (tarif client appliqué automatiquement, vente à perte bloquée), « Client de passage (comptoir) » par défaut et après chaque vente. Restauration : choix de la taille et des suppléments, portions possibles. Impression : ticket 80 mm, facture A4 (multi-pages), bon de cuisine (plats) et bon de bar (boissons).'],
   ['Ventes', 'Le journal de toutes les ventes : filtre Jour/Mois/Année (ou dates personnalisées), synthèse (nb ventes, CA, encaissé, reste dû), détail d\'une vente et réimpression du reçu, export PDF/Excel.'],
   ['Créances Clients', 'Ce que les clients doivent : avances et reste dû par vente, encaissements, historique des règlements, et établissement d\'avoirs (notes de crédit).'],
   ['Clients & Fournisseurs', 'Les tiers commerciaux : fiches clients (fidélité, encours) et fournisseurs (coffre-fort documents). Panneau « Produits fournis » par fournisseur (prix négocié) et panneau « Tarifs » par client (prix de vente négocié).'],
   ['Achats', 'Les commandes fournisseurs : création (produits pré-remplis selon le fournisseur), colonne « Produits » (nom + quantité), saisie à la pièce ou au carton, réception valorisée (met à jour le stock et le prix d\'achat moyen), suivi des règlements (dette fournisseurs). TVA optionnelle, filtre par date.'],
   ['Réapprovisionnement', 'Les articles sous le seuil minimum : quantités suggérées et création groupée de commandes d\'achat par fournisseur (avec anti-doublon).'],
   ['Dépenses', 'Les frais sans stock : loyer, salaires, électricité/eau, gaz/charbon, entretien, transport, douane, taxes, carburant…, liés ou non à un achat, avec statut payé/non payé. Ils diminuent directement le résultat.'],
-  ['Livraisons', 'Les livraisons chez le client : type de transport (moto, voiture, camion…), tarif ajouté à la facture, statut, chauffeur, date planifiée.'],
+  ['Livraisons', 'Les livraisons chez le client : type de transport (moto, voiture, camion…), adresse et téléphone du client, tarif payé par le client sur sa facture mais reversé au prestataire (hors chiffre d\'affaires), statut, chauffeur, date planifiée.'],
   ['Calendrier', 'Vue mensuelle des commandes fournisseurs (réception prévue), livraisons planifiées et échéances de créances. Bouton « + » sur chaque date pour créer directement une commande ou une livraison.'],
   ['Audits & Ajustements', 'Les inventaires physiques : comptage, validation (ajuste le stock), historique.'],
   ['Historique des Flux', 'Le registre inaltérable de tous les mouvements de stock (entrées, sorties, retours…).'],
@@ -169,7 +169,7 @@ A(
   bullet([b('TVA nette'), r(' = TVA collectée − TVA déductible. C\'est ce qui est dû (ou récupérable) sur la période.')]),
   h2('B. Compte de résultat'),
   p('Il mesure la rentabilité :'),
-  bullet([b('CA HT'), r(' (chiffre d\'affaires hors taxe) = total des ventes − TVA − frais de livraison (le transport n\'est pas du chiffre d\'affaires marchandises). Les avoirs se déduisent.')]),
+  bullet([b('CA HT'), r(' (chiffre d\'affaires hors taxe) = total des ventes − TVA comprise − frais de livraison (reversés au prestataire, jamais comptés dans le chiffre d\'affaires). Les avoirs se déduisent.')]),
   bullet([b('COGS'), r(' (coût des marchandises vendues) = le coût d\'achat réel des produits vendus, enregistré au moment de la vente (coût historique), déduction faite des retours.')]),
   bullet([b('Marge brute'), r(' = CA HT − COGS. Le taux de marge = marge ÷ CA HT.')]),
   bullet([b('Charges externes'), r(' = les dépenses de la période.')]),
@@ -283,7 +283,7 @@ A(
     ['Code machine', 'Identifiant d\'un PC, utilisé pour fabriquer sa clé de licence'],
   ]),
   spacer(),
-  new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 200 }, children: [new TextRun({ text: 'Fin du document — Vokatra-ko 1.1.0 · 2026-11-22', italics: true, color: '999999', size: 18 })] }),
+  new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 200 }, children: [new TextRun({ text: 'Fin du document — Vokatra-ko 1.2.0 · 2026-11-23', italics: true, color: '999999', size: 18 })] }),
 );
 
 const doc = new Document({

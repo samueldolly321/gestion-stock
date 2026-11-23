@@ -10,6 +10,7 @@ import { showToast } from '../services/toast';
 import Pagination, { usePagination } from './Pagination';
 import ReceiptModal from './ReceiptModal';
 import { periodRange, shiftAnchor, type Gran } from '../services/period';
+import { saleRevenue } from '../services/profitability';
 
 interface SalesProps {
   sales: Sale[];
@@ -71,9 +72,11 @@ export default function Sales({ sales, user, currencySymbol, company, clients, p
   );
 
   const totals = useMemo(() => {
-    const ca = periodSales.reduce((a, s) => a + (Number(s.totalAmount) || 0), 0);
+    // CA hors frais de livraison (reversés au prestataire) ; le reste dû, lui, les inclut (le client les doit).
+    const ca = periodSales.reduce((a, s) => a + saleRevenue(s), 0);
     const paid = periodSales.reduce((a, s) => a + (Number(s.paidAmount) || 0), 0);
-    return { count: periodSales.length, ca, paid, due: ca - paid };
+    const due = periodSales.reduce((a, s) => a + ((Number(s.totalAmount) || 0) - (Number(s.paidAmount) || 0)), 0);
+    return { count: periodSales.length, ca, paid, due };
   }, [periodSales]);
 
   const page = usePagination<Sale>(periodSales);
@@ -253,7 +256,10 @@ export default function Sales({ sales, user, currencySymbol, company, clients, p
               ))}
               {viewTarget.notes && <p className="text-[11px] text-slate-500 italic pt-1">Note : {viewTarget.notes}</p>}
               <div className="border-t border-slate-200 dark:border-slate-800 pt-3 font-mono text-slate-500 space-y-1">
-                <div className="flex justify-between"><span>TVA</span><span>{format(viewTarget.vatAmount)}</span></div>
+                <div className="flex justify-between"><span>{(viewTarget.items || []).some((it: any) => it.vatIncluded) ? 'dont TVA' : 'TVA'}</span><span>{format(viewTarget.vatAmount)}</span></div>
+                {(viewTarget.deliveryFee || 0) > 0 && (
+                  <div className="flex justify-between"><span>Livraison (prestataire, hors CA)</span><span>{format(viewTarget.deliveryFee || 0)}</span></div>
+                )}
                 <div className="flex justify-between text-sm font-bold font-sans text-slate-900 dark:text-white"><span>Total TTC</span><span>{format(viewTarget.totalAmount)}</span></div>
                 <div className="flex justify-between"><span>Encaissé</span><span className="text-emerald-500">{format(viewTarget.paidAmount || 0)}</span></div>
                 {viewTarget.totalAmount - (viewTarget.paidAmount || 0) > 0 && (

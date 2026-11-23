@@ -116,6 +116,7 @@ export default function Calendar({ deliveries, purchases, sales, suppliers, prod
           clientId: qaClientId || null,
           clientName: cli?.name || null,
           address: cli?.address || null,
+          phone: cli?.phone || null,
           type: qaType,
           fee: Number(qaFee) || 0,
           status: 'pending',
@@ -327,7 +328,7 @@ export default function Calendar({ deliveries, purchases, sales, suppliers, prod
                     ))}
                   </div>
                   <div className="border-t border-slate-200 dark:border-slate-800 pt-2 flex justify-between font-mono text-sm font-bold text-slate-900 dark:text-white">
-                    <span>Total HT</span><span className="text-cyan-500">{format(qaTotals)}</span>
+                    <span>Total TTC</span><span className="text-cyan-500">{format(qaTotals)}</span>
                   </div>
                   <p className="text-[10px] text-slate-400">La réception prévue sera fixée à cette date (visible sur le calendrier).</p>
                 </>
@@ -414,6 +415,7 @@ function DeliveryDetail({ d, sales, onClose, onOpen }: { d: Delivery; sales: Sal
           </div>
           <div className="space-y-1.5 text-slate-600 dark:text-slate-300">
             {d.address && <p className="flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5 text-slate-400" /> {d.address}</p>}
+            {d.phone && <p className="flex items-center gap-1.5 font-mono"><span className="w-3.5 text-center text-slate-400">☎</span> {d.phone}</p>}
             <p className="flex items-center gap-1.5"><Truck className="w-3.5 h-3.5 text-slate-400" /> {deliveryTypeLabel(d.type)} · {format(d.fee)}</p>
             {d.driverName && <p className="flex items-center gap-1.5"><UserIcon className="w-3.5 h-3.5 text-slate-400" /> {d.driverName}</p>}
             {d.notes && <p className="text-slate-500">{d.notes}</p>}

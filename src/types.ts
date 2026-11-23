@@ -223,10 +223,13 @@ export interface Sale {
   relatedSaleId?: string | null; // avoir (type 'return') : facture d'origine corrigée
   clientId: string;
   clientName?: string;
+  clientPhone?: string | null; // imprimé sur la facture
+  clientAddress?: string | null;
   status: 'draft' | 'pending' | 'approved' | 'delivered' | 'returned' | 'cancelled';
   items: TransactionItem[];
   vatAmount: number;
   totalAmount: number;
+  deliveryFee?: number; // inclus dans totalAmount, reversé au prestataire : hors chiffre d'affaires
   paymentStatus: 'unpaid' | 'partially_paid' | 'paid';
   paymentMethod: 'cash' | 'card' | 'mobile_money' | 'bank_transfer' | 'check';
   paidAmount: number;
@@ -329,8 +332,9 @@ export interface Delivery {
   clientId?: string | null;
   clientName?: string | null;
   address?: string | null;
+  phone?: string | null;
   type: DeliveryType;
-  fee: number; // tarif de livraison (Ariary), ajouté à la facture
+  fee: number; // tarif de livraison (Ariary), payé par le client pour le prestataire
   status: DeliveryStatus;
   driverName?: string | null;
   scheduledDate?: string | null;

@@ -18,8 +18,9 @@ function pickFields(b: any) {
     clientId: b.clientId ?? null,
     clientName: b.clientName ?? null,
     address: b.address ?? null,
+    phone: b.phone ? String(b.phone).trim().slice(0, 40) || null : null,
     type: TYPES.includes(b.type) ? b.type : 'moto',
-    fee: Number(b.fee) || 0,
+    fee: Math.max(0, Math.round(Number(b.fee) || 0)),
     status: STATUSES.includes(b.status) ? b.status : 'pending',
     driverName: b.driverName ?? null,
     scheduledDate: b.scheduledDate ?? null,
@@ -76,7 +77,11 @@ deliveriesRouter.post('/', requireAuth, requireWrite('deliveries'), async (req: 
 
 deliveriesRouter.put('/:id', requireAuth, requireWrite('deliveries'), async (req: AuthedRequest, res) => {
   try {
+    const [existing] = await db.select().from(deliveries).where(eq(deliveries.id, req.params.id)).limit(1);
+    if (!existing) return res.status(404).json({ error: 'Livraison introuvable.' });
     const f = pickFields(req.body ?? {});
+    // Livraison facturée en caisse : la facture et son tarif sont figés (le montant est sur la facture).
+    if (existing.saleId) { f.saleId = existing.saleId; f.fee = existing.fee; }
     const [updated] = await db
       .update(deliveries)
       .set({ ...f, updatedAt: new Date().toISOString() })

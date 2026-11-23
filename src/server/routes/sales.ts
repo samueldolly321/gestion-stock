@@ -19,6 +19,9 @@ async function loadIngredients(recipes: (RecipeItem[] | null | undefined)[]) {
 }
 import { SerialError, cleanSerials, sellSerials, returnSerials } from './serials.ts';
 
+/** Fidélité : 1 point par tranche de LOYALTY_STEP Ar d'achat (marchandises, hors livraison). */
+const LOYALTY_STEP = 10000;
+
 export const salesRouter = Router();
 
 const CASHIER_ROLES = ['Super Admin', 'Admin', 'Manager', 'Commercial', 'Caissier', 'Magasinier'];
@@ -52,9 +55,7 @@ salesRouter.post('/', requireAuth, requireRole(...CASHIER_ROLES), async (req: Au
     // --- Recalcul serveur des montants (anti-falsification) + garde-fou vente à perte ---
     // On ne fait JAMAIS confiance à totalAmount/vatAmount/loyaltyPointsEarned envoyés par
     // le client : ils sont recalculés depuis les articles et les prix lus en base.
-    const applyVat = b.applyVat !== undefined
-      ? !!b.applyVat
-      : items.some((it: any) => (Number(it.tax) || 0) > 0); // repli : TVA si des taux sont présents
+    // Prix TOUJOURS TVA comprise : la TVA est la part incluse dans le prix (taux de chaque article).
     const discountPercent = Math.min(100, Math.max(0, Number(b.discountPercent) || 0));
     const deliveryFee = Math.max(0, Number(b.deliveryFee) || 0);
 
@@ -122,10 +123,11 @@ salesRouter.post('/', requireAuth, requireRole(...CASHIER_ROLES), async (req: Au
             : `Vente à perte refusée pour « ${product.name} » : prix de vente (${unitPrice}) inférieur au prix d'achat (${product.purchasePrice}).`,
         });
       }
-      const lineHT = quantity * unitPrice;
-      subtotal += lineHT;
-      const tax = applyVat ? (Number(it.tax) || 0) : 0;
-      if (applyVat) vat += lineHT * (tax / 100);
+      const lineTTC = quantity * unitPrice;
+      subtotal += lineTTC;
+      const tax = Math.min(100, Math.max(0, Number(it.tax) || 0));
+      vat += lineTTC * tax / (100 + tax); // TVA incluse dans le prix
+
       normalizedItems.push({
         productId: it.productId,
         productName: product?.name ?? it.productName ?? null,
@@ -134,7 +136,8 @@ salesRouter.post('/', requireAuth, requireRole(...CASHIER_ROLES), async (req: Au
         unitPrice,
         discount: Number(it.discount) || 0,
         tax,
-        total: lineHT,
+        total: lineTTC,
+        vatIncluded: true, // montants TTC (factures antérieures : HT + TVA ajoutée)
         // Affichage « vente en gros » (n'affecte ni stock ni montants : quantity est en pièces).
         unitLabel: it.unitLabel ?? null,
         packQty: it.packQty != null ? Math.round(Number(it.packQty)) : null,
@@ -151,11 +154,14 @@ salesRouter.post('/', requireAuth, requireRole(...CASHIER_ROLES), async (req: Au
       });
     }
     const discountAmount = subtotal * (discountPercent / 100);
-    const goodsTotal = subtotal + vat - discountAmount;
+    const goodsTotal = subtotal - discountAmount; // TTC, TVA déjà comprise
+    vat = vat * (1 - discountPercent / 100); // la remise réduit aussi la TVA incluse
     const totalAmount = Math.max(0, Math.round(goodsTotal + deliveryFee));
+    // Part du total reversée au prestataire de livraison (hors chiffre d'affaires).
+    const deliveryFeeStored = Math.min(totalAmount, Math.round(deliveryFee));
     const vatAmount = Math.round(vat);
-    // Fidélité : 1 point / 10 (marchandises hors livraison), calculée serveur.
-    const loyaltyEarned = Math.floor(Math.max(0, goodsTotal) / 10);
+    // Fidélité : 1 point par tranche de 10 000 (marchandises hors livraison), calculée serveur.
+    const loyaltyEarned = Math.floor(Math.max(0, goodsTotal) / LOYALTY_STEP);
 
     // Avance / reste : le montant encaissé peut être inférieur au total (vente à crédit).
     const paidAmount = b.paidAmount === undefined
@@ -184,10 +190,13 @@ salesRouter.post('/', requireAuth, requireRole(...CASHIER_ROLES), async (req: Au
           type: saleType,
           clientId: b.clientId || 'PASSAGE',
           clientName: b.clientName ?? null,
+          clientPhone: b.clientPhone ? String(b.clientPhone).trim().slice(0, 40) || null : null,
+          clientAddress: b.clientAddress ? String(b.clientAddress).trim().slice(0, 300) || null : null,
           status: b.status || 'delivered',
           items: normalizedItems,
           vatAmount,
           totalAmount,
+          deliveryFee: deliveryFeeStored,
           paymentStatus,
           paymentMethod: b.paymentMethod ?? null,
           paidAmount,
@@ -313,8 +322,8 @@ salesRouter.post('/', requireAuth, requireRole(...CASHIER_ROLES), async (req: Au
         });
       }
 
-      // 5. Crédite les points fidélité du client (si client identifié)
-      if (b.clientId && b.clientId !== 'PASSAGE' && loyaltyEarned > 0) {
+      // 5. Crédite les points fidélité du client (si client identifié — pas la fiche « passage »)
+      if (b.clientId && b.clientId !== 'PASSAGE' && !/passage/i.test(String(b.clientName || '')) && loyaltyEarned > 0) {
         await tx
           .update(clients)
           .set({ loyaltyPoints: sql`${clients.loyaltyPoints} + ${loyaltyEarned}` })
@@ -479,6 +488,7 @@ salesRouter.post('/:id/credit-note', requireAuth, requireRole(...CASHIER_ROLES),
           productId: src.productId, productName: src.productName, sku: src.sku,
           quantity: -qty, unitPrice: Number(src.unitPrice) || 0,
           discount: Number(src.discount) || 0, tax: Number(src.tax) || 0, total: -lineHT,
+          vatIncluded: src.vatIncluded ? true : undefined,
           // Appareils suivis : numéros retournés (vérifiés plus bas)
           serials: Array.isArray(src.serials) && src.serials.length ? cleanSerials(line.serials) : undefined,
         });
@@ -489,7 +499,12 @@ salesRouter.post('/:id/credit-note', requireAuth, requireRole(...CASHIER_ROLES),
       const creditVAT = invoiceGoodsHT > 0
         ? Math.round((Number(invoice.vatAmount) || 0) * (creditGoodsHT / invoiceGoodsHT))
         : 0;
-      const creditTTC = creditGoodsHT + creditVAT;
+      // Facture TVA comprise : les lignes sont déjà TTC (remise de la facture répercutée au prorata).
+      const vatIncluded = rawItems.some((it) => it.vatIncluded);
+      const invoiceGoodsTTC = (Number(invoice.totalAmount) || 0) - (Number(invoice.deliveryFee) || 0);
+      const creditTTC = vatIncluded
+        ? (invoiceGoodsHT > 0 ? Math.round(invoiceGoodsTTC * (creditGoodsHT / invoiceGoodsHT)) : 0)
+        : creditGoodsHT + creditVAT;
 
       const creditNoteId = generateId('CN');
       const creditNumber = await nextDocNumber(tx, 'credit_note');
@@ -502,6 +517,8 @@ salesRouter.post('/:id/credit-note', requireAuth, requireRole(...CASHIER_ROLES),
         relatedSaleId: invoice.id,
         clientId: invoice.clientId,
         clientName: invoice.clientName ?? null,
+        clientPhone: invoice.clientPhone ?? null,
+        clientAddress: invoice.clientAddress ?? null,
         status: 'returned',
         items: creditItems,
         vatAmount: -creditVAT,

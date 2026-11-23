@@ -50,8 +50,10 @@ interface Line { ingredientId: string; quantity: string; unit?: string }
 const INGREDIENT_UNITS = ['Kg', 'Litre', 'Pièces', 'Bouteilles', 'Sacs', 'Pots', 'Unités'];
 
 export default function DishForm({
-  dish, products, categories, productStock, warehouses = [], format, onManageCategories, onClose, onSaved, onIngredientCreated,
+  dish, products, categories, productStock, warehouses = [], defaultVatRate = 20, format, onManageCategories, onClose, onSaved, onIngredientCreated,
 }: {
+  /** TVA par défaut d'un nouveau plat (Paramètres) */
+  defaultVatRate?: number;
   /** Entrepôts (stock initial d'un ingrédient créé depuis la recette) */
   warehouses?: { id: string; name: string }[];
   /** Un ingrédient vient d'être créé depuis la fiche : recharger la liste des articles */
@@ -74,7 +76,7 @@ export default function DishForm({
   const [categoryId, setCategoryId] = useState(dish?.categoryId || defaultCat?.id || '');
   const [subCategoryId, setSubCategoryId] = useState(dish?.subCategoryId || '');
   const [salePrice, setSalePrice] = useState<string>(dish ? String(dish.salePrice) : '');
-  const [vatRate, setVatRate] = useState<number>(dish?.vatRate ?? 20);
+  const [vatRate, setVatRate] = useState<number>(dish?.vatRate ?? defaultVatRate);
   const [description, setDescription] = useState(dish?.description || '');
   const [image, setImage] = useState<string>(dish?.image || '');
   const [lines, setLines] = useState<Line[]>(

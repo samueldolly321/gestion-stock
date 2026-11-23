@@ -1,9 +1,9 @@
-# Vokatra-ko (version 1.1.0)
+# Vokatra-ko (version 1.2.0)
 
 Logiciel de **gestion de stock, de caisse et de comptabilité** pour les commerces : React 19 + Vite + Tailwind côté front, API **Express** côté serveur, base de données **PostgreSQL** (via Drizzle ORM).
 
 Deux façons de l'utiliser :
-- **Version de bureau (.exe Windows)** : Electron + PostgreSQL intégré, 100 % hors ligne — `npm run desktop:build` produit `release/Vokatra-ko Setup 1.1.0.exe`. Essai de 7 jours puis licence à vie liée au PC (voir `GUIDE_LICENCES.md`).
+- **Version de bureau (.exe Windows)** : Electron + PostgreSQL intégré, 100 % hors ligne — `npm run desktop:build` produit `release/Vokatra-ko Setup 1.2.0.exe`. Essai de 7 jours puis licence à vie liée au PC (voir `GUIDE_LICENCES.md`).
 - **Version serveur / web** : API + front, en local ou sur Render.
 
 Authentification maison (JWT, mots de passe hachés bcrypt) — aucune dépendance cloud.

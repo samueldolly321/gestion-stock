@@ -637,6 +637,7 @@ export default function App() {
               initialStatus={productFilter}
               writePerms={settings?.writePermissions}
               sectors={settings?.businessSectors}
+              defaultVatRate={settings?.defaultVatRate ?? 20}
             />
           )}
 
@@ -795,7 +796,6 @@ export default function App() {
               expenses={expenses}
               products={products}
               movements={movements}
-              deliveries={deliveries}
               settings={settings}
               canEditInvestment={['Super Admin', 'Admin', 'Manager'].includes(currentUser.role)}
               onSettingsSaved={setSettings}

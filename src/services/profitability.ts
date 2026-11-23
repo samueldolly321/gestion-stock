@@ -5,15 +5,21 @@
  * Résultat = ventes HT (nettes des avoirs, hors frais de livraison)
  *          − coût des produits vendus (coût historique des mouvements de vente − retours)
  *          − dépenses de la période.
+ *
+ * Les frais de livraison encaissés sur une facture sont reversés au prestataire : ils ne
+ * font jamais partie du chiffre d'affaires (voir saleRevenue).
  */
-import type { Sale, Purchase, Expense, StockMovement, Delivery } from '../types';
+import type { Sale, Purchase, Expense, StockMovement } from '../types';
+
+/** Chiffre d'affaires TTC d'une vente / d'un avoir : total moins les frais de livraison. */
+export const saleRevenue = (s: Pick<Sale, 'totalAmount' | 'deliveryFee'>) =>
+  (Number(s.totalAmount) || 0) - (Number(s.deliveryFee) || 0);
 
 export interface AccountingData {
   sales: Sale[];
   purchases: Purchase[];
   expenses: Expense[];
   movements: StockMovement[];
-  deliveries: Delivery[];
 }
 
 export interface PeriodFigures {
@@ -35,13 +41,10 @@ export interface PeriodFigures {
 export function periodFigures(d: AccountingData, start: Date, end: Date): PeriodFigures {
   const s0 = start.getTime(), s1 = end.getTime();
   const inR = (ds?: string | null) => { if (!ds) return false; const t = new Date(ds).getTime(); return t >= s0 && t <= s1; };
-  // Frais de livraison facturés sur une vente — exclus du CA (pas de coût marchandise en face).
-  const deliveryForSale = (saleId: string) => d.deliveries.filter((x) => x.saleId === saleId).reduce((a, x) => a + (Number(x.fee) || 0), 0);
-
   const salesIn = d.sales.filter((s) => inR(s.createdAt));
   const invoices = salesIn.filter((s) => s.type !== 'return');
   const avoirs = salesIn.filter((s) => s.type === 'return');
-  const caHT = salesIn.reduce((a, s) => a + ((Number(s.totalAmount) || 0) - (Number(s.vatAmount) || 0) - deliveryForSale(s.id)), 0);
+  const caHT = salesIn.reduce((a, s) => a + (saleRevenue(s) - (Number(s.vatAmount) || 0)), 0);
   const tvaCollectee = salesIn.reduce((a, s) => a + (Number(s.vatAmount) || 0), 0);
   // Coût des produits vendus au COÛT HISTORIQUE (mouvements de vente), moins les retours réintégrés.
   const cogs = d.movements.filter((m) => inR(m.createdAt)).reduce((a, m) => {

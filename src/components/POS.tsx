@@ -174,7 +174,6 @@ export default function POS({
   }, [walkInId, selectedClientId]);
   const [paymentMethod, setPaymentMethod] = useState<Sale['paymentMethod']>('cash');
   const [discountPercent, setDiscountPercent] = useState<number>(0);
-  const [applyVat, setApplyVat] = useState<boolean>(false); // TVA optionnelle (désactivée par défaut)
   const [notes, setNotes] = useState('');
   const [paymentRef, setPaymentRef] = useState(''); // réf. chèque / virement / TPE-CB
   const [deliveryEnabled, setDeliveryEnabled] = useState(false);
@@ -199,6 +198,16 @@ export default function POS({
   const selectedClient = useMemo(() => {
     return clients.find((c) => c.id === selectedClientId) || null;
   }, [clients, selectedClientId]);
+  const isWalkIn = !selectedClient || selectedClient.id === walkInClient?.id;
+
+  // Téléphone / adresse imprimés sur la facture : repris de la fiche client (modifiables) ;
+  // vides pour un client de passage (à saisir, obligatoires en cas de livraison).
+  const [clientPhone, setClientPhone] = useState('');
+  const [clientAddress, setClientAddress] = useState('');
+  React.useEffect(() => {
+    setClientPhone(isWalkIn ? '' : selectedClient?.phone || '');
+    setClientAddress(isWalkIn ? '' : selectedClient?.address || '');
+  }, [selectedClientId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Prix de vente À LA PIÈCE applicable au client : tarif négocié si défini, sinon prix par défaut.
   // En mode carton, si un prix de vente au carton est renseigné, on en déduit le prix/pièce.
@@ -501,16 +510,18 @@ export default function POS({
     cart.forEach((item) => {
       const itemSubtotal = item.quantity * item.unitPrice;
       subtotal += itemSubtotal;
-      // La TVA n'est comptée que si l'option est activée (vente sans TVA sinon).
-      if (applyVat) vatTotal += itemSubtotal * (item.tax / 100);
+      // Prix TVA comprise : on en extrait seulement la part de TVA (pour l'affichage « dont TVA »).
+      const rate = Number(item.tax) || 0;
+      vatTotal += itemSubtotal * rate / (100 + rate);
     });
 
     const discountAmount = subtotal * (discountPercent / 100);
-    const goodsTotal = subtotal + vatTotal - discountAmount;
-    const delivery = deliveryEnabled ? Number(deliveryFee) || 0 : 0;
+    vatTotal = vatTotal * (1 - discountPercent / 100);
+    const goodsTotal = subtotal - discountAmount;
+    const delivery = deliveryEnabled ? Math.max(0, Number(deliveryFee) || 0) : 0;
     const totalAmount = goodsTotal + delivery;
     // La fidélité est calculée sur les marchandises, pas sur les frais de livraison.
-    const loyaltyPointsEarned = Math.floor(goodsTotal / 10);
+    const loyaltyPointsEarned = isWalkIn ? 0 : Math.floor(goodsTotal / 10000); // 1 point / 10 000 Ar
 
     return {
       subtotal,
@@ -520,7 +531,7 @@ export default function POS({
       totalAmount,
       loyaltyPointsEarned
     };
-  }, [cart, discountPercent, deliveryEnabled, deliveryFee, applyVat]);
+  }, [cart, discountPercent, deliveryEnabled, deliveryFee, isWalkIn]);
 
   // Submit checkout — un seul appel API : le serveur crée la vente,
   // déduit le stock et crédite la fidélité en transaction.
@@ -530,6 +541,12 @@ export default function POS({
     // Une vente à crédit doit être rattachée à un vrai client (sinon la dette n'est suivie nulle part).
     if (advanceMode && (!selectedClient || selectedClient.id === walkInClient?.id)) {
       showAlert('Pour une vente à crédit ou un paiement partiel, choisissez le client concerné (la dette sera suivie dans Créances clients).', { variant: 'warning' });
+      return;
+    }
+
+    // Livraison à domicile : il faut savoir où livrer et qui appeler.
+    if (deliveryEnabled && (!clientPhone.trim() || !clientAddress.trim())) {
+      showAlert("Livraison à domicile : indiquez le numéro de téléphone et l'adresse du client (champs sous « Sélection Client »).", { variant: 'warning' });
       return;
     }
 
@@ -553,12 +570,10 @@ export default function POS({
       if (notes) noteParts.push(notes);
       const notesFinal = noteParts.join(' ').trim();
 
-      // Si la TVA n'est pas appliquée, on neutralise le taux sur chaque ligne
-      // (cohérence du reçu et des recalculs éventuels) et vatAmount = 0.
+      // Prix TVA comprise (taux de l'article transmis pour extraire la TVA).
       // On transmet aussi le libellé/nombre de cartons (affichage reçu) ; quantity reste en pièces.
       const itemsForSale = cart.map((it) => ({
         ...it,
-        tax: applyVat ? it.tax : 0,
         unitLabel: it.saleUnit === 'pack' ? (it.packLabel || 'Carton') : null,
         packQty: it.saleUnit === 'pack' ? Math.round(it.quantity / it.packSize) : null,
       }));
@@ -567,6 +582,8 @@ export default function POS({
         type: 'invoice',
         clientId: selectedClientId || 'PASSAGE',
         clientName: selectedClient?.name || 'Client de Passage',
+        clientPhone: clientPhone.trim() || null,
+        clientAddress: clientAddress.trim() || null,
         status: 'delivered',
         items: itemsForSale,
         vatAmount: totals.vatTotal,
@@ -574,7 +591,6 @@ export default function POS({
         // Champs pour le recalcul serveur (anti-falsification) :
         discountPercent,
         deliveryFee: totals.delivery,
-        applyVat,
         paymentStatus: 'paid',
         paymentMethod,
         loyaltyPointsEarned: totals.loyaltyPointsEarned,
@@ -593,9 +609,10 @@ export default function POS({
             saleId: created.id,
             clientId: selectedClientId || null,
             clientName: selectedClient?.name || 'Client de Passage',
-            address: selectedClient?.address || null,
+            address: clientAddress.trim() || null,
+            phone: clientPhone.trim() || null,
             type: deliveryType,
-            fee: Number(deliveryFee) || 0,
+            fee: totals.delivery,
             status: 'pending',
             driverName: null,
             scheduledDate: null,
@@ -608,8 +625,12 @@ export default function POS({
               unit: it.packQty && it.unitLabel ? it.unitLabel : (products.find((p) => p.id === it.productId)?.unit ?? null),
             })),
           });
-        } catch (delErr) {
+        } catch (delErr: any) {
           console.error('Création livraison échouée :', delErr);
+          showAlert(
+            `La vente est enregistrée, mais la fiche de livraison n'a pas pu être créée (${delErr?.message || 'erreur'}). Créez-la depuis l'onglet Livraisons.`,
+            { title: 'Livraison non créée', variant: 'warning' },
+          );
         }
       }
 
@@ -633,6 +654,8 @@ export default function POS({
       setDeliveryEnabled(false);
       setAdvanceMode(false);
       setAmountReceived(0);
+      setClientPhone('');
+      setClientAddress('');
       setSelectedClientId(walkInId); // vente suivante : client de passage (évite de facturer le client précédent)
       onRefresh();
     } catch (err: any) {
@@ -894,14 +917,14 @@ export default function POS({
                         value={item.unitPrice}
                         onFocus={(e) => e.target.select()}
                         onChange={(e) => setUnitPrice(keyOf(item), e.target.value)}
-                        title="Prix de vente unitaire (HT) — modifiable pour ce client."
+                        title="Prix de vente unitaire TTC (TVA comprise) — modifiable pour ce client."
                         className={`w-20 font-mono text-[10px] bg-transparent border rounded px-1 py-0.5 focus:outline-none focus:border-cyan-500 ${
                           isBelowCost(item)
                             ? 'border-red-500 text-red-500'
                             : 'border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200'
                         }`}
                       />
-                      <span className="text-[9px] text-slate-400 font-mono">HT</span>
+                      <span className="text-[9px] text-slate-400 font-mono">TTC</span>
                       {isBelowCost(item) && (
                         <span className="text-[8px] px-1 py-0.5 bg-red-500/10 text-red-500 rounded font-mono" title="Prix sous le prix d'achat — bloqué à l'encaissement">
                           &lt; achat
@@ -1007,6 +1030,27 @@ export default function POS({
                   </option>
                 ))}
               </select>
+              <div className="grid grid-cols-2 gap-2 mt-2">
+                <input
+                  type="tel"
+                  value={clientPhone}
+                  onChange={(e) => setClientPhone(e.target.value)}
+                  placeholder={deliveryEnabled ? 'Téléphone *' : 'Téléphone'}
+                  aria-label="Téléphone du client"
+                  className={`w-full bg-white dark:bg-slate-950/20 p-2 text-xs rounded-lg border text-slate-700 dark:text-gray-200 focus:outline-none focus:border-cyan-500 ${deliveryEnabled && !clientPhone.trim() ? 'border-amber-500' : 'border-slate-200 dark:border-slate-800'}`}
+                />
+                <input
+                  type="text"
+                  value={clientAddress}
+                  onChange={(e) => setClientAddress(e.target.value)}
+                  placeholder={deliveryEnabled ? 'Adresse *' : 'Adresse'}
+                  aria-label="Adresse du client"
+                  className={`w-full bg-white dark:bg-slate-950/20 p-2 text-xs rounded-lg border text-slate-700 dark:text-gray-200 focus:outline-none focus:border-cyan-500 ${deliveryEnabled && !clientAddress.trim() ? 'border-amber-500' : 'border-slate-200 dark:border-slate-800'}`}
+                />
+              </div>
+              {deliveryEnabled && isWalkIn && (
+                <p className="text-[10px] text-amber-500 mt-1">Client de passage livré : téléphone et adresse obligatoires.</p>
+              )}
               {selectedClient && selectedClient.loyaltyPoints > 0 && (
                 <div className="flex items-center gap-1 text-[10px] text-amber-500 mt-1">
                   <Coins className="w-3 h-3" />
@@ -1122,34 +1166,12 @@ export default function POS({
             )}
           </div>
 
-          {/* Option TVA (désactivée par défaut) */}
-          <div className="border-t border-slate-200 dark:border-slate-800/60 pt-3 text-xs">
-            <label className="flex items-center gap-2 cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={applyVat}
-                onChange={(e) => setApplyVat(e.target.checked)}
-                className="accent-cyan-500 w-3.5 h-3.5"
-              />
-              <span className="text-slate-700 dark:text-slate-200 font-semibold">
-                Appliquer la TVA
-              </span>
-              <span className="text-[10px] text-slate-400">(sinon vente sans TVA)</span>
-            </label>
-          </div>
-
           {/* Pricing calculations */}
           <div className="border-t border-slate-200 dark:border-slate-800/60 pt-4 space-y-2 text-xs font-mono text-slate-400">
             <div className="flex justify-between">
-              <span>Sous-total HT :</span>
+              <span>Sous-total TTC :</span>
               <span className="text-slate-900 dark:text-white">{format(totals.subtotal)}</span>
             </div>
-            {applyVat && (
-              <div className="flex justify-between">
-                <span>TVA cumulée :</span>
-                <span className="text-slate-900 dark:text-white">{format(totals.vatTotal)}</span>
-              </div>
-            )}
             {totals.discountAmount > 0 && (
               <div className="flex justify-between text-red-400">
                 <span>Remise ({discountPercent}%) :</span>
@@ -1167,6 +1189,10 @@ export default function POS({
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-indigo-400">
                 {format(totals.totalAmount)}
               </span>
+            </div>
+            <div className="flex justify-between text-[10px]">
+              <span>dont TVA (comprise dans les prix) :</span>
+              <span>{format(totals.vatTotal)}</span>
             </div>
           </div>
 

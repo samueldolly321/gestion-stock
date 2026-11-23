@@ -21,8 +21,9 @@ function pickItems(raw: any): any[] {
         sku: it.sku ?? null,
         quantity,
         unitCost,
-        tax: Number(it.tax) || 0,
+        tax: Math.min(100, Math.max(0, Number(it.tax) || 0)),
         total: quantity * unitCost,
+        vatIncluded: true, // coût saisi TVA comprise (achats antérieurs : HT + TVA ajoutée)
         // Affichage « achat en gros » (n'affecte pas le stock : quantity est déjà en pièces).
         unitLabel: it.unitLabel ?? null,
         packQty: it.packQty != null ? Number(it.packQty) : null,
@@ -56,10 +57,11 @@ purchasesRouter.post('/', requireAuth, requireWrite('purchases'), async (req: Au
       return res.status(400).json({ error: `« ${dishRows[0].name} » est un plat : commandez plutôt ses ingrédients au fournisseur.` });
     }
 
+    // Prix d'achat TOUJOURS TVA comprise : la TVA est la part incluse (taux de chaque ligne).
     const subtotal = items.reduce((a, it) => a + it.total, 0);
-    const vatAmount = items.reduce((a, it) => a + it.total * (it.tax / 100), 0);
+    const vatAmount = Math.round(items.reduce((a, it) => a + it.total * it.tax / (100 + it.tax), 0));
     const discountAmount = Number(b.discountAmount) || 0;
-    const totalAmount = subtotal + vatAmount - discountAmount;
+    const totalAmount = subtotal - discountAmount;
 
     const id = generateId('ACH');
     const [created] = await db

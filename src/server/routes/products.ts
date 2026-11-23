@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { and, desc, eq, inArray, ne, sql } from 'drizzle-orm';
 import { db } from '../../db/index.ts';
 import { products, productStock, stockMovements } from '../../db/schema.ts';
-import { requireAuth, requireWrite, type AuthedRequest } from '../auth-middleware.ts';
+import { requireAuth, requireWrite, requireRole, type AuthedRequest } from '../auth-middleware.ts';
 import { generateId, computeProductStatus, writeAuditLog } from '../helpers.ts';
 import { setWarehouseStock, resolveWarehouseId, recomputeProductTotal, adjustWarehouseStock, getWarehouseStock, lockProducts } from '../stock.ts';
 import { generateEan13 } from '../../services/barcode.ts';
@@ -289,6 +289,28 @@ productsRouter.get('/', requireAuth, async (_req, res) => {
   } catch (err) {
     console.error('list products error:', err);
     res.status(500).json({ error: 'Erreur lors du chargement des produits.' });
+  }
+});
+
+/**
+ * POST /api/products/vat-rate { rate } — applique un taux de TVA à TOUS les articles
+ * (bouton des Paramètres). Prix inchangés : la TVA est comprise dans les prix.
+ */
+productsRouter.post('/vat-rate', requireAuth, requireRole('Super Admin', 'Admin', 'Manager'), async (req: AuthedRequest, res) => {
+  const rate = Number(req.body?.rate);
+  if (!Number.isFinite(rate) || rate < 0 || rate > 100) return res.status(400).json({ error: 'Taux de TVA invalide (0 à 100 %).' });
+  try {
+    const updated = await db.update(products).set({ vatRate: rate, updatedAt: new Date().toISOString() }).returning({ id: products.id });
+    await writeAuditLog({
+      userId: req.user?.sub,
+      userName: req.user?.name,
+      action: `TVA ${rate} % appliquée à tous les articles (${updated.length})`,
+      module: 'Configuration',
+    });
+    res.json({ ok: true, count: updated.length });
+  } catch (err) {
+    console.error('bulk vat-rate error:', err);
+    res.status(500).json({ error: 'Erreur lors de la mise à jour du taux de TVA.' });
   }
 });
 

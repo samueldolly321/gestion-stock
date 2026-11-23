@@ -57,7 +57,9 @@ export function dishMargins(sales: Sale[], movements: StockMovement[], products:
         : row(it.productId, baseName);
       const qty = Number(it.quantity) || 0;
       r.portions += qty;
-      r.revenue += Number(it.total ?? qty * (Number(it.unitPrice) || 0)) || 0;
+      const amount = Number(it.total ?? qty * (Number(it.unitPrice) || 0)) || 0;
+      // Lignes TVA comprise : on ramène au HT (part de TVA retirée).
+      r.revenue += it.vatIncluded ? amount * 100 / (100 + (Number(it.tax) || 0)) : amount;
       if (s.type === 'invoice') {
         // Coût figé à la vente ; repli : coût actuel de la recette (ventes antérieures à la fonction).
         const unitCost = it.cost != null ? Number(it.cost) : recipeCost(byId.get(it.productId)?.recipe, byId);

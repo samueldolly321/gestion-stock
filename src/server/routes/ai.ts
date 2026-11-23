@@ -2,7 +2,7 @@ import { Router } from 'express';
 import Anthropic from '@anthropic-ai/sdk';
 import { desc } from 'drizzle-orm';
 import { db } from '../../db/index.ts';
-import { sales, products, expenses, purchases, stockMovements, deliveries } from '../../db/schema.ts';
+import { sales, products, expenses, purchases, stockMovements } from '../../db/schema.ts';
 import { requireAuth, requireAnyTab, type AuthedRequest } from '../auth-middleware.ts';
 import { writeAuditLog } from '../helpers.ts';
 
@@ -43,21 +43,21 @@ aiRouter.post('/summary', requireAuth, requireAnyTab('dashboard', 'accounting'),
     const inR = (ds?: string | null) => { if (!ds) return false; const t = new Date(ds).getTime(); return t >= r.start && t <= r.end; };
 
     // --- Chargement des données (volume actuel faible → filtrage en mémoire) ---
-    const [allSales, allProducts, allExpenses, allPurchases, allMovements, allDeliveries] = await Promise.all([
+    const [allSales, allProducts, allExpenses, allPurchases, allMovements] = await Promise.all([
       db.select().from(sales).orderBy(desc(sales.createdAt)),
       db.select().from(products),
       db.select().from(expenses),
       db.select().from(purchases),
       db.select().from(stockMovements),
-      db.select().from(deliveries),
     ]);
 
     const salesIn = allSales.filter((s) => s.type !== 'return' && inR(s.createdAt));
-    const deliveryFor = (saleId: string) => allDeliveries.filter((d) => d.saleId === saleId).reduce((a, d) => a + (Number(d.fee) || 0), 0);
+    // Frais de livraison reversés au prestataire : hors chiffre d'affaires.
+    const ca = (s: typeof allSales[number]) => (Number(s.totalAmount) || 0) - (Number(s.deliveryFee) || 0);
 
-    const caTTC = salesIn.reduce((a, s) => a + (Number(s.totalAmount) || 0), 0);
+    const caTTC = salesIn.reduce((a, s) => a + ca(s), 0);
     const encaisse = salesIn.reduce((a, s) => a + (Number(s.paidAmount) || 0), 0);
-    const caHT = salesIn.reduce((a, s) => a + ((Number(s.totalAmount) || 0) - (Number(s.vatAmount) || 0) - deliveryFor(s.id)), 0);
+    const caHT = salesIn.reduce((a, s) => a + (ca(s) - (Number(s.vatAmount) || 0)), 0);
 
     // COGS au coût historique (mouvements exit_sale − entry_return sur la période).
     const cogs = allMovements.filter((mv) => inR(mv.createdAt)).reduce((a, mv) => {

@@ -78,6 +78,7 @@ interface ProductsProps {
   initialStatus?: string; // filtre de statut appliqué à l'arrivée (depuis le Dashboard)
   writePerms?: Record<string, string[]> | null;
   sectors?: string[] | null; // secteurs d'activité → fonctions affichées
+  defaultVatRate?: number; // TVA par défaut des nouveaux articles (Paramètres)
 }
 
 // Libellés d'affichage des mouvements de stock (historique par article).
@@ -114,7 +115,8 @@ export default function Products({
   currencySymbol,
   initialStatus,
   writePerms,
-  sectors
+  sectors,
+  defaultVatRate = 20
 }: ProductsProps) {
   const features = useMemo(() => featuresFor(sectors), [sectors]);
   // Formatage monétaire (Ariary base / Euro converti)
@@ -163,7 +165,7 @@ export default function Products({
   const [brandId, setBrandId] = useState('');
   const [purchasePrice, setPurchasePrice] = useState(0);
   const [salePrice, setSalePrice] = useState(0);
-  const [vatRate, setVatRate] = useState(20);
+  const [vatRate, setVatRate] = useState(defaultVatRate);
   const [unit, setUnit] = useState('Pièces');
   // Conditionnement (vente en gros) : 1 carton = packSize pièces.
   const [packSize, setPackSize] = useState<number | string>(1); // texte pendant la saisie (« 12,5 »)
@@ -266,7 +268,7 @@ export default function Products({
     setBrandId(brands[0]?.id || '');
     setPurchasePrice(0);
     setSalePrice(0);
-    setVatRate(20);
+    setVatRate(defaultVatRate);
     const defaults = productDefaultsFor(sectors); // ex. poissonnerie : Kg + Caisse
     setTrackSerial(features.serials); // high-tech : suivi par IMEI proposé d'office
     setWarrantyMonths(features.serials ? 12 : 0);
@@ -1746,7 +1748,7 @@ export default function Products({
 
                 {/* Purchase Price */}
                 <div>
-                  <label className="text-xs text-slate-400 block mb-1">Prix d'Achat HT (Ar) *</label>
+                  <label className="text-xs text-slate-400 block mb-1">Prix d'Achat TTC (Ar) *</label>
                   <input
                     type="number"
                     step="any"
@@ -1760,7 +1762,7 @@ export default function Products({
 
                 {/* Sale Price */}
                 <div>
-                  <label className="text-xs text-slate-400 block mb-1">Prix de Vente HT (Ar) <span className="text-slate-400 font-normal">(facultatif)</span></label>
+                  <label className="text-xs text-slate-400 block mb-1">Prix de Vente TTC (Ar) <span className="text-slate-400 font-normal">(facultatif)</span></label>
                   <input
                     type="number"
                     step="any"
@@ -1768,6 +1770,21 @@ export default function Products({
                     value={salePrice}
                     onChange={(e) => setSalePrice(Number(e.target.value))}
                     className="w-full bg-white dark:bg-slate-950/20 p-2.5 text-xs rounded-lg border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500"
+                  />
+                </div>
+
+                {/* Taux de TVA de l'article (comprise dans les prix) */}
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1">TVA (%) <span className="text-slate-400 font-normal">(comprise dans les prix ; 0 = sans TVA)</span></label>
+                  <input
+                    type="number"
+                    step="any"
+                    min={0}
+                    max={100}
+                    value={vatRate}
+                    onChange={(e) => setVatRate(Math.min(100, Math.max(0, Number(e.target.value) || 0)))}
+                    className="w-full bg-white dark:bg-slate-950/20 p-2.5 text-xs rounded-lg border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500"
+                    aria-label="Taux de TVA"
                   />
                 </div>
 
@@ -2071,6 +2088,7 @@ export default function Products({
           categories={categories}
           productStock={productStock}
           warehouses={warehouses}
+          defaultVatRate={defaultVatRate}
           onIngredientCreated={onRefresh}
           format={format}
           onManageCategories={openCategoryManager}

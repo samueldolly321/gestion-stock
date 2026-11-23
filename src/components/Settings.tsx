@@ -22,7 +22,8 @@ import { sectorLabel, featuresFor } from '../services/sectors';
 import { useMoney } from '../services/CurrencyContext';
 import { saveSettings } from '../services/settingsService';
 import { resetFigures } from '../services/adminService';
-import { showAlert } from '../services/dialog';
+import { showAlert, showConfirm } from '../services/dialog';
+import { apiFetch } from '../services/api';
 import { showToast } from '../services/toast';
 import { setExportCompany } from '../services/exportContext';
 import LogoPicker from './LogoPicker';
@@ -63,7 +64,7 @@ export default function Settings({
   const [address, setAddress] = useState(settings?.address || '');
   const [phone, setPhone] = useState(settings?.phone || '');
   const [email, setEmail] = useState(settings?.email || '');
-  const [defaultVatRate, setDefaultVatRate] = useState(settings?.defaultVatRate || 20);
+  const [defaultVatRate, setDefaultVatRate] = useState(settings?.defaultVatRate ?? 20); // ?? : un taux 0 % doit rester 0
   const [alertExpirationDays, setAlertExpirationDays] = useState(settings?.alertExpirationDays || 30);
   const [invoicePrefix, setInvoicePrefix] = useState(settings?.invoicePrefix || 'FAC');
   const [creditNotePrefix, setCreditNotePrefix] = useState(settings?.creditNotePrefix || 'AV');
@@ -155,6 +156,32 @@ export default function Settings({
       document.documentElement.classList.remove('dark');
     }
     localStorage.setItem('theme', nextTheme);
+  };
+
+  // Applique le taux de TVA saisi à TOUS les articles existants (prix inchangés : TVA comprise).
+  const [vatApplying, setVatApplying] = useState(false);
+  const applyVatToAll = async () => {
+    const rate = Number(defaultVatRate);
+    if (!Number.isFinite(rate) || rate < 0 || rate > 100) {
+      showAlert('Taux de TVA invalide (0 à 100 %).', { variant: 'warning' });
+      return;
+    }
+    if (!(await showConfirm(
+      `Mettre la TVA à ${rate} % sur TOUS les articles ?
+
+Les prix ne changent pas (TVA comprise) : seule la part de TVA indiquée sur les factures change. Les factures déjà émises ne sont pas modifiées.`,
+      { title: 'TVA de tous les articles', confirmText: 'Appliquer' },
+    ))) return;
+    setVatApplying(true);
+    try {
+      const r = await apiFetch<{ count: number }>('/products/vat-rate', { method: 'POST', body: JSON.stringify({ rate }) });
+      onRefresh();
+      showToast(`TVA ${rate} % appliquée à ${r.count} article(s). Pensez à enregistrer les réglages pour garder ce taux par défaut.`, { title: 'TVA' });
+    } catch (err: any) {
+      showAlert(err?.message || 'Erreur lors de la mise à jour de la TVA.', { variant: 'error' });
+    } finally {
+      setVatApplying(false);
+    }
   };
 
   // Submit settings save
@@ -430,10 +457,26 @@ export default function Settings({
                 <label className="text-slate-400 block mb-1">TVA par défaut (%) :</label>
                 <input
                   type="number"
+                  min={0}
+                  max={100}
+                  step="any"
                   value={defaultVatRate}
                   onChange={(e) => setDefaultVatRate(Number(e.target.value))}
                   className="w-full bg-white dark:bg-slate-950/20 p-2 text-xs rounded-lg border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none"
                 />
+                <p className="text-[10px] text-slate-500 mt-1 leading-normal">
+                  Taux proposé pour les nouveaux articles (TVA comprise dans les prix ; 0 = sans TVA). Chaque article garde son propre taux, modifiable sur sa fiche.
+                </p>
+                {canManage && (
+                  <button
+                    type="button"
+                    onClick={applyVatToAll}
+                    disabled={vatApplying}
+                    className="mt-1.5 px-2.5 py-1 text-[11px] font-semibold rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700/60 disabled:opacity-50"
+                  >
+                    {vatApplying ? 'Application…' : 'Appliquer ce taux à tous les articles'}
+                  </button>
+                )}
               </div>
 
               <div>

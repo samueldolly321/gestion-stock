@@ -57,7 +57,8 @@
 - **Prix négocié par client** appliqué automatiquement.
 - **Paiement partiel / à crédit** géré (le reste devient une créance).
 - **Vente à perte bloquée** : impossible de vendre sous le prix d'achat par erreur.
-- **TVA optionnelle** selon votre régime.
+- **Prix TVA comprise** : taux réglable par article (0 % si vous n'êtes pas assujetti), « dont TVA » sur le ticket.
+- **Livraison à domicile** : téléphone et adresse du client sur la facture ; les frais vont au livreur, pas dans votre chiffre d'affaires.
 
 ### 🚚 Achats & fournisseurs maîtrisés
 - Commandes fournisseurs avec **produits pré-remplis** et **prix négocié par fournisseur**.

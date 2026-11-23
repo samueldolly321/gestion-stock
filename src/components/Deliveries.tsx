@@ -50,6 +50,7 @@ export default function Deliveries({ deliveries, clients, products, sales, user,
   const [clientId, setClientId] = useState('');
   const [clientName, setClientName] = useState('');
   const [address, setAddress] = useState('');
+  const [phone, setPhone] = useState('');
   const [type, setType] = useState<DeliveryType>('moto');
   const [fee, setFee] = useState<number>(defaultFeeFor('moto'));
   const [status, setStatus] = useState<DeliveryStatus>('pending');
@@ -64,6 +65,7 @@ export default function Deliveries({ deliveries, clients, products, sales, user,
       const matchSearch =
         (d.clientName || '').toLowerCase().includes(s) ||
         (d.address || '').toLowerCase().includes(s) ||
+        (d.phone || '').toLowerCase().includes(s) ||
         (d.driverName || '').toLowerCase().includes(s) ||
         itemsSummary(deliveryItemsOf(d, sales)).toLowerCase().includes(s) ||
         d.id.toLowerCase().includes(s);
@@ -79,6 +81,7 @@ export default function Deliveries({ deliveries, clients, products, sales, user,
     setClientId('');
     setClientName('');
     setAddress('');
+    setPhone('');
     setType('moto');
     setFee(defaultFeeFor('moto'));
     setStatus('pending');
@@ -94,6 +97,7 @@ export default function Deliveries({ deliveries, clients, products, sales, user,
     setClientId(d.clientId || '');
     setClientName(d.clientName || '');
     setAddress(d.address || '');
+    setPhone(d.phone || '');
     setType(d.type);
     setFee(d.fee);
     setStatus(d.status);
@@ -112,6 +116,7 @@ export default function Deliveries({ deliveries, clients, products, sales, user,
     if (c) {
       setClientName(c.name);
       if (c.address) setAddress(c.address);
+      if (c.phone) setPhone(c.phone);
     }
   };
 
@@ -132,6 +137,7 @@ export default function Deliveries({ deliveries, clients, products, sales, user,
       clientId: clientId || null,
       clientName: clientName.trim(),
       address: address.trim() || null,
+      phone: phone.trim() || null,
       type,
       fee: Number(fee) || 0,
       status,
@@ -179,6 +185,7 @@ export default function Deliveries({ deliveries, clients, products, sales, user,
     { label: 'ID', value: (d: Delivery) => d.id },
     { label: 'Client', value: (d: Delivery) => d.clientName || '' },
     { label: 'Adresse', value: (d: Delivery) => d.address || '' },
+    { label: 'Téléphone', value: (d: Delivery) => d.phone || '' },
     { label: 'Articles', value: (d: Delivery) => itemsSummary(deliveryItemsOf(d, sales)) },
     { label: 'Type', value: (d: Delivery) => deliveryTypeLabel(d.type) },
     { label: 'Tarif', value: (d: Delivery) => d.fee },
@@ -204,7 +211,7 @@ export default function Deliveries({ deliveries, clients, products, sales, user,
             <Truck className="w-5 h-5 text-cyan-500" />
             Livraisons Client
           </h2>
-          <p className="text-xs text-slate-400">Planifiez et suivez les livraisons ; le tarif est ajouté à la facture.</p>
+          <p className="text-xs text-slate-400">Planifiez et suivez les livraisons. Le tarif est payé par le client pour le prestataire : il ne compte pas dans le chiffre d'affaires.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <button
@@ -292,6 +299,7 @@ export default function Deliveries({ deliveries, clients, products, sales, user,
                         <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                         <span className="truncate">{d.address || '—'}</span>
                       </span>
+                      {d.phone && <span className="block text-[10px] text-slate-400 font-mono pl-5">{d.phone}</span>}
                     </td>
                     <td className="py-3.5 px-4">
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-[10px] font-semibold">
@@ -396,6 +404,11 @@ export default function Deliveries({ deliveries, clients, products, sales, user,
                   <input type="text" value={address} onChange={(e) => setAddress(e.target.value)} className={inputCls} placeholder="Quartier, rue, ville..." />
                 </div>
 
+                <div className="col-span-1 sm:col-span-2">
+                  <label className="text-slate-500 dark:text-slate-400 block mb-1">Téléphone du client</label>
+                  <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className={inputCls} placeholder="03x xx xxx xx" />
+                </div>
+
                 <div>
                   <label className="text-slate-500 dark:text-slate-400 block mb-1">Type de transport *</label>
                   <select value={type} onChange={(e) => onSelectType(e.target.value as DeliveryType)} className={inputCls}>
@@ -409,7 +422,16 @@ export default function Deliveries({ deliveries, clients, products, sales, user,
 
                 <div>
                   <label className="text-slate-500 dark:text-slate-400 block mb-1">Tarif de livraison (Ar) *</label>
-                  <input type="number" min={0} value={fee} onChange={(e) => setFee(Number(e.target.value))} className={inputCls} />
+                  <input
+                    type="number"
+                    min={0}
+                    value={fee}
+                    onChange={(e) => setFee(Math.max(0, Number(e.target.value) || 0))}
+                    disabled={!!editing?.saleId}
+                    title={editing?.saleId ? 'Tarif déjà facturé en caisse : il ne peut plus être modifié ici.' : undefined}
+                    className={`${inputCls} disabled:opacity-60`}
+                  />
+                  {editing?.saleId && <p className="text-[10px] text-slate-400 mt-1">Déjà facturé en caisse (non modifiable).</p>}
                 </div>
 
                 <div>
