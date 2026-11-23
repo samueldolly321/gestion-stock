@@ -33,7 +33,12 @@ const PUB_PEM = path.join(path.dirname(fileURLToPath(import.meta.url)), 'cle-pub
 const inProject = fs.existsSync(PUB_TS);
 const REGISTRY = path.join(VAULT, 'registre-licences.csv');
 
-const die = (msg) => { console.error(`\n✖ ${msg}\n`); process.exit(1); };
+// Mode « json » (fenêtre du générateur) : les erreurs remontent au lieu d'arrêter le script.
+let JSON_MODE = false;
+const die = (msg) => {
+  if (JSON_MODE) throw new Error(msg);
+  console.error(`\n✖ ${msg}\n`); process.exit(1);
+};
 const normCode = (s) => String(s || '').toUpperCase().replace(/[^0-9A-F]/g, '');
 const fmtCode = (s) => normCode(s).match(/.{4}/g)?.join('-') ?? '';
 
@@ -74,22 +79,57 @@ function generer(machine, client) {
   fs.mkdirSync(VAULT, { recursive: true });
   if (!fs.existsSync(REGISTRY)) fs.writeFileSync(REGISTRY, '﻿date;client;code_machine;cle\n');
   fs.appendFileSync(REGISTRY, `${payload.d};"${payload.c.replace(/"/g, '""')}";${payload.m};${key}\n`);
-  console.log(`\n✔ Licence à vie — ${payload.c} — ordinateur ${payload.m}\n\nClé à envoyer au client (à copier en entier) :\n\n${key}\n\n(ajoutée au registre : ${REGISTRY})\n`);
+  if (!JSON_MODE) console.log(`\n✔ Licence à vie — ${payload.c} — ordinateur ${payload.m}\n\nClé à envoyer au client (à copier en entier) :\n\n${key}\n\n(ajoutée au registre : ${REGISTRY})\n`);
+  return { key, client: payload.c, machine: payload.m, date: payload.d, registry: REGISTRY };
 }
 
 function verifier(key, machine) {
-  const parts = String(key || '').trim().split('.');
-  if (parts.length !== 3 || parts[0] !== 'VK1') die('Clé illisible.');
-  const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
+  const parts = String(key || '').trim().replace(/\s+/g, '').split('.');
+  if (parts.length !== 3 || parts[0] !== 'VK1') die('Clé illisible : elle doit commencer par « VK1. » et être copiée en entier.');
+  let payload;
+  try { payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8')); } catch { die('Clé illisible : vérifiez qu’elle a été copiée en entier.'); }
   const pubSrc = inProject ? fs.readFileSync(PUB_TS, 'utf8').match(/`(-----BEGIN PUBLIC KEY-----[^`]+)`/)?.[1] : fs.readFileSync(PUB_PEM, 'utf8');
-  const ok = crypto.verify(null, Buffer.from(`VK1.${parts[1]}`), crypto.createPublicKey(pubSrc), Buffer.from(parts[2], 'base64url'));
-  console.log(`\nClient : ${payload.c}\nDate : ${payload.d}\nOrdinateur : ${payload.m}\nSignature : ${ok ? 'valide ✔' : 'INVALIDE ✖'}`);
-  if (machine) console.log(`Pour ${fmtCode(machine)} : ${normCode(machine) === normCode(payload.m) ? 'oui ✔' : 'non ✖ (autre ordinateur)'}`);
-  console.log('');
+  let ok = false;
+  try { ok = crypto.verify(null, Buffer.from(`VK1.${parts[1]}`), crypto.createPublicKey(pubSrc), Buffer.from(parts[2], 'base64url')); } catch { ok = false; }
+  const sameMachine = machine ? normCode(machine) === normCode(payload.m) : null;
+  if (!JSON_MODE) {
+    console.log(`\nClient : ${payload.c}\nDate : ${payload.d}\nOrdinateur : ${payload.m}\nSignature : ${ok ? 'valide ✔' : 'INVALIDE ✖'}`);
+    if (machine) console.log(`Pour ${fmtCode(machine)} : ${sameMachine ? 'oui ✔' : 'non ✖ (autre ordinateur)'}`);
+    console.log('');
+  }
+  return { valid: ok, client: payload.c, date: payload.d, machine: payload.m, sameMachine };
+}
+
+/** Licences déjà vendues (registre CSV : date;client;code_machine;cle), plus récentes d'abord. */
+function liste() {
+  if (!fs.existsSync(REGISTRY)) return [];
+  const rows = [];
+  for (const line of fs.readFileSync(REGISTRY, 'utf8').replace(/^﻿/, '').split(/\r?\n/).slice(1)) {
+    const m = line.match(/^([^;]*);("(?:[^"]|"")*"|[^;]*);([^;]*);(.*)$/);
+    if (!m) continue;
+    rows.push({ date: m[1], client: m[2].replace(/^"|"$/g, '').replace(/""/g, '"'), machine: m[3], key: m[4].trim() });
+  }
+  return rows.reverse();
 }
 
 const [cmd, a, b] = process.argv.slice(2);
-if (cmd === 'init') init();
+if (cmd === 'json') {
+  // Appelé par la fenêtre (generateur-licence.ps1) : arguments dans VK_ARGS (JSON), réponse JSON.
+  JSON_MODE = true;
+  let out;
+  try {
+    const args = JSON.parse(process.env.VK_ARGS || '{}');
+    if (args.action === 'generer') out = { ok: true, ...generer(args.machine, args.client) };
+    else if (args.action === 'verifier') out = { ok: true, ...verifier(args.key, args.machine) };
+    else if (args.action === 'liste') out = { ok: true, rows: liste(), registry: REGISTRY };
+    else if (args.action === 'etat') out = { ok: true, privateKey: fs.existsSync(PRIV), vault: VAULT, registry: REGISTRY };
+    else out = { ok: false, error: `Action inconnue : ${args.action}` };
+  } catch (e) {
+    out = { ok: false, error: e.message };
+  }
+  process.stdout.write(JSON.stringify(out));
+}
+else if (cmd === 'init') init();
 else if (cmd === 'generer') generer(a, b);
 else if (cmd === 'verifier') verifier(a, b);
 else console.log('Usage :\n  node scripts/licence.mjs init\n  node scripts/licence.mjs generer <CODE-MACHINE> "<Nom du client>"\n  node scripts/licence.mjs verifier <CLE> [CODE-MACHINE]');

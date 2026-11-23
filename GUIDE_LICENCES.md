@@ -75,10 +75,14 @@ Dans le même dossier, `registre-licences.csv` garde la trace de chaque licence 
    et vous envoie le **code machine** affiché, par ex. `1A2B-3C4D-5E6F-7A8B`
    (bouton « Copier » ; par SMS, WhatsApp, e-mail…).
 3. Après paiement, sur **votre** PC, double-cliquez sur **`generer-licence.cmd`** (à la
-   racine du projet) ou sur **`release\Generer une licence.cmd`**, saisissez le code machine et le nom du client.
+   racine du projet) ou sur **`release\Generer une licence.cmd`** : la fenêtre **« Générateur de
+   licences »** s'ouvre. Onglet **Nouvelle licence** : saisissez le code machine (le compteur passe à
+   « Code complet » à 16 caractères) et le nom du client, puis **Générer la clé** et confirmez.
+   Si ce PC a déjà une licence, la fenêtre le signale (la clé existante reste valable).
    *(En ligne de commande : `node scripts/licence.mjs generer 1A2B-3C4D-5E6F-7A8B "Épicerie Rasoa"`)*
-4. Envoyez au client la clé affichée (elle commence par `VK1.` — environ 180 caractères,
-   à copier **en entier**).
+4. Cliquez **Copier la clé** et envoyez-la au client (elle commence par `VK1.` — environ
+   180 caractères, à copier **en entier**). Les autres onglets : **Vérifier une clé** (authentique ?
+   pour quel PC ?) et **Licences vendues** (recherche, recopier une clé perdue, ouvrir le registre).
 5. Le client la colle dans l'écran d'activation → **« Licence activée »**. C'est fini.
 
 Vérifier une clé (réclamation d'un client) :
@@ -129,7 +133,7 @@ retirer le contrôle. Ce que la protection garantit :
 - Interface : `src/components/LicenseGate.tsx` (bandeau d'essai, écran d'activation).
 - Activée **uniquement** dans le `.exe` (`LICENSE_REQUIRED=1` posé par `electron/main.cjs`) :
   la version web (Render) et `npm run dev` ne sont pas concernées.
-- Outil vendeur : `scripts/licence.mjs` + `generer-licence.cmd` — **exclus de l'installateur**.
+- Outil vendeur : `scripts/licence.mjs` (moteur, mode `json` pour la fenêtre) + `scripts/generateur-licence.ps1` (fenêtre WinForms, UTF-8 avec BOM) + `generer-licence.cmd` (lanceur) — **exclus de l'installateur**.
   Copie dans `release\` par `scripts/copy-licence-tool.mjs` (clé publique lue dans
   `outil-licence\cle-publique.pem` ; `init` y est refusé). La clé privée n'est jamais copiée.
 - Clé publique : `src/server/license-public-key.ts` (peut être publiée sans risque).

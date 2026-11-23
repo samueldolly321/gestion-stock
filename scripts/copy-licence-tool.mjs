@@ -21,10 +21,13 @@ const pub = fs.readFileSync(path.join(ROOT, 'src', 'server', 'license-public-key
 if (!pub) throw new Error('Clé publique introuvable dans src/server/license-public-key.ts');
 fs.writeFileSync(path.join(OUT, 'cle-publique.pem'), pub.trim() + '\n');
 
-// Même assistant que generer-licence.cmd, mais qui appelle la copie locale.
+// Fenêtre du générateur (UTF-8 avec BOM conservé par la copie binaire).
+fs.copyFileSync(path.join(ROOT, 'scripts', 'generateur-licence.ps1'), path.join(OUT, 'generateur-licence.ps1'));
+
+// Même lanceur que generer-licence.cmd, mais qui ouvre la copie locale.
 const cmd = fs.readFileSync(path.join(ROOT, 'generer-licence.cmd'), 'utf8')
-  .replace('node scripts\\licence.mjs', 'node outil-licence\\licence.mjs');
-if (!cmd.includes('outil-licence')) throw new Error('generer-licence.cmd : ligne « node scripts\\licence.mjs » introuvable');
+  .replace('%~dp0scripts\\generateur-licence.ps1', '%~dp0outil-licence\\generateur-licence.ps1');
+if (!cmd.includes('outil-licence')) throw new Error('generer-licence.cmd : chemin « scripts\\generateur-licence.ps1 » introuvable');
 fs.writeFileSync(path.join(REL, 'Generer une licence.cmd'), cmd);
 
 console.log(`✔ Générateur de licences déposé dans ${path.relative(ROOT, REL)}\\ (Generer une licence.cmd + outil-licence\\)`);
